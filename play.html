@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arithmetic Game</title>
+<style>
+  /* Deliberately mirrors arithmetic.zetamac.com, which has no dark theme. */
+  :root {
+    --bg: #ffffff;
+    --ink: #000000;
+    --box: #dddddd;
+    --link: #0000ee;
+    --muted: #555555;
+    --good: #1a7f37;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  a { color: var(--link); }
+  input, select, button { font: inherit; color: var(--ink); }
+
+  /* ---- settings screen ---- */
+  #settings { width: 478px; max-width: 100%; margin: 0 auto; background: var(--box); padding: 41px 20px 20px; line-height: 17px; }
+  h1 { font-size: 28px; line-height: 32px; margin: 0 0 19px; }
+  #settings p { margin: 0 0 12px; }
+  #settings p + p { margin-bottom: 17px; }
+  .op + .op { margin-top: 8px; }
+  .op label { display: inline-flex; align-items: center; gap: 7px; }
+  .op input[type=checkbox] { width: 13px; height: 13px; margin: 0 0 0 4px; accent-color: #1a66d6; }
+  .detail { margin: 0 0 0 40px; white-space: nowrap; }
+  .detail input { width: 41px; height: 20px; text-align: right; padding: 0 3px; border: 1px solid #999; border-radius: 3px; background: #fff; }
+  .duration { margin-top: 12px; }
+  .duration select { height: 20px; padding: 0 2px; border: 1px solid #999; border-radius: 3px; background: #fff; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+  .foot a { font-size: 13px; }
+  #start { height: 21px; padding: 0 6px; border: 1px solid #888; border-radius: 3px; background: #f4f4f4; cursor: pointer; line-height: 1; }
+  .custom-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .custom-note:empty { display: none; }
+
+  /* ---- game screen ---- */
+  #game { display: none; }
+  .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
+  .band { background: var(--box); margin-top: 199px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
+  #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
+  #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
+  #end { display: none; text-align: center; padding: 12px 0; }
+  #end .score { font-size: 37px; }
+  #end .links { font-size: 18px; margin-top: 6px; }
+  #end .links a { margin: 0 8px; }
+  #end .saved { font-size: 15px; color: var(--muted); margin-top: 8px; }
+  #end .saved.pb { color: var(--good); font-weight: bold; }
+
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    #settings { margin-top: 0; padding: 28px 14px 16px; }
+    .detail { margin-left: 18px; }
+    .detail input { width: 40px; }
+    .bar { font-size: 18px; padding: 16px 16px 0; }
+    .band { margin-top: 90px; font-size: 30px; }
+    #answer { width: 130px; height: 48px; font-size: 30px; }
+    #end .score { font-size: 32px; }
+    #end .links { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="settings">
+  <h1>Arithmetic Game</h1>
+  <p>The Arithmetic Game is a fast-paced speed drill where you are given two minutes to solve as many arithmetic problems as you can.</p>
+  <p>Games with the default ranges save to your progress tracker.</p>
+
+  <div class="op">
+    <label><input type="checkbox" id="add-on" checked> Addition</label>
+    <div class="detail">Range: (<input id="add-a-lo" value="2"> to <input id="add-a-hi" value="100">) + (<input id="add-b-lo" value="2"> to <input id="add-b-hi" value="100">)</div>
+  </div>
+  <div class="op">
+    <label><input type="checkbox" id="sub-on" checked> Subtraction</label>
+    <div class="detail">Addition problems in reverse.</div>
+  </div>
+  <div class="op">
+    <label><input type="checkbox" id="mul-on" checked> Multiplication</label>
+    <div class="detail">Range: (<input id="mul-a-lo" value="2"> to <input id="mul-a-hi" value="12">) × (<input id="mul-b-lo" value="2"> to <input id="mul-b-hi" value="100">)</div>
+  </div>
+  <div class="op">
+    <label><input type="checkbox" id="div-on" checked> Division</label>
+    <div class="detail">Multiplication problems in reverse.</div>
+  </div>
+
+  <div class="duration">Duration:
+    <select id="duration">
+      <option value="30">30 seconds</option>
+      <option value="60">60 seconds</option>
+      <option value="120" selected>120 seconds</option>
+      <option value="300">300 seconds</option>
+      <option value="600">600 seconds</option>
+    </select>
+  </div>
+  <div class="custom-note" id="custom-note"></div>
+
+  <div class="foot">
+    <a href="/">View progress</a>
+    <button id="start">Start</button>
+  </div>
+</div>
+
+<div id="game">
+  <div class="bar">
+    <span>Seconds left: <span id="secs">120</span></span>
+    <span>Score: <span id="score">0</span></span>
+  </div>
+  <div class="band">
+    <div id="play" style="display:contents">
+      <span id="question"></span><span>=</span>
+      <input id="answer" type="text" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Answer">
+    </div>
+    <div id="end">
+      <div class="score">Score: <span id="final"></span></div>
+      <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="/">View progress</a></div>
+      <div class="saved" id="saved"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const DEFAULTS = {
+  'add-a-lo': 2, 'add-a-hi': 100, 'add-b-lo': 2, 'add-b-hi': 100,
+  'mul-a-lo': 2, 'mul-a-hi': 12, 'mul-b-lo': 2, 'mul-b-hi': 100,
+};
+const input = $('#answer');
+let cfg, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
+
+const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const num = id => parseInt($('#' + id).value, 10);
+
+function readSettings() {
+  const ops = ['add', 'sub', 'mul', 'div'].filter(o => $(`#${o}-on`).checked);
+  const r = {};
+  for (const k in DEFAULTS) r[k] = num(k);
+  const ranged = (a, b) => Number.isFinite(r[a]) && Number.isFinite(r[b]) && r[a] <= r[b];
+  if (!ops.length) return { error: 'Pick at least one operation.' };
+  for (const [lo, hi] of [['add-a-lo', 'add-a-hi'], ['add-b-lo', 'add-b-hi'], ['mul-a-lo', 'mul-a-hi'], ['mul-b-lo', 'mul-b-hi']])
+    if (!ranged(lo, hi)) return { error: 'Each range needs a low number that is not above the high number.' };
+  if ((ops.includes('div')) && r['mul-a-lo'] <= 0 && r['mul-a-hi'] >= 0) return { error: 'Division ranges can’t include 0.' };
+  const duration = parseInt($('#duration').value, 10);
+  const defaultRanges = ops.length === 4 && Object.keys(DEFAULTS).every(k => r[k] === DEFAULTS[k]);
+  const tracked = defaultRanges && (duration === 120 || duration === 30);
+  return { ops, r, duration, tracked };
+}
+
+function updateNote() {
+  const s = readSettings();
+  $('#custom-note').textContent = s.error ? s.error
+    : s.tracked ? (s.duration === 30 ? 'Saved to the 30-second section of your tracker.' : '')
+    : 'Custom settings: this game won’t be saved to your tracker. (Tracked: default ranges at 120 or 30 seconds.)';
+}
+document.querySelectorAll('#settings input, #settings select').forEach(el => el.addEventListener('input', updateNote));
+
+function nextProblem() {
+  const { r, ops } = cfg;
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let q;
+  if (op === 'add' || op === 'sub') {
+    const a = rand(r['add-a-lo'], r['add-a-hi']), b = rand(r['add-b-lo'], r['add-b-hi']);
+    q = op === 'add' ? [`${a} + ${b}`, a + b] : [`${a + b} – ${a}`, b];
+  } else {
+    let a = rand(r['mul-a-lo'], r['mul-a-hi']);
+    while (op === 'div' && a === 0) a = rand(r['mul-a-lo'], r['mul-a-hi']);
+    const b = rand(r['mul-b-lo'], r['mul-b-hi']);
+    q = op === 'mul' ? [`${a} × ${b}`, a * b] : [`${a * b} ÷ ${a}`, b];
+  }
+  $('#question').textContent = q[0];
+  answer = String(q[1]);
+  input.value = '';
+}
+
+function tick() {
+  const left = Math.max(0, Math.ceil((endAt - performance.now()) / 1000));
+  $('#secs').textContent = left;
+  if (left === 0) finish();
+}
+
+function start() {
+  const s = readSettings();
+  if (s.error) { updateNote(); return; }
+  cfg = s;
+  score = 0;
+  $('#score').textContent = 0;
+  $('#settings').style.display = 'none';
+  $('#game').style.display = 'block';
+  $('#end').style.display = 'none';
+  $('#play').style.display = 'contents';
+  input.disabled = false;
+  nextProblem();
+  input.focus();
+  running = true;
+  endAt = performance.now() + cfg.duration * 1000;
+  tick();
+  timer = setInterval(tick, 50);
+}
+
+input.addEventListener('input', () => {
+  if (!running) return;
+  if (input.value.trim() === answer) {
+    score++;
+    $('#score').textContent = score;
+    nextProblem();
+  }
+});
+
+async function save(final) {
+  const saved = $('#saved');
+  saved.className = 'saved';
+  if (!cfg.tracked) { saved.textContent = 'Custom settings: not saved to your tracker.'; return; }
+  const same = history.filter(g => g.seconds === cfg.duration);
+  const prevBest = same.reduce((m, g) => Math.max(m, g.score), 0);
+  saved.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
+      body: new URLSearchParams({ score: final, seconds: cfg.duration }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    history = data;
+    const label = cfg.duration === 30 ? '30-second ' : '';
+    const proj = cfg.duration === 30 ? ` · projects to ${final * 4} in 2 minutes` : '';
+    if (same.length && final > prevBest) {
+      saved.className = 'saved pb';
+      saved.textContent = `New ${label}personal best! (was ${prevBest})${proj}`;
+    } else {
+      saved.textContent = `Saved · ${label}personal best ${Math.max(prevBest, final)}${proj}`;
+    }
+  } catch {
+    saved.innerHTML = 'Couldn’t save — is <code>./zetamac tracker</code> running? <a href="#" id="retry">Retry</a>';
+    $('#retry').onclick = e => { e.preventDefault(); save(final); };
+  }
+}
+
+function finish() {
+  clearInterval(timer);
+  running = false;
+  input.disabled = true;
+  $('#play').style.display = 'none';
+  $('#final').textContent = score;
+  $('#end').style.display = 'block';
+  save(score);
+  // Short pause so keys mashed at the buzzer don't trigger "Try again".
+  setTimeout(() => $('#again').focus(), 700);
+}
+
+$('#start').addEventListener('click', start);
+$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
+$('#change').addEventListener('click', e => {
+  e.preventDefault();
+  $('#game').style.display = 'none';
+  $('#settings').style.display = 'block';
+  $('#start').focus();
+});
+
+fetch('/api/scores').then(r => r.json()).then(d => { history = d; }).catch(() => {});
+$('#start').focus();
+</script>
+</body>
+</html>
