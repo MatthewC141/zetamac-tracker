@@ -2,3 +2,4 @@ zetamac
 scores.csv
 *.tmp
 .DS_Store
+details/

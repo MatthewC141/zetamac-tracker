@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script src="store.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squares Game</title>
+<style>
+  /* Same look as play.html (the zetamac clone). */
+  :root {
+    --bg: #ffffff;
+    --ink: #000000;
+    --box: #dddddd;
+    --link: #0000ee;
+    --muted: #555555;
+    --good: #1a7f37;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  a { color: var(--link); }
+  input, select, button { font: inherit; color: var(--ink); }
+
+  /* ---- settings screen ---- */
+  #settings { width: 478px; max-width: 100%; margin: 0 auto; background: var(--box); padding: 41px 20px 20px; line-height: 17px; }
+  h1 { font-size: 28px; line-height: 32px; margin: 0 0 19px; }
+  #settings p { margin: 0 0 17px; }
+  .op + .op { margin-top: 8px; }
+  .op label { display: inline-flex; align-items: center; gap: 7px; }
+  .op input { width: 13px; height: 13px; margin: 0 0 0 4px; accent-color: #1a66d6; }
+  .group { margin-bottom: 14px; }
+  .detail { margin: 0 0 0 40px; }
+  .duration { margin-top: 12px; }
+  .duration select { height: 20px; padding: 0 2px; border: 1px solid #999; border-radius: 3px; background: #fff; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
+  .foot a { font-size: 13px; }
+  #start { height: 21px; padding: 0 6px; border: 1px solid #888; border-radius: 3px; background: #f4f4f4; cursor: pointer; line-height: 1; }
+  .custom-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .custom-note:empty { display: none; }
+
+  /* ---- game screen ---- */
+  #game { display: none; }
+  .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
+  .band { background: var(--box); margin-top: 199px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
+  #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
+  #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
+  #end { display: none; text-align: center; padding: 12px 0; }
+  #end .score { font-size: 37px; }
+  #end .pace { font-size: 16px; color: var(--muted); margin-top: 4px; }
+  #end .pace:empty { display: none; }
+  #end .links { font-size: 18px; margin-top: 6px; }
+  #end .links a { margin: 0 8px; }
+  #end .saved { font-size: 15px; color: var(--muted); margin-top: 8px; }
+  #end .saved.pb { color: var(--good); font-weight: bold; }
+
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    #settings { margin-top: 0; padding: 28px 14px 16px; }
+    .detail { margin-left: 18px; }
+    .band { margin-top: 90px; font-size: 30px; }
+    #answer { width: 150px; height: 48px; font-size: 30px; }
+    #end .score { font-size: 32px; }
+    #end .links { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="settings">
+  <h1>Squares Game</h1>
+  <p>Square as many numbers as you can before the time runs out. Games at 120 or 30 seconds save to your progress tracker.</p>
+
+  <div class="group">
+    <div class="op"><label><input type="radio" name="range" value="99" checked> Two-digit squares <span style="color:var(--muted)">(1–99)</span></label></div>
+    <div class="op"><label><input type="radio" name="range" value="999"> Three-digit squares <span style="color:var(--muted)">(100–999)</span></label></div>
+  </div>
+  <div class="op">
+    <label><input type="checkbox" id="hard"> Hard mode</label>
+    <div class="detail" id="hard-detail"></div>
+  </div>
+
+  <div class="duration">Duration:
+    <select id="duration">
+      <option value="30">30 seconds</option>
+      <option value="120" selected>120 seconds</option>
+      <option value="0">Endless</option>
+    </select>
+  </div>
+  <div class="custom-note" id="custom-note"></div>
+
+  <div class="foot">
+    <span><a href="./">View progress</a> · <a href="play.html">Arithmetic game</a> · <a href="practice.html">Practice</a></span>
+    <button id="start">Start</button>
+  </div>
+</div>
+
+<div id="game">
+  <div class="bar">
+    <span><span id="clock-label">Seconds left:</span> <span id="secs">120</span></span>
+    <a href="#" id="stop" hidden>Stop</a>
+    <span>Score: <span id="score">0</span></span>
+  </div>
+  <div class="band">
+    <div id="play" style="display:contents">
+      <span id="question"></span><span>=</span>
+      <input id="answer" type="text" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Answer">
+    </div>
+    <div id="end">
+      <div class="score">Score: <span id="final"></span></div>
+      <div class="pace" id="pace"></div>
+      <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="./">View progress</a></div>
+      <div class="saved" id="saved"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const MODE_NAMES = { sq99: 'Two-digit squares', sq99h: 'Two-digit squares, hard', sq999: 'Three-digit squares', sq999h: 'Three-digit squares, hard' };
+const input = $('#answer');
+let log = [], current = null, prevLen = 0, startAt = 0, cfg, pool = [], last = 0, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
+
+// Numbers that can come up. Hard mode drops numbers ending in 5 (x5² is a trick) and, for
+// two-digit squares, 1–20, which most people already know by heart.
+function buildPool(range, hard) {
+  const [lo, hi] = range === '99' ? [1, 99] : [100, 999];
+  const out = [];
+  for (let n = lo; n <= hi; n++) {
+    if (hard && n % 10 === 5) continue;
+    if (hard && range === '99' && n <= 20) continue;
+    out.push(n);
+  }
+  return out;
+}
+
+function readSettings() {
+  const range = document.querySelector('input[name=range]:checked').value;
+  const hard = $('#hard').checked;
+  const duration = parseInt($('#duration').value, 10);
+  const mode = `sq${range}${hard ? 'h' : ''}`;
+  return { range, hard, duration, mode, tracked: [120, 30, 0].includes(duration) };
+}
+
+function updateNote() {
+  const s = readSettings();
+  $('#hard-detail').textContent = s.range === '99'
+    ? 'Skips numbers ending in 5, and 1–20.'
+    : 'Skips numbers ending in 5.';
+  $('#custom-note').textContent = !s.tracked ? 'Only 120-second, 30-second and endless games save to your tracker.'
+    : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : '';
+}
+document.querySelectorAll('#settings input, #settings select').forEach(el => el.addEventListener('input', updateNote));
+
+function nextProblem() {
+  let n;
+  do n = pool[Math.floor(Math.random() * pool.length)]; while (n === last && pool.length > 1);
+  last = n;
+  $('#question').textContent = `${n}²`;
+  answer = String(n * n);
+  input.value = '';
+  prevLen = 0;
+  current = { q: `${n}²`, a: n * n, o: 'sq', c: 0, shownAt: performance.now() };
+}
+
+const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+function tick() {
+  if (cfg.duration === 0) {  // endless: count up instead of down
+    $('#secs').textContent = clock(Math.floor((performance.now() - startAt) / 1000));
+    return;
+  }
+  const left = Math.max(0, Math.ceil((endAt - performance.now()) / 1000));
+  $('#secs').textContent = left;
+  if (left === 0) finish();
+}
+
+function start() {
+  cfg = readSettings();
+  pool = buildPool(cfg.range, cfg.hard);
+  score = 0;
+  log = [];
+  $('#score').textContent = 0;
+  $('#settings').style.display = 'none';
+  $('#game').style.display = 'block';
+  $('#end').style.display = 'none';
+  $('#play').style.display = 'contents';
+  input.disabled = false;
+  nextProblem();
+  input.focus();
+  running = true;
+  startAt = performance.now();
+  endAt = startAt + cfg.duration * 1000;
+  $('#clock-label').textContent = cfg.duration === 0 ? 'Time:' : 'Seconds left:';
+  $('#stop').hidden = cfg.duration !== 0;
+  tick();
+  timer = setInterval(tick, 50);
+}
+
+input.addEventListener('input', () => {
+  if (!running) return;
+  // A shorter value than last time means the player deleted something: count it as a correction.
+  if (input.value.length < prevLen) current.c++;
+  prevLen = input.value.length;
+  if (input.value.trim() === answer) {
+    log.push({ ...current, t: Math.round(performance.now() - current.shownAt), shownAt: undefined });
+    score++;
+    $('#score').textContent = score;
+    nextProblem();
+  }
+});
+
+async function save(final, elapsed) {
+  const saved = $('#saved');
+  saved.className = 'saved';
+  if (!cfg.tracked) { saved.textContent = 'Only 120-second, 30-second and endless games save to your tracker.'; return; }
+  if (cfg.duration === 0 && final === 0) { saved.textContent = 'Empty run: not saved.'; return; }
+  const same = history.filter(g => g.seconds === cfg.duration && g.mode === cfg.mode);
+  const prevBest = same.reduce((m, g) => Math.max(m, g.score), 0);
+  saved.textContent = 'Saving…';
+  try {
+    const r = await fetch('api/game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
+      body: new URLSearchParams({ score: final, elapsed, detail: JSON.stringify(log), seconds: cfg.duration, mode: cfg.mode }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error);
+    history = data;
+    const mine = history[history.length - 1];  // the server appends, so the newest row is this game
+    const label = `${MODE_NAMES[cfg.mode]}${cfg.duration === 30 ? ', 30 s' : cfg.duration === 0 ? ', endless' : ''}`;
+    if (cfg.duration === 0 && final > prevBest) {
+      saved.className = 'saved pb';
+      saved.textContent = same.length ? `New longest endless run! (was ${prevBest}) · ${label}` : `First endless run saved — that’s your record to beat. · ${label}`;
+    } else if (same.length && final > prevBest) {
+      saved.className = 'saved pb';
+      saved.textContent = `New personal best! (was ${prevBest}) · ${label}`;
+    } else {
+      saved.textContent = `Saved · personal best ${Math.max(prevBest, final)} · ${label}`;
+    }
+    if (mine && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
+  } catch {
+    saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
+    $('#retry').onclick = e => { e.preventDefault(); save(final, elapsed); };
+  }
+}
+
+function finish() {
+  clearInterval(timer);
+  running = false;
+  const elapsed = Math.max(1, Math.round((performance.now() - startAt) / 1000));
+  $('#stop').hidden = true;
+  $('#pace').textContent = cfg.duration === 0
+    ? `${clock(elapsed)} · ${score ? `${((performance.now() - startAt) / 1000 / score).toFixed(2)} s per problem` : 'no problems answered'}`
+    : '';
+  input.disabled = true;
+  $('#play').style.display = 'none';
+  $('#final').textContent = score;
+  $('#end').style.display = 'block';
+  save(score, elapsed);
+  // Short pause so keys mashed at the buzzer don't trigger "Try again".
+  setTimeout(() => $('#again').focus(), 700);
+}
+
+$('#start').addEventListener('click', start);
+$('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && running && cfg.duration === 0) finish();
+});
+$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
+$('#change').addEventListener('click', e => {
+  e.preventDefault();
+  $('#game').style.display = 'none';
+  $('#settings').style.display = 'block';
+  $('#start').focus();
+});
+
+fetch('api/scores').then(r => r.json()).then(d => { history = d; }).catch(() => {});
+updateNote();
+$('#start').focus();
+</script>
+</body>
+</html>

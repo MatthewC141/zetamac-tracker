@@ -7,6 +7,7 @@
 //   ./zetamac tracker [PORT]  open the progress dashboard (default port 8777)
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <csignal>
@@ -47,7 +48,8 @@ constexpr int kAddLo = 2, kAddHi = 100;
 constexpr int kMulLeftLo = 2, kMulLeftHi = 12;
 constexpr int kMulRightLo = 2, kMulRightHi = 100;
 
-static fs::path g_home;  // folder holding scores.csv, dashboard.html and play.html
+static fs::path g_home;  // folder holding scores.csv and the pages (index.html, play.html, …)
+static int g_port = 8777;  // port the tracker listens on (checked against each request's Host)
 
 // ---- Small helpers ----------------------------------------------------------
 
@@ -124,9 +126,17 @@ struct Entry {
   int score = 0;
   int seconds = kDuration;
   std::string source;  // "game" or "manual"
+  std::string mode = "standard";  // "standard", or a squares mode (see kModes)
+  int elapsed = 0;  // endless runs (seconds == 0): how long the run lasted, in seconds
 };
 
-static const char* kHeader = "timestamp,date,score,seconds,source";
+// Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 5,
+// and no 1–20 in the 1–99 range). Practice drills: subtraction with / without borrowing, and
+// "guided" (the arithmetic game with guided mode on, kept apart from real scores).
+static const std::set<std::string> kModes = {"standard", "sq99",       "sq99h",    "sq999",
+                                             "sq999h",   "sub-borrow", "sub-easy", "guided"};
+
+static const char* kHeader = "timestamp,date,score,seconds,source,mode,elapsed";
 
 static fs::path scores_path() { return g_home / "scores.csv"; }
 
@@ -144,6 +154,15 @@ static std::vector<Entry> load_scores() {
       continue;
     std::getline(ss, secs, ',');
     std::getline(ss, e.source, ',');
+    std::getline(ss, e.mode, ',');
+    std::string elapsed;
+    std::getline(ss, elapsed, ',');
+    if (!elapsed.empty()) {
+      try {
+        e.elapsed = std::stoi(elapsed);
+      } catch (...) {
+      }
+    }
     try {
       e.score = std::stoi(score);
       e.seconds = secs.empty() ? kDuration : std::stoi(secs);
@@ -152,6 +171,7 @@ static std::vector<Entry> load_scores() {
     }
     if (!valid_date(e.date)) continue;
     if (e.source.empty()) e.source = "manual";
+    if (e.mode.empty()) e.mode = "standard";  // rows from before modes existed
     list.push_back(e);
   }
   return list;
@@ -159,7 +179,7 @@ static std::vector<Entry> load_scores() {
 
 static std::string entry_line(const Entry& e) {
   return e.ts + "," + e.date + "," + std::to_string(e.score) + "," + std::to_string(e.seconds) + "," +
-         e.source + "\n";
+         e.source + "," + e.mode + "," + std::to_string(e.elapsed) + "\n";
 }
 
 static bool save_all(const std::vector<Entry>& list) {
@@ -186,8 +206,10 @@ static bool append_score(const Entry& e) {
   return static_cast<bool>(f);
 }
 
-static Entry make_entry(int score, const std::string& date, const std::string& source, int seconds = kDuration) {
+static Entry make_entry(int score, const std::string& date, const std::string& source, int seconds = kDuration,
+                        const std::string& mode = "standard") {
   Entry e;
+  e.mode = mode;
   e.date = date;
   e.score = score;
   e.seconds = seconds;
@@ -211,7 +233,7 @@ static Summary summarize(const std::vector<Entry>& list) {
   int today_sum = 0;
   for (const Entry& e : list) {
     dates.insert(e.date);  // any game counts toward days played and the streak
-    if (e.seconds != kDuration) continue;
+    if (e.seconds != kDuration || e.mode != "standard") continue;
     s.games++;
     s.best = std::max(s.best, e.score);
     if (e.date == t) {
@@ -260,7 +282,7 @@ static void print_summary(const std::vector<Entry>& list) {
   out(buf);
   std::vector<Entry> full;
   for (const Entry& e : list)
-    if (e.seconds == kDuration) full.push_back(e);
+    if (e.seconds == kDuration && e.mode == "standard") full.push_back(e);
   if (!full.empty()) out("  Last games  " + sparkline(full, 20) + "\n");
 }
 
@@ -480,6 +502,38 @@ static std::string json_escape(const std::string& s) {
   return r;
 }
 
+// ---- Per-question details (details/<timestamp>.json) -----------------------
+// The browser game sends a JSON array with one object per question it asked. The server doesn't
+// interpret it; it checks the shape loosely and stores it next to the score it belongs to.
+
+static bool valid_ts(const std::string& ts) {
+  if (ts.size() != 19 || ts[10] != 'T') return false;
+  for (char c : ts)
+    if (!(std::isdigit(static_cast<unsigned char>(c)) || c == '-' || c == ':' || c == 'T')) return false;
+  return true;
+}
+
+static fs::path detail_path(const std::string& ts) {
+  std::string name = ts;
+  std::replace(name.begin(), name.end(), ':', '-');
+  return g_home / "details" / (name + ".json");
+}
+
+static bool valid_detail(const std::string& d) {
+  if (d.size() < 2 || d.size() > 2000000 || d.front() != '[' || d.back() != ']') return false;
+  for (char c : d)
+    if (static_cast<unsigned char>(c) < 0x20) return false;
+  return true;
+}
+
+static bool save_detail(const std::string& ts, const std::string& detail) {
+  std::error_code ec;
+  fs::create_directories(g_home / "details", ec);
+  std::ofstream f(detail_path(ts), std::ios::trunc);
+  f << detail;
+  return static_cast<bool>(f);
+}
+
 static std::string scores_json() {
   std::vector<Entry> list = load_scores();
   std::string j = "[";
@@ -488,7 +542,9 @@ static std::string scores_json() {
     if (i) j += ",";
     j += "{\"i\":" + std::to_string(i) + ",\"ts\":\"" + json_escape(e.ts) + "\",\"date\":\"" +
          json_escape(e.date) + "\",\"score\":" + std::to_string(e.score) +
-         ",\"seconds\":" + std::to_string(e.seconds) + ",\"source\":\"" + json_escape(e.source) + "\"}";
+         ",\"seconds\":" + std::to_string(e.seconds) + ",\"source\":\"" + json_escape(e.source) + "\",\"mode\":\"" + json_escape(e.mode) +
+         "\",\"elapsed\":" + std::to_string(e.elapsed) +
+         ",\"detail\":" + (valid_ts(e.ts) && fs::exists(detail_path(e.ts)) ? "true" : "false") + "}";
   }
   return j + "]";
 }
@@ -531,7 +587,9 @@ static bool parse_int(const std::string& s, int& v) {
 static void respond(int fd, const std::string& status, const std::string& type, const std::string& body) {
   std::string r = "HTTP/1.1 " + status + "\r\nContent-Type: " + type +
                   "\r\nContent-Length: " + std::to_string(body.size()) +
-                  "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n" + body;
+                  "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY"
+                  "\r\nContent-Security-Policy: frame-ancestors 'none'\r\nReferrer-Policy: no-referrer"
+                  "\r\nConnection: close\r\n\r\n" + body;
   const char* p = r.data();
   size_t left = r.size();
   while (left > 0) {
@@ -553,16 +611,38 @@ static int parse_seconds(const std::map<std::string, std::string>& form) {
   return it->second == "30" ? 30 : 0;
 }
 
+// Game mode for a posted score: "standard" unless a known squares mode is given. Empty if invalid.
+static std::string parse_mode(const std::map<std::string, std::string>& form) {
+  auto it = form.find("mode");
+  if (it == form.end() || it->second.empty()) return "standard";
+  return kModes.count(it->second) ? it->second : "";
+}
+
+// The Host a request was sent to. Only our own address is accepted, so a website that points its
+// domain at 127.0.0.1 (DNS rebinding) can't read or change scores through the victim's browser.
+static bool allowed_host(const std::string& lower_head) {
+  size_t h = lower_head.find("\r\nhost:");
+  if (h == std::string::npos) return false;
+  size_t start = h + 7, end = lower_head.find("\r\n", start);
+  std::string host = lower_head.substr(start, end == std::string::npos ? std::string::npos : end - start);
+  host.erase(0, host.find_first_not_of(" \t"));
+  host.erase(host.find_last_not_of(" \t") + 1);
+  const std::string port = ":" + std::to_string(g_port);
+  return host == "127.0.0.1" + port || host == "localhost" + port;
+}
+
 static void handle_client(int fd) {
   timeval tv{3, 0};
   setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+  // One request at a time, so a client that trickles bytes must not hold the server for long.
+  const auto deadline = Clock::now() + std::chrono::seconds(10);
 
   std::string req;
   char buf[8192];
   size_t header_end;
   while ((header_end = req.find("\r\n\r\n")) == std::string::npos) {
     ssize_t n = recv(fd, buf, sizeof buf, 0);
-    if (n <= 0 || req.size() > 65536) return;
+    if (n <= 0 || req.size() > 65536 || Clock::now() > deadline) return;
     req.append(buf, static_cast<size_t>(n));
   }
   std::string head = req.substr(0, header_end);
@@ -572,11 +652,11 @@ static void handle_client(int fd) {
   size_t content_length = 0;
   size_t cl = lower.find("\r\ncontent-length:");
   if (cl != std::string::npos) content_length = std::strtoul(lower.c_str() + cl + 17, nullptr, 10);
-  if (content_length > 65536) return;
+  if (content_length > 2100000) return;  // room for long endless-run details
   size_t body_start = header_end + 4;
   while (req.size() - body_start < content_length) {
     ssize_t n = recv(fd, buf, sizeof buf, 0);
-    if (n <= 0) return;
+    if (n <= 0 || Clock::now() > deadline) return;
     req.append(buf, static_cast<size_t>(n));
   }
   std::string body = req.substr(body_start, content_length);
@@ -584,17 +664,46 @@ static void handle_client(int fd) {
   std::stringstream first(head.substr(0, head.find("\r\n")));
   std::string method, path;
   first >> method >> path;
+  std::string query = path.find('?') == std::string::npos ? "" : path.substr(path.find('?') + 1);
   path = path.substr(0, path.find('?'));
+  if (!allowed_host(lower)) return respond_error(fd, "421 Misdirected Request", "Open the tracker at http://127.0.0.1:" + std::to_string(g_port) + "/");
 
-  if (method == "GET" && (path == "/" || path == "/index.html" || path == "/play")) {
-    std::string page = path == "/play" ? "play.html" : "dashboard.html";
+  // Pages by file name (the links between them are relative, so the same files also work as a
+  // static website) plus the short names older bookmarks use.
+  static const std::map<std::string, std::string> kPages = {
+      {"/", "index.html"},          {"/index.html", "index.html"},     {"/play", "play.html"},
+      {"/play.html", "play.html"},  {"/squares", "squares.html"},      {"/squares.html", "squares.html"},
+      {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"}};
+  if (method == "GET" && kPages.count(path)) {
+    const std::string& page = kPages.at(path);
     std::ifstream f(g_home / page);
     if (!f) return respond_error(fd, "500 Internal Server Error", page + " not found next to zetamac");
     std::stringstream ss;
     ss << f.rdbuf();
-    return respond(fd, "200 OK", "text/html; charset=utf-8", ss.str());
+    const bool js = page == "store.js";
+    return respond(fd, "200 OK", js ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8", ss.str());
+  }
+  if (method == "GET" && path.rfind("/fonts/", 0) == 0) {  // self-hosted webfonts for the dashboard
+    std::string name = path.substr(7);
+    bool ok = name.size() > 6 && name.size() < 64 && name.compare(name.size() - 6, 6, ".woff2") == 0;
+    for (size_t i = 0; ok && i + 6 < name.size(); i++) ok = std::isalnum(static_cast<unsigned char>(name[i])) || name[i] == '-';
+    if (!ok) return respond_error(fd, "404 Not Found", "not found");
+    std::ifstream f(g_home / "fonts" / name, std::ios::binary);
+    if (!f) return respond_error(fd, "404 Not Found", "not found");
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return respond(fd, "200 OK", "font/woff2", ss.str());
   }
   if (method == "GET" && path == "/api/scores") return respond(fd, "200 OK", "application/json", scores_json());
+  if (method == "GET" && path == "/api/detail") {
+    std::string ts = parse_form(query)["ts"];
+    if (!valid_ts(ts)) return respond_error(fd, "400 Bad Request", "Bad game timestamp.");
+    std::ifstream f(detail_path(ts));
+    if (!f) return respond_error(fd, "404 Not Found", "No question-by-question data for this game.");
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return respond(fd, "200 OK", "application/json", "{\"ts\":\"" + ts + "\",\"questions\":" + ss.str() + "}");
+  }
 
   if (method == "POST") {
     // Custom header forces a CORS preflight, so other websites can't post here.
@@ -611,18 +720,29 @@ static void handle_client(int fd) {
       if (date > today()) return respond_error(fd, "400 Bad Request", "That date is in the future.");
       int seconds = parse_seconds(form);
       if (!seconds) return respond_error(fd, "400 Bad Request", "Game length must be 30 or 120 seconds.");
-      if (!append_score(make_entry(score, date, "manual", seconds)))
+      std::string mode = parse_mode(form);
+      if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
+      if (!append_score(make_entry(score, date, "manual", seconds, mode)))
         return respond_error(fd, "500 Internal Server Error", "Could not write scores.csv.");
       return respond(fd, "200 OK", "application/json", scores_json());
     }
     if (path == "/api/game") {  // a finished round from the browser game: always today
-      int score;
-      if (!parse_int(form["score"], score) || score > 500)
-        return respond_error(fd, "400 Bad Request", "Score must be a whole number from 0 to 500.");
-      int seconds = parse_seconds(form);
-      if (!seconds) return respond_error(fd, "400 Bad Request", "Game length must be 30 or 120 seconds.");
-      if (!append_score(make_entry(score, today(), "game", seconds)))
+      // seconds=0 is an endless run: no timer, score = questions answered, elapsed = run length.
+      bool endless = form["seconds"] == "0";
+      int score, elapsed = 0;
+      if (!parse_int(form["score"], score) || score > (endless ? 999999 : 500))
+        return respond_error(fd, "400 Bad Request", "Score is out of range.");
+      int seconds = endless ? 0 : parse_seconds(form);
+      if (!endless && !seconds) return respond_error(fd, "400 Bad Request", "Game length must be 30 or 120 seconds.");
+      if (endless && !parse_int(form["elapsed"], elapsed))
+        return respond_error(fd, "400 Bad Request", "Endless runs need an elapsed time in seconds.");
+      std::string mode = parse_mode(form);
+      if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
+      Entry e = make_entry(score, today(), "game", seconds, mode);
+      e.elapsed = elapsed;
+      if (!append_score(e))
         return respond_error(fd, "500 Internal Server Error", "Could not write scores.csv.");
+      if (valid_detail(form["detail"])) save_detail(e.ts, form["detail"]);
       return respond(fd, "200 OK", "application/json", scores_json());
     }
     if (path == "/api/delete") {
@@ -632,6 +752,8 @@ static void handle_client(int fd) {
         return respond_error(fd, "400 Bad Request", "No such entry.");
       if (form["ts"] != list[static_cast<size_t>(index)].ts)
         return respond_error(fd, "409 Conflict", "Scores changed since the page loaded — refresh and try again.");
+      std::error_code ec;
+      if (valid_ts(list[static_cast<size_t>(index)].ts)) fs::remove(detail_path(list[static_cast<size_t>(index)].ts), ec);
       list.erase(list.begin() + index);
       if (!save_all(list)) return respond_error(fd, "500 Internal Server Error", "Could not write scores.csv.");
       return respond(fd, "200 OK", "application/json", scores_json());
@@ -641,6 +763,7 @@ static void handle_client(int fd) {
 }
 
 static int cmd_tracker(int port) {
+  g_port = port;
   std::signal(SIGPIPE, SIG_IGN);
   int srv = socket(AF_INET, SOCK_STREAM, 0);
   if (srv < 0) {
@@ -724,7 +847,7 @@ int main(int argc, char** argv) {
   }
   if (cmd == "tracker" || cmd == "serve") {
     int port = 8777;
-    if (argc > 2 && !parse_int(argv[2], port)) {
+    if (argc > 2 && (!parse_int(argv[2], port) || port < 1 || port > 65535)) {
       std::fprintf(stderr, "zetamac: bad port\n");
       return 1;
     }

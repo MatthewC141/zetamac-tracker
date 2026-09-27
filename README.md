@@ -20,7 +20,7 @@ make            # builds ./zetamac (needs a C++17 compiler)
 
 ## The game
 
-The browser game at `/play` looks and plays like zetamac, including the settings page. Its defaults
+The browser game (`play.html`) looks and plays like zetamac, including the settings page. Its defaults
 are the same as zetamac's:
 
 - **Addition:** (2–100) + (2–100)
@@ -32,6 +32,37 @@ are the same as zetamac's:
 A correct answer is accepted the moment you type it, with no Enter. Games with the default ranges
 at 120 or 30 seconds are saved to the tracker. Games with other settings are not saved, so every
 score on the chart is comparable.
+
+## Squares game
+
+`squares.html` (the **Squares** button) asks for two-digit squares (1–99) or three-digit squares
+(100–999). **Hard mode** skips numbers ending in 5, and for two-digit squares also skips 1–20. Games
+at 120 or 30 seconds are saved, and each of the four modes gets its own chart on the dashboard.
+
+## Practice
+
+`practice.html` (the **Practice** button) drills one kind of problem, untimed by default (120 and 30
+seconds are options). Problems come from zetamac's subtraction range:
+
+- **Subtraction with borrowing:** the ones digit being subtracted is bigger, like 62 – 17.
+- **Subtraction without borrowing:** every other case, like 68 – 23 or 64 – 24.
+
+The dashboard's **Practice** section shows each drill's games, bests, and average time per question.
+
+## Endless mode
+
+Pick **Endless** as the duration in either game to play with no timer. The clock counts up, and you
+stop with **Stop** or Esc. Each run saves how many questions you answered and how long it took. The
+dashboard's **Endless runs** section shows your longest run for arithmetic and for squares, your
+total endless questions, and your top 10 runs with their seconds per problem.
+
+## Question-by-question times
+
+Every browser game records how long each question took and how many times you backspaced. In
+**Recent games**, click a game marked ▶ to expand it: average, median, fastest and slowest times,
+your average for each operation, a bar per question, and the full list of questions (sortable
+slowest first). The **See breakdown** link on the end screen opens the same view. The data lives in
+`details/`, one JSON file per game.
 
 ## Dashboard
 
@@ -48,8 +79,19 @@ score on the chart is comparable.
 ## Data
 
 Scores live in `scores.csv` next to the binary, one row per game:
-`timestamp,date,score,seconds,source`. The file is not committed to git. You can edit it by hand or
+`timestamp,date,score,seconds,source,mode,elapsed`. The file is not committed to git. You can edit it by hand or
 back it up. Set `ZETAMAC_HOME` to keep the data somewhere else, and `ZETAMAC_NO_OPEN=1` to stop
 `tracker` from opening a browser.
 
 The server only listens on 127.0.0.1 and has no login, so don't expose it to the internet.
+
+## Website
+
+The same pages also work as a static website, such as GitHub Pages. With no server behind them,
+`store.js` keeps each visitor's scores in their own browser (localStorage), so everyone starts with
+an empty tracker and no one sees anyone else's scores. Clearing site data, a private window or a
+different device starts fresh. Opened through `./zetamac tracker`, the pages use `scores.csv` as
+usual.
+
+To publish: on GitHub, **Settings → Pages → Deploy from a branch**, branch `main`, folder `/ (root)`.
+The site appears at `https://<user>.github.io/<repo>/`.

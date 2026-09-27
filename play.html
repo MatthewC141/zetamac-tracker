@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="store.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arithmetic Game</title>
@@ -42,10 +43,46 @@
   #game { display: none; }
   .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
   .band { background: var(--box); margin-top: 199px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
+  /* Guided mode: 30 + 160 + 9 = the band's usual 199px offset, so the band stays put. */
+  #guide { max-width: 720px; height: 160px; margin: 30px auto 0; padding: 12px 16px; overflow: auto;
+           border: 1px dashed #bbb; border-radius: 6px; font-size: 20px; line-height: 1.4; text-align: center;
+           display: none; flex-direction: column; justify-content: center; }
+  .guided #guide { display: flex; }
+  .guided .band { margin-top: 9px; }
+  #guide .guide-empty { color: var(--muted); font-size: 15px; }
+  /* The worked problem sits in a box of its operation's color (set per problem in renderGuide). */
+  #guide { --gc: #999; }
+  #guide .ggrid, #guide .ldiv { border: 2px solid var(--gc); border-radius: 8px; padding: 4px 14px 0; }
+  /* --c-add etc. come from the guide color settings (applyGuideColors). */
+  #guide[data-op="add"] { --gc: var(--c-add); }
+  #guide[data-op="sub"] { --gc: var(--c-sub); }
+  #guide[data-op="mul"] { --gc: var(--c-mul); }
+  #guide[data-op="div"] { --gc: var(--c-div); }
+  #guide.no-color .ggrid, #guide.no-color .ldiv { border-color: transparent; }
+  #guide-colors { margin-top: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  #guide-colors[hidden] { display: none; }
+  #guide-colors .sw { display: inline-flex; align-items: center; gap: 3px; }
+  #guide-colors input[type=color] { width: 24px; height: 18px; padding: 0; border: 1px solid #999; border-radius: 3px; background: #fff; cursor: pointer; }
+  #guide-colors input[type=color]:disabled { opacity: .35; cursor: default; }
+  #guide-colors a { font-size: 13px; }
+  /* Column-sum layout used by guides: one cell per digit, a rule, and an empty answer row. */
+  .gcap { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .ggrid { display: inline-grid; align-self: center; font-size: 30px; line-height: 1.15; }
+  .gd { text-align: center; min-width: .75em; }
+  .gd.overlap { background: color-mix(in srgb, var(--gc) 18%, transparent); border-radius: 3px; }
+  .gd.sign { color: var(--muted); }
+  .grule { grid-column: 1 / -1; border-top: 2px solid var(--ink); height: 1.15em; margin-top: 3px; }
+  /* Long division: the quotient space sits above the bar, blank. */
+  .ldiv { display: inline-flex; align-self: center; align-items: flex-end; font-size: 30px; line-height: 1.15; padding-top: 1.3em; }
+  .ldiv-d { padding: 0 .25em 0 0; }
+  .ldiv-n { border-top: 2px solid var(--ink); border-left: 2px solid var(--ink); border-top-left-radius: 10px 60%;
+            padding: 2px .35em 0 .4em; letter-spacing: .08em; }
   #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
   #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
   #end { display: none; text-align: center; padding: 12px 0; }
   #end .score { font-size: 37px; }
+  #end .pace { font-size: 16px; color: var(--muted); margin-top: 4px; }
+  #end .pace:empty { display: none; }
   #end .links { font-size: 18px; margin-top: 6px; }
   #end .links a { margin: 0 8px; }
   #end .saved { font-size: 15px; color: var(--muted); margin-top: 8px; }
@@ -58,6 +95,7 @@
     .detail input { width: 40px; }
     .bar { font-size: 18px; padding: 16px 16px 0; }
     .band { margin-top: 90px; font-size: 30px; }
+    #guide { height: 120px; margin: 16px 12px 0; font-size: 17px; }
     #answer { width: 130px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
     #end .links { font-size: 17px; }
@@ -87,29 +125,41 @@
     <label><input type="checkbox" id="div-on" checked> Division</label>
     <div class="detail">Multiplication problems in reverse.</div>
   </div>
+  <div class="op" style="margin-top:14px">
+    <label><input type="checkbox" id="guided"> Guided mode</label>
+    <div class="detail" style="white-space:normal">Shows what to picture in your head above the answer box. Saved separately from your real scores.</div>
+    <div class="detail" id="guide-colors" hidden>
+      <label><input type="checkbox" id="gc-on" checked> Color-code by operation</label>
+      <span class="sw">+ <input type="color" id="gc-add" aria-label="Addition color"></span>
+      <span class="sw">– <input type="color" id="gc-sub" aria-label="Subtraction color"></span>
+      <span class="sw">× <input type="color" id="gc-mul" aria-label="Multiplication color"></span>
+      <span class="sw">÷ <input type="color" id="gc-div" aria-label="Division color"></span>
+      <a href="#" id="gc-reset">Reset</a>
+    </div>
+  </div>
 
   <div class="duration">Duration:
     <select id="duration">
       <option value="30">30 seconds</option>
-      <option value="60">60 seconds</option>
       <option value="120" selected>120 seconds</option>
-      <option value="300">300 seconds</option>
-      <option value="600">600 seconds</option>
+      <option value="0">Endless</option>
     </select>
   </div>
   <div class="custom-note" id="custom-note"></div>
 
   <div class="foot">
-    <a href="/">View progress</a>
+    <span><a href="./">View progress</a> · <a href="squares.html">Squares game</a> · <a href="practice.html">Practice</a></span>
     <button id="start">Start</button>
   </div>
 </div>
 
 <div id="game">
   <div class="bar">
-    <span>Seconds left: <span id="secs">120</span></span>
+    <span><span id="clock-label">Seconds left:</span> <span id="secs">120</span></span>
+    <a href="#" id="stop" hidden>Stop</a>
     <span>Score: <span id="score">0</span></span>
   </div>
+  <div id="guide" aria-live="polite"></div>
   <div class="band">
     <div id="play" style="display:contents">
       <span id="question"></span><span>=</span>
@@ -117,7 +167,8 @@
     </div>
     <div id="end">
       <div class="score">Score: <span id="final"></span></div>
-      <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="/">View progress</a></div>
+      <div class="pace" id="pace"></div>
+      <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="./">View progress</a></div>
       <div class="saved" id="saved"></div>
     </div>
   </div>
@@ -130,7 +181,7 @@ const DEFAULTS = {
   'mul-a-lo': 2, 'mul-a-hi': 12, 'mul-b-lo': 2, 'mul-b-hi': 100,
 };
 const input = $('#answer');
-let cfg, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
+let log = [], current = null, prevLen = 0, startAt = 0, cfg, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
 
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const num = id => parseInt($('#' + id).value, 10);
@@ -145,18 +196,128 @@ function readSettings() {
     if (!ranged(lo, hi)) return { error: 'Each range needs a low number that is not above the high number.' };
   if ((ops.includes('div')) && r['mul-a-lo'] <= 0 && r['mul-a-hi'] >= 0) return { error: 'Division ranges can’t include 0.' };
   const duration = parseInt($('#duration').value, 10);
-  const defaultRanges = ops.length === 4 && Object.keys(DEFAULTS).every(k => r[k] === DEFAULTS[k]);
-  const tracked = defaultRanges && (duration === 120 || duration === 30);
-  return { ops, r, duration, tracked };
+  const guided = $('#guided').checked;
+  // Guided games are saved separately, so they may leave operations out.
+  const defaultRanges = (guided || ops.length === 4) && Object.keys(DEFAULTS).every(k => r[k] === DEFAULTS[k]);
+  const tracked = defaultRanges && [120, 30, 0].includes(duration);
+  return { ops, r, duration, tracked, guided, mode: guided ? 'guided' : 'standard' };
 }
 
 function updateNote() {
   const s = readSettings();
   $('#custom-note').textContent = s.error ? s.error
-    : s.tracked ? (s.duration === 30 ? 'Saved to the 30-second section of your tracker.' : '')
-    : 'Custom settings: this game won’t be saved to your tracker. (Tracked: default ranges at 120 or 30 seconds.)';
+    : s.tracked ? (s.duration === 30 ? 'Saved to the 30-second section of your tracker.'
+      : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : '')
+    : 'Custom settings: this game won’t be saved to your tracker. (Tracked: default ranges at 120, 30 seconds or endless.)';
 }
 document.querySelectorAll('#settings input, #settings select').forEach(el => el.addEventListener('input', updateNote));
+
+
+// ---- Guided mode ----
+// What to picture for each kind of problem. Each guide gets the problem and what's typed so far:
+//   p = { op, x, y, answer, text }   e.g. 83 – 47 → { op: 'sub', x: 83, y: 47, answer: 36, text: '83 – 47' }
+//   typed = the answer box's current contents ('' at first)
+// and returns HTML for the guide area, or null for an empty area. It's re-run on every keystroke,
+// so a guide can move on as the answer is typed. An op with no guide shows a placeholder.
+const GUIDES = {
+  add: p => stackGuide(p.x, p.y, '+'),
+  sub: p => stackGuide(p.x, p.y, '–'),
+  mul: p => ((p.x === 11 || p.y === 11) && elevenGuide(p.x === 11 ? p.y : p.x)) || splitGuide(p.x, p.y),
+  div: p => p.y === 11 ? longDivisionGuide(p.x, p.y) : divisionGuide(p.x, p.y),
+};
+
+// Two numbers stacked by place value with the sign and a blank answer row under them:
+//    5 4
+//  + 8 7
+//  ─────
+function stackGuide(top, bottom, sign) {
+  const a = String(top), b = String(bottom);
+  const width = Math.max(a.length, b.length);
+  const row = s => [...s.padStart(width, ' ')].map(d => `<span class="gd">${d.trim()}</span>`).join('');
+  return `<div class="ggrid" style="grid-template-columns: repeat(${width + 1}, auto)">` +
+    '<span class="gd"></span>' + row(a) +
+    `<span class="gd sign">${sign}</span>` + row(b) +
+    '<span class="grule"></span></div>';
+}
+
+// Written long-division setup, d ) n, with the answer space above the bar left blank.
+function longDivisionGuide(n, d) {
+  return `<div class="ldiv"><span class="ldiv-d">${d}</span><span class="ldiv-n">${n}</span></div>`;
+}
+
+// n ÷ d: put n on top and, under it, the biggest round multiple of d that fits (434 ÷ 7 → 420,
+// which is 7 × 60), so the gap between them (14 = 7 × 2) is what's left to divide. If the answer
+// is itself a round number (120 ÷ 3 = 40), that multiple would give it away, so step down one ten
+// (90, which is 3 × 30). When there's no round multiple left to take off, there's no guide.
+function divisionGuide(n, d) {
+  let tens = Math.floor(n / d / 10) * 10;
+  if (d * tens === n) tens -= 10;
+  if (tens <= 0) return null;
+  return `<div class="gcap">${n} ÷ ${d} — ${d * tens} is ${d} × ${tens}</div>` + stackGuide(n, d * tens, '–');
+}
+
+// m × n with n two digits: split n into tens and ones, multiply each by m, and add. 7 × 43 →
+// 7 × 40 = 280 on top, 7 × 3 = 21 below. Nothing to split (both one digit), or a round n
+// (7 × 40, 7 × 100), means no guide.
+function splitGuide(x, y) {
+  const n = Math.max(x, y), m = Math.min(x, y);
+  if (n < 10 || n > 99 || n % 10 === 0) return null;
+  const tens = n - n % 10, ones = n % 10;
+  return `<div class="gcap">${m} × ${tens} on top, ${m} × ${ones} below</div>` + stackGuide(m * tens, m * ones, '+');
+}
+
+// Two-digit n × 11: spread n out with a 0 in the middle (43 → 403), then write the sum of its
+// digits under the 0 (4 + 3 = 7), carrying into the hundreds column when it's 10 or more
+// (58 → 508, with 13 under it). 403 + 70 is the answer; the answer row is left blank on purpose.
+// Other sizes of n (one digit, or 100) don't fit this pattern, so they get no guide.
+function elevenGuide(n) {
+  if (n < 10 || n > 99) return null;
+  const first = Math.floor(n / 10), last = n % 10, sum = first + last;
+  const cell = (v, cls = '') => `<span class="gd ${cls}">${v}</span>`;
+  const top = [first, 0, last];
+  const bottom = sum < 10 ? ['', sum, ''] : [Math.floor(sum / 10), sum % 10, ''];
+  return `<div class="gcap">${n} × 11 — spread it out, then add ${first} + ${last} under the 0</div>` +
+    '<div class="ggrid" style="grid-template-columns: repeat(4, auto)">' +
+    cell('') + top.map(v => cell(v)).join('') +
+    cell('+', 'sign') + bottom.map(v => cell(v, v === '' ? '' : 'overlap')).join('') +
+    '<span class="grule"></span></div>';
+}
+const OP_LABELS = { add: 'addition', sub: 'subtraction', mul: 'multiplication', div: 'division' };
+let problem = null;
+
+// Guide colors: one per operation, can be switched off or changed; remembered per browser.
+const GUIDE_COLOR_DEFAULTS = { add: '#1a8a3a', sub: '#d0342c', mul: '#1f5fd6', div: '#e07b00' };
+const guideColors = { on: true, ...GUIDE_COLOR_DEFAULTS };
+try { Object.assign(guideColors, JSON.parse(localStorage.getItem('zm-guide-colors') || '{}')); } catch {}
+
+function applyGuideColors() {
+  const g = $('#guide');
+  for (const op in GUIDE_COLOR_DEFAULTS) {
+    g.style.setProperty(`--c-${op}`, guideColors[op]);
+    $(`#gc-${op}`).value = guideColors[op];
+    $(`#gc-${op}`).disabled = !guideColors.on;
+  }
+  g.classList.toggle('no-color', !guideColors.on);
+  $('#gc-on').checked = guideColors.on;
+  try { localStorage.setItem('zm-guide-colors', JSON.stringify(guideColors)); } catch {}
+}
+for (const op in GUIDE_COLOR_DEFAULTS) $(`#gc-${op}`).addEventListener('input', e => { guideColors[op] = e.target.value; applyGuideColors(); });
+$('#gc-on').addEventListener('change', e => { guideColors.on = e.target.checked; applyGuideColors(); });
+$('#gc-reset').addEventListener('click', e => { e.preventDefault(); Object.assign(guideColors, { on: true, ...GUIDE_COLOR_DEFAULTS }); applyGuideColors(); });
+// The color options only matter in guided mode.
+const showGuideColors = () => { $('#guide-colors').hidden = !$('#guided').checked; };
+$('#guided').addEventListener('change', showGuideColors);
+showGuideColors();
+applyGuideColors();
+
+function renderGuide() {
+  if (!cfg.guided || !problem) return;
+  const guide = GUIDES[problem.op];
+  $('#guide').dataset.op = problem.op;
+  $('#guide').innerHTML = guide
+    ? (guide(problem, input.value) ?? '')
+    : `<span class="guide-empty">Guide for ${OP_LABELS[problem.op]} isn’t set up yet.</span>`;
+}
 
 function nextProblem() {
   const { r, ops } = cfg;
@@ -164,19 +325,29 @@ function nextProblem() {
   let q;
   if (op === 'add' || op === 'sub') {
     const a = rand(r['add-a-lo'], r['add-a-hi']), b = rand(r['add-b-lo'], r['add-b-hi']);
-    q = op === 'add' ? [`${a} + ${b}`, a + b] : [`${a + b} – ${a}`, b];
+    q = op === 'add' ? [`${a} + ${b}`, a + b, a, b] : [`${a + b} – ${a}`, b, a + b, a];
   } else {
     let a = rand(r['mul-a-lo'], r['mul-a-hi']);
     while (op === 'div' && a === 0) a = rand(r['mul-a-lo'], r['mul-a-hi']);
     const b = rand(r['mul-b-lo'], r['mul-b-hi']);
-    q = op === 'mul' ? [`${a} × ${b}`, a * b] : [`${a * b} ÷ ${a}`, b];
+    q = op === 'mul' ? [`${a} × ${b}`, a * b, a, b] : [`${a * b} ÷ ${a}`, b, a * b, a];
   }
   $('#question').textContent = q[0];
   answer = String(q[1]);
   input.value = '';
+  prevLen = 0;
+  current = { q: q[0], a: q[1], o: op, c: 0, shownAt: performance.now() };
+  problem = { op, x: q[2], y: q[3], answer: q[1], text: q[0] };
+  renderGuide();
 }
 
+const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
 function tick() {
+  if (cfg.duration === 0) {  // endless: count up instead of down
+    $('#secs').textContent = clock(Math.floor((performance.now() - startAt) / 1000));
+    return;
+  }
   const left = Math.max(0, Math.ceil((endAt - performance.now()) / 1000));
   $('#secs').textContent = left;
   if (left === 0) finish();
@@ -187,72 +358,99 @@ function start() {
   if (s.error) { updateNote(); return; }
   cfg = s;
   score = 0;
+  log = [];
   $('#score').textContent = 0;
   $('#settings').style.display = 'none';
   $('#game').style.display = 'block';
+  $('#game').classList.toggle('guided', cfg.guided);
   $('#end').style.display = 'none';
   $('#play').style.display = 'contents';
   input.disabled = false;
   nextProblem();
   input.focus();
   running = true;
-  endAt = performance.now() + cfg.duration * 1000;
+  startAt = performance.now();
+  endAt = startAt + cfg.duration * 1000;
+  $('#clock-label').textContent = cfg.duration === 0 ? 'Time:' : 'Seconds left:';
+  $('#stop').hidden = cfg.duration !== 0;
   tick();
   timer = setInterval(tick, 50);
 }
 
 input.addEventListener('input', () => {
   if (!running) return;
+  // A shorter value than last time means the player deleted something: count it as a correction.
+  if (input.value.length < prevLen) current.c++;
+  prevLen = input.value.length;
+  renderGuide();
   if (input.value.trim() === answer) {
+    log.push({ ...current, t: Math.round(performance.now() - current.shownAt), shownAt: undefined });
     score++;
     $('#score').textContent = score;
     nextProblem();
   }
 });
 
-async function save(final) {
+async function save(final, elapsed) {
   const saved = $('#saved');
   saved.className = 'saved';
   if (!cfg.tracked) { saved.textContent = 'Custom settings: not saved to your tracker.'; return; }
-  const same = history.filter(g => g.seconds === cfg.duration);
+  if (cfg.duration === 0 && final === 0) { saved.textContent = 'Empty run: not saved.'; return; }
+  const hidden = cfg.mode === 'guided';  // guided games are saved, but hidden from the tracker for now
+  const same = history.filter(g => g.seconds === cfg.duration && (g.mode || 'standard') === cfg.mode);
   const prevBest = same.reduce((m, g) => Math.max(m, g.score), 0);
   saved.textContent = 'Saving…';
   try {
-    const r = await fetch('/api/game', {
+    const r = await fetch('api/game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
-      body: new URLSearchParams({ score: final, seconds: cfg.duration }),
+      body: new URLSearchParams({ score: final, elapsed, detail: JSON.stringify(log), seconds: cfg.duration, mode: cfg.mode }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error);
     history = data;
-    const label = cfg.duration === 30 ? '30-second ' : '';
+    const mine = history[history.length - 1];  // the server appends, so the newest row is this game
+    if (hidden) { saved.textContent = 'Saved · guided games are hidden from your tracker for now'; return; }
+    const label = cfg.duration === 30 ? '30-second ' : cfg.duration === 0 ? 'endless ' : '';
     const proj = cfg.duration === 30 ? ` · projects to ${final * 4} in 2 minutes` : '';
-    if (same.length && final > prevBest) {
+    if (cfg.duration === 0 && final > prevBest) {
+      saved.className = 'saved pb';
+      saved.textContent = same.length ? `New longest endless run! (was ${prevBest})` : 'First endless run saved — that’s your record to beat.';
+    } else if (same.length && final > prevBest) {
       saved.className = 'saved pb';
       saved.textContent = `New ${label}personal best! (was ${prevBest})${proj}`;
     } else {
       saved.textContent = `Saved · ${label}personal best ${Math.max(prevBest, final)}${proj}`;
     }
+    if (mine && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
   } catch {
-    saved.innerHTML = 'Couldn’t save — is <code>./zetamac tracker</code> running? <a href="#" id="retry">Retry</a>';
-    $('#retry').onclick = e => { e.preventDefault(); save(final); };
+    saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
+    $('#retry').onclick = e => { e.preventDefault(); save(final, elapsed); };
   }
 }
 
 function finish() {
   clearInterval(timer);
   running = false;
+  const elapsed = Math.max(1, Math.round((performance.now() - startAt) / 1000));
+  $('#stop').hidden = true;
+  $('#pace').textContent = cfg.duration === 0
+    ? `${clock(elapsed)} · ${score ? `${((performance.now() - startAt) / 1000 / score).toFixed(2)} s per problem` : 'no problems answered'}`
+    : '';
   input.disabled = true;
   $('#play').style.display = 'none';
   $('#final').textContent = score;
   $('#end').style.display = 'block';
-  save(score);
+  save(score, elapsed);
   // Short pause so keys mashed at the buzzer don't trigger "Try again".
   setTimeout(() => $('#again').focus(), 700);
 }
 
 $('#start').addEventListener('click', start);
+$('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && running && cfg.duration === 0) finish();
+});
 $('#again').addEventListener('click', e => { e.preventDefault(); start(); });
 $('#change').addEventListener('click', e => {
   e.preventDefault();
@@ -261,7 +459,7 @@ $('#change').addEventListener('click', e => {
   $('#start').focus();
 });
 
-fetch('/api/scores').then(r => r.json()).then(d => { history = d; }).catch(() => {});
+fetch('api/scores').then(r => r.json()).then(d => { history = d; }).catch(() => {});
 $('#start').focus();
 </script>
 </body>
