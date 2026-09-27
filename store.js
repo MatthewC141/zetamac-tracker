@@ -23,10 +23,19 @@
   const parseSeconds = s => (!s || s === '120' ? 120 : s === '30' ? 30 : 0);
   const parseMode = s => (!s ? 'standard' : MODES.has(s) ? s : '');
 
+  // Saved rows are read back as untrusted: a row is kept only if every field has the shape the
+  // server itself would write, and only those fields are kept, so nothing else reaches the page.
+  const whole = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
+  const validRow = e => e && typeof e === 'object' &&
+    typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
+    whole(e.score, 999999) && [0, 30, 120].includes(e.seconds) && whole(e.elapsed, 999999) &&
+    (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode);
   const load = () => {
     try {
       const list = JSON.parse(localStorage.getItem(SCORES) || '[]');
-      return Array.isArray(list) ? list.filter(e => e && typeof e.ts === 'string' && validDate(e.date)) : [];
+      return Array.isArray(list)
+        ? list.filter(validRow).map(({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed }))
+        : [];
     } catch { return []; }
   };
   const store = list => localStorage.setItem(SCORES, JSON.stringify(list));
