@@ -3,6 +3,13 @@
 // Every visitor starts with an empty tracker and nobody sees anyone else's scores. It follows the
 // same rules as the C++ server (zetamac.cpp). Opened from ./zetamac tracker, it does nothing.
 (() => {
+  // Never run inside another site's frame (GitHub Pages can't send X-Frame-Options): hide the page
+  // and take over the whole tab instead, so no one can dress it up and trick a click.
+  if (window.top !== window.self) {
+    document.documentElement.style.display = 'none';
+    try { window.top.location = location.href; } catch {}
+    return;
+  }
   if (['127.0.0.1', 'localhost'].includes(location.hostname)) return;
   window.ZM_WEB = true;
 

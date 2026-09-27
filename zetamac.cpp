@@ -170,6 +170,11 @@ static std::vector<Entry> load_scores() {
       continue;
     }
     if (!valid_date(e.date)) continue;
+    // Hand-edited rows outside what the tracker ever writes are skipped (huge values would
+    // overflow the stats maths).
+    if (e.score < 0 || e.score > 999999 || e.elapsed < 0 || e.elapsed > 999999 ||
+        (e.seconds != 0 && e.seconds != 30 && e.seconds != kDuration))
+      continue;
     if (e.source.empty()) e.source = "manual";
     if (e.mode.empty()) e.mode = "standard";  // rows from before modes existed
     list.push_back(e);
