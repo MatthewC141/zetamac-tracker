@@ -713,7 +713,9 @@ const PRACTICE_MODES = { 'sub-borrow': 'Subtraction with borrowing', 'sub-easy':
 const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borrow practice' };
 // Games that are saved but not shown anywhere on the dashboard (yet).
 const HIDDEN_MODES = new Set(['guided']);
-const modeName = m => m in SQ_MODES ? `${SQ_MODES[m]} squares` : m in PRACTICE_MODES ? PRACTICE_MODES[m] : 'Arithmetic';
+// Table lookups by own key only, so a stray name like "toString" never matches a mode.
+const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
+const modeName = m => has(SQ_MODES, m) ? `${SQ_MODES[m]} squares` : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : 'Arithmetic';
 // The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99').
 let chartGame = 'standard';
 try { chartGame = localStorage.getItem('zm-chart-game') || chartGame; } catch {}
@@ -945,7 +947,7 @@ function renderChart() {
     ].filter(Boolean).join('<br>'),
     tipY: d => d.full ? d.full.best : d.short.best * PROJECT,
     target: chartGame === 'standard' ? TARGET : null,
-    empty: chartGame in PRACTICE_MODES
+    empty: has(PRACTICE_MODES, chartGame)
       ? `No timed runs in the ${RANGE_NAMES[range]} yet. Endless runs show in the Practice and Endless sections below.`
       : `No 2-minute or 30-second games in the ${RANGE_NAMES[range]} yet.`,
   });
@@ -981,12 +983,12 @@ const pace = g => g.elapsed && g.score ? `${(g.elapsed / g.score).toFixed(2)} s`
 
 function renderEndless() {
   const longest = list => list.reduce((b, g) => (!b || g.score > b.score ? g : b), null);
-  const record = (label, g) => g && `<div><span>${label}</span><b>${g.score}</b><em>in ${clock(g.elapsed || 0)} · ${shortDate(parseDate(g.date))}${g.mode in SQ_MODES ? ` · ${SQ_MODES[g.mode]}` : ''}</em></div>`;
+  const record = (label, g) => g && `<div><span>${label}</span><b>${g.score}</b><em>in ${clock(g.elapsed || 0)} · ${shortDate(parseDate(g.date))}${has(SQ_MODES, g.mode) ? ` · ${SQ_MODES[g.mode]}` : ''}</em></div>`;
   const total = endless.reduce((n, g) => n + g.score, 0);
   $('#endless-stats').innerHTML = endless.length ? [
     record('Longest run · Arithmetic', longest(endless.filter(g => (g.mode || 'standard') === 'standard'))),
-    record('Longest run · Squares', longest(endless.filter(g => g.mode in SQ_MODES))),
-    record('Longest run · Practice', longest(endless.filter(g => g.mode in PRACTICE_MODES))),
+    record('Longest run · Squares', longest(endless.filter(g => has(SQ_MODES, g.mode)))),
+    record('Longest run · Practice', longest(endless.filter(g => has(PRACTICE_MODES, g.mode)))),
     `<div><span>Questions answered</span><b>${total}</b><em>across ${plural(endless.length, 'run')}</em></div>`,
   ].filter(Boolean).join('') : '';
 
@@ -1073,7 +1075,7 @@ function renderRecent() {
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${g.mode in SQ_MODES ? `<span class="len sq">${SQ_MODES[g.mode]} squares</span>` : ''}${g.mode in PRACTICE_MODES ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]} squares</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -1149,7 +1151,7 @@ async function renderWeak() {
   const [qs, prevQs] = await Promise.all([load(cur), load(prev)]);
   if (run !== weakRun) return;  // a newer render started while these loaded
 
-  const now = avgBy(qs, q => (q.o in OP_CODES ? q.o : null)), before = avgBy(prevQs, q => (q.o in OP_CODES ? q.o : null));
+  const now = avgBy(qs, q => (has(OP_CODES, q.o) ? q.o : null)), before = avgBy(prevQs, q => (has(OP_CODES, q.o) ? q.o : null));
   const rows = OPS.filter(o => now[o]).map(o => ({ op: o, ...now[o] })).sort((a, b) => b.avg - a.avg);
   if (!rows.length) { el.innerHTML = emptyMsg; return; }
   const fastest = Math.min(...rows.map(r => r.avg)), slowest = rows[0].avg;
@@ -1289,7 +1291,7 @@ function breakdownHTML(qs, sortSlow) {
   const list = rows.map(q => `<tr><td class="src">${q.n}</td><td>${esc(q.q)} = ${esc(q.a)}</td><td class="num ${cls(q.t)}">${secs(q.t)} s</td><td class="num src">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</td></tr>`).join('');
 
   return `<div class="bd-stats">${stats.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>` +
-    `<div class="bd-ops">${ops.map(([o, avg, n]) => `<span><i class="op-${esc(o)}"></i>${OP_NAMES[o] || esc(o)} <b>${secs(avg)} s</b> avg · ${n}</span>`).join('')}` +
+    `<div class="bd-ops">${ops.map(([o, avg, n]) => `<span><i class="op-${esc(o)}"></i>${(has(OP_NAMES, o) ? OP_NAMES[o] : esc(o))} <b>${secs(avg)} s</b> avg · ${n}</span>`).join('')}` +
     `<span>${plural(corrections, 'correction')}</span></div>` +
     `<svg class="bd-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Seconds per question, in order">${svg}</svg>` +
     `<div class="bd-list-head"><span>Every question · red = over 2× your median, green = quick</span><button class="bd-sort" data-slow="${sortSlow ? 1 : 0}">${sortSlow ? 'Show in order' : 'Sort slowest first'}</button></div>` +
@@ -1336,6 +1338,11 @@ function render() {
 
 // ---------- data ----------
 function setGames(list) {
+  // Rows are rendered into the page, so only well-formed ones are used: whole-number figures and
+  // text fields that are text. (Both the server and store.js already write rows this way.)
+  const whole = v => Number.isInteger(v) && v >= 0;
+  list = list.filter(g => g && whole(g.i) && whole(g.score) && whole(g.seconds) && whole(g.elapsed ?? 0) &&
+    typeof g.ts === 'string' && typeof g.date === 'string' && typeof (g.mode ?? '') === 'string' && typeof (g.source ?? '') === 'string');
   list = list.filter(g => !HIDDEN_MODES.has(g.mode));  // each row keeps its server index `i`
   allGames = list;
   // games / sprints: the chosen game's 2-minute and 30-second scores, for the tiles and chart.
@@ -1402,7 +1409,7 @@ $('#add').addEventListener('submit', async e => {
     const seconds = $('#f-len').value, mode = $('#f-mode').value;
     setGames(await api('api/scores', { date: $('#f-date').value, score: $('#f-score').value, seconds, mode }));
     msg.className = 'msg ok';
-    const kind = `${mode in SQ_MODES ? `${SQ_MODES[mode].toLowerCase()} squares, ` : ''}${seconds === '30' ? '30 seconds' : '2 minutes'}`;
+    const kind = `${has(SQ_MODES, mode) ? `${SQ_MODES[mode].toLowerCase()} squares, ` : ''}${seconds === '30' ? '30 seconds' : '2 minutes'}`;
     msg.textContent = `Logged ${$('#f-score').value} (${kind}) for ${shortDate(parseDate($('#f-date').value))}.`;
     $('#f-score').value = '';
     $('#f-score').focus();
@@ -1447,7 +1454,9 @@ $('#recent').addEventListener('keydown', e => {
 async function openFromHash() {
   const m = location.hash.match(/^#game=(.+)$/);
   if (!m) return;
-  const find = () => $(`#recent tr[data-ts="${CSS.escape(decodeURIComponent(m[1]))}"]`);
+  let ts;
+  try { ts = decodeURIComponent(m[1]); } catch { return; }  // a mangled link just opens the page
+  const find = () => $(`#recent tr[data-ts="${CSS.escape(ts)}"]`);
   let tr = find();
   if (!tr) {  // hidden by the filters: show everything, newest first
     Object.assign(recentFilter, { game: 'all', len: 'all', sort: 'new' });
