@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <script src="store.js"></script>
+<link rel="stylesheet" href="launch.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Arithmetic Game</title>
@@ -21,23 +22,6 @@
   a { color: var(--link); }
   input, select, button { font: inherit; color: var(--ink); }
 
-  /* ---- settings screen ---- */
-  #settings { width: 478px; max-width: 100%; margin: 0 auto; background: var(--box); padding: 41px 20px 20px; line-height: 17px; }
-  h1 { font-size: 28px; line-height: 32px; margin: 0 0 19px; }
-  #settings p { margin: 0 0 12px; }
-  #settings p + p { margin-bottom: 17px; }
-  .op + .op { margin-top: 8px; }
-  .op label { display: inline-flex; align-items: center; gap: 7px; }
-  .op input[type=checkbox] { width: 13px; height: 13px; margin: 0 0 0 4px; accent-color: #1a66d6; }
-  .detail { margin: 0 0 0 40px; white-space: nowrap; }
-  .detail input { width: 41px; height: 20px; text-align: right; padding: 0 3px; border: 1px solid #999; border-radius: 3px; background: #fff; }
-  .duration { margin-top: 12px; }
-  .duration select { height: 20px; padding: 0 2px; border: 1px solid #999; border-radius: 3px; background: #fff; }
-  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
-  .foot a { font-size: 13px; }
-  #start { height: 21px; padding: 0 6px; border: 1px solid #888; border-radius: 3px; background: #f4f4f4; cursor: pointer; line-height: 1; }
-  .custom-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
-  .custom-note:empty { display: none; }
 
   /* ---- game screen ---- */
   #game { display: none; }
@@ -59,12 +43,6 @@
   #guide[data-op="mul"] { --gc: var(--c-mul); }
   #guide[data-op="div"] { --gc: var(--c-div); }
   #guide.no-color .ggrid, #guide.no-color .ldiv { border-color: transparent; }
-  #guide-colors { margin-top: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  #guide-colors[hidden] { display: none; }
-  #guide-colors .sw { display: inline-flex; align-items: center; gap: 3px; }
-  #guide-colors input[type=color] { width: 24px; height: 18px; padding: 0; border: 1px solid #999; border-radius: 3px; background: #fff; cursor: pointer; }
-  #guide-colors input[type=color]:disabled { opacity: .35; cursor: default; }
-  #guide-colors a { font-size: 13px; }
   /* Column-sum layout used by guides: one cell per digit, a rule, and an empty answer row. */
   .gcap { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
   .ggrid { display: inline-grid; align-self: center; font-size: 30px; line-height: 1.15; }
@@ -90,9 +68,6 @@
 
   @media (max-width: 600px) {
     body { font-size: 16px; }
-    #settings { margin-top: 0; padding: 28px 14px 16px; }
-    .detail { margin-left: 18px; }
-    .detail input { width: 40px; }
     .bar { font-size: 18px; padding: 16px 16px 0; }
     .band { margin-top: 90px; font-size: 30px; }
     #guide { height: 120px; margin: 16px 12px 0; font-size: 17px; }
@@ -102,56 +77,82 @@
   }
 </style>
 </head>
-<body>
+<body class="launch">
 
-<div id="settings">
-  <h1>Arithmetic Game</h1>
-  <p>The Arithmetic Game is a fast-paced speed drill where you are given two minutes to solve as many arithmetic problems as you can.</p>
-  <p>Games with the default ranges save to your progress tracker.</p>
+<div id="settings" class="lt">
+  <header class="lt-strip">
+    <h1 class="lt-brand">Zetamac<span>Arithmetic</span></h1>
+    <a class="lt-progress" href="./">View progress</a>
+    <nav class="lt-tabs" aria-label="Games">
+      <a href="play.html" aria-current="page">Arithmetic</a>
+      <a href="squares.html">Squares</a>
+      <a href="practice.html">Practice</a>
+    </nav>
+  </header>
 
-  <div class="op">
-    <label><input type="checkbox" id="add-on" checked> Addition</label>
-    <div class="detail">Range: (<input id="add-a-lo" value="2"> to <input id="add-a-hi" value="100">) + (<input id="add-b-lo" value="2"> to <input id="add-b-hi" value="100">)</div>
-  </div>
-  <div class="op">
-    <label><input type="checkbox" id="sub-on" checked> Subtraction</label>
-    <div class="detail">Addition problems in reverse.</div>
-  </div>
-  <div class="op">
-    <label><input type="checkbox" id="mul-on" checked> Multiplication</label>
-    <div class="detail">Range: (<input id="mul-a-lo" value="2"> to <input id="mul-a-hi" value="12">) × (<input id="mul-b-lo" value="2"> to <input id="mul-b-hi" value="100">)</div>
-  </div>
-  <div class="op">
-    <label><input type="checkbox" id="div-on" checked> Division</label>
-    <div class="detail">Multiplication problems in reverse.</div>
-  </div>
-  <div class="op" style="margin-top:14px">
-    <label><input type="checkbox" id="guided"> Guided mode</label>
-    <div class="detail" style="white-space:normal">Shows what to picture in your head above the answer box. Saved separately from your real scores.</div>
-    <div class="detail" id="guide-colors" hidden>
-      <label><input type="checkbox" id="gc-on" checked> Color-code by operation</label>
-      <span class="sw">+ <input type="color" id="gc-add" aria-label="Addition color"></span>
-      <span class="sw">– <input type="color" id="gc-sub" aria-label="Subtraction color"></span>
-      <span class="sw">× <input type="color" id="gc-mul" aria-label="Multiplication color"></span>
-      <span class="sw">÷ <input type="color" id="gc-div" aria-label="Division color"></span>
-      <a href="#" id="gc-reset">Reset</a>
-    </div>
-  </div>
+  <div class="lt-grid">
+    <section class="lt-panel" aria-labelledby="ops-title">
+      <div class="lt-head"><h2 id="ops-title">Operations</h2><span class="sub">zetamac defaults · all four save to your tracker</span></div>
+      <ol class="lt-tower">
+        <li class="lt-row team-add">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Add</span>
+          <span class="lt-body"><span class="lt-name">Addition</span>
+            <span class="lt-range">
+              <span class="pair">(<input class="num" id="add-a-lo" value="2" inputmode="numeric" aria-label="Addition, first number, low"> – <input class="num" id="add-a-hi" value="100" inputmode="numeric" aria-label="Addition, first number, high">)</span>
+              <span class="pair"><span class="op">+</span>(<input class="num" id="add-b-lo" value="2" inputmode="numeric" aria-label="Addition, second number, low"> – <input class="num" id="add-b-hi" value="100" inputmode="numeric" aria-label="Addition, second number, high">)</span>
+            </span></span>
+          <input type="checkbox" class="switch" id="add-on" checked aria-label="Include addition">
+        </li>
+        <li class="lt-row team-sub">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Sub</span>
+          <span class="lt-body"><span class="lt-name">Subtraction</span><span class="lt-detail">Addition problems in reverse</span></span>
+          <input type="checkbox" class="switch" id="sub-on" checked aria-label="Include subtraction">
+        </li>
+        <li class="lt-row team-mul">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Mul</span>
+          <span class="lt-body"><span class="lt-name">Multiplication</span>
+            <span class="lt-range">
+              <span class="pair">(<input class="num" id="mul-a-lo" value="2" inputmode="numeric" aria-label="Multiplication, first number, low"> – <input class="num" id="mul-a-hi" value="12" inputmode="numeric" aria-label="Multiplication, first number, high">)</span>
+              <span class="pair"><span class="op">×</span>(<input class="num" id="mul-b-lo" value="2" inputmode="numeric" aria-label="Multiplication, second number, low"> – <input class="num" id="mul-b-hi" value="100" inputmode="numeric" aria-label="Multiplication, second number, high">)</span>
+            </span></span>
+          <input type="checkbox" class="switch" id="mul-on" checked aria-label="Include multiplication">
+        </li>
+        <li class="lt-row team-div">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Div</span>
+          <span class="lt-body"><span class="lt-name">Division</span><span class="lt-detail">Multiplication problems in reverse</span></span>
+          <input type="checkbox" class="switch" id="div-on" checked aria-label="Include division">
+        </li>
+        <li class="lt-row team-guide mod">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Gde</span>
+          <span class="lt-body"><span class="lt-name">Guided mode</span><span class="lt-detail">Shows what to picture in your head above the answer box. Saved apart from your real scores.</span></span>
+          <input type="checkbox" class="switch" id="guided" aria-label="Guided mode">
+        </li>
+      </ol>
+      <div class="lt-colors" id="guide-colors" hidden>
+        <label class="cc"><input type="checkbox" class="switch" id="gc-on" checked> Color-code by operation</label>
+        <span class="sw">+ <input type="color" id="gc-add" aria-label="Addition color"></span>
+        <span class="sw">– <input type="color" id="gc-sub" aria-label="Subtraction color"></span>
+        <span class="sw">× <input type="color" id="gc-mul" aria-label="Multiplication color"></span>
+        <span class="sw">÷ <input type="color" id="gc-div" aria-label="Division color"></span>
+        <a href="#" id="gc-reset">Reset</a>
+      </div>
+    </section>
 
-  <div class="duration">Duration:
-    <select id="duration">
-      <option value="30">30 seconds</option>
-      <option value="120" selected>120 seconds</option>
-      <option value="0">Endless</option>
-    </select>
-  </div>
-  <div class="custom-note" id="custom-note"></div>
-
-  <div class="foot">
-    <span><a href="./">View progress</a> · <a href="squares.html">Squares game</a> · <a href="practice.html">Practice</a></span>
-    <button id="start">Start</button>
+    <section class="lt-panel" aria-labelledby="len-title">
+      <p class="lt-lede">Solve as many problems as you can. A correct answer is taken the moment you type it, with no Enter.</p>
+      <div class="lt-head"><h2 id="len-title">Length</h2><span class="sub lt-best" id="lt-best"></span></div>
+      <div class="lt-seg" role="radiogroup" aria-labelledby="len-title">
+        <label><input type="radio" name="len" value="30"><b>0:30</b><small>×4 projected</small></label>
+        <label><input type="radio" name="len" value="120" checked><b>2:00</b><small>The score</small></label>
+        <label><input type="radio" name="len" value="0"><b>∞</b><small>Endless</small></label>
+      </div>
+      <input type="hidden" id="duration" value="120">
+      <p class="lt-save"><span class="custom-note" id="custom-note" data-default="Counts toward your 2-minute score."></span></p>
+      <button id="start"><span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="lt-go"><b>Start</b><span>Enter</span></span></button>
+    </section>
   </div>
 </div>
+<script src="launch.js"></script>
 
 <div id="game">
   <div class="bar">

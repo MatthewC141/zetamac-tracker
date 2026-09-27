@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <script src="store.js"></script>
+<link rel="stylesheet" href="launch.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Practice</title>
@@ -21,22 +22,6 @@
   a { color: var(--link); }
   input, select, button { font: inherit; color: var(--ink); }
 
-  /* ---- settings screen ---- */
-  #settings { width: 478px; max-width: 100%; margin: 0 auto; background: var(--box); padding: 41px 20px 20px; line-height: 17px; }
-  h1 { font-size: 28px; line-height: 32px; margin: 0 0 19px; }
-  #settings p { margin: 0 0 17px; }
-  .op + .op { margin-top: 8px; }
-  .op label { display: inline-flex; align-items: center; gap: 7px; }
-  .op input { width: 13px; height: 13px; margin: 0 0 0 4px; accent-color: #1a66d6; }
-  .group { margin-bottom: 14px; }
-  .detail { margin: 1px 0 0 25px; color: var(--muted); font-size: 13px; }
-  .duration { margin-top: 12px; }
-  .duration select { height: 20px; padding: 0 2px; border: 1px solid #999; border-radius: 3px; background: #fff; }
-  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
-  .foot a { font-size: 13px; }
-  #start { height: 21px; padding: 0 6px; border: 1px solid #888; border-radius: 3px; background: #f4f4f4; cursor: pointer; line-height: 1; }
-  .custom-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
-  .custom-note:empty { display: none; }
 
   /* ---- game screen ---- */
   #game { display: none; }
@@ -55,8 +40,6 @@
 
   @media (max-width: 600px) {
     body { font-size: 16px; }
-    #settings { margin-top: 0; padding: 28px 14px 16px; }
-    .detail { margin-left: 18px; }
     .band { margin-top: 90px; font-size: 30px; }
     #answer { width: 150px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
@@ -64,37 +47,51 @@
   }
 </style>
 </head>
-<body>
+<body class="launch">
 
-<div id="settings">
-  <h1>Practice</h1>
-  <p>Drill one kind of problem at a time. Problems come from zetamac’s subtraction range (addition problems in reverse), filtered to the drill you pick. Every run saves to your tracker.</p>
+<div id="settings" class="lt">
+  <header class="lt-strip">
+    <h1 class="lt-brand">Zetamac<span>Practice</span></h1>
+    <a class="lt-progress" href="./">View progress</a>
+    <nav class="lt-tabs" aria-label="Games">
+      <a href="play.html">Arithmetic</a>
+      <a href="squares.html">Squares</a>
+      <a href="practice.html" aria-current="page">Practice</a>
+    </nav>
+  </header>
 
-  <div class="group">
-    <div class="op">
-      <label><input type="radio" name="drill" value="sub-borrow" checked> Subtraction with borrowing</label>
-      <div class="detail">The ones digit being subtracted is bigger, like 62 – 17.</div>
-    </div>
-    <div class="op">
-      <label><input type="radio" name="drill" value="sub-easy"> Subtraction without borrowing</label>
-      <div class="detail">Every other case, like 68 – 23 or 64 – 24.</div>
-    </div>
-  </div>
+  <div class="lt-grid">
+    <section class="lt-panel" aria-labelledby="ops-title">
+      <div class="lt-head"><h2 id="ops-title">Drill</h2><span class="sub">zetamac’s subtraction range</span></div>
+      <ol class="lt-tower">
+        <li class="lt-row team-sub">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Brw</span>
+          <span class="lt-body"><span class="lt-name">Subtraction with borrowing</span><span class="lt-detail">The ones digit being subtracted is bigger, like 62&#8288;&nbsp;–&nbsp;&#8288;17.</span></span>
+          <input type="radio" class="pick" name="drill" value="sub-borrow" checked aria-label="Subtraction with borrowing">
+        </li>
+        <li class="lt-row team-sub">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Sub</span>
+          <span class="lt-body"><span class="lt-name">Subtraction without borrowing</span><span class="lt-detail">Every other case, like 68&#8288;&nbsp;–&nbsp;&#8288;23 or 64&#8288;&nbsp;–&nbsp;&#8288;24.</span></span>
+          <input type="radio" class="pick" name="drill" value="sub-easy" aria-label="Subtraction without borrowing">
+        </li>
+      </ol>
+    </section>
 
-  <div class="duration">Duration:
-    <select id="duration">
-      <option value="0" selected>Endless (no timer)</option>
-      <option value="120">120 seconds</option>
-      <option value="30">30 seconds</option>
-    </select>
-  </div>
-  <div class="custom-note" id="custom-note"></div>
-
-  <div class="foot">
-    <span><a href="./">View progress</a> · <a href="play.html">Arithmetic game</a> · <a href="squares.html">Squares</a></span>
-    <button id="start">Start</button>
+    <section class="lt-panel" aria-labelledby="len-title">
+      <p class="lt-lede">Drill one kind of problem at a time. Problems come from zetamac’s subtraction range (addition problems in reverse), filtered to the drill you pick. Every run saves to your tracker.</p>
+      <div class="lt-head"><h2 id="len-title">Length</h2><span class="sub lt-best" id="lt-best"></span></div>
+      <div class="lt-seg" role="radiogroup" aria-labelledby="len-title">
+        <label><input type="radio" name="len" value="30"><b>0:30</b><small>30 seconds</small></label>
+        <label><input type="radio" name="len" value="120"><b>2:00</b><small>2 minutes</small></label>
+        <label><input type="radio" name="len" value="0" checked><b>∞</b><small>Endless</small></label>
+      </div>
+      <input type="hidden" id="duration" value="0">
+      <p class="lt-save"><span class="custom-note" id="custom-note" data-default="Saves to your practice tracker."></span></p>
+      <button id="start"><span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="lt-go"><b>Start</b><span>Enter</span></span></button>
+    </section>
   </div>
 </div>
+<script src="launch.js"></script>
 
 <div id="game">
   <div class="bar">

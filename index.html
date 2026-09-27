@@ -335,6 +335,9 @@
     .strip { gap: 12px 16px; }
     .nav { margin-left: 0; width: 100%; }
     .nav .play-btn { flex: 1; text-align: center; }
+    .brand { flex: 1; }
+    .help-btn { order: -1; margin-left: auto; padding: 9px 12px; }
+    .brand { order: -2; }
     .panel { padding: 16px 14px 16px; }
     .readout { gap: 6px 18px; }
     /* Stats tables become one block per row, each value labelled, so no column hides off-screen. */
@@ -356,6 +359,90 @@
     .game-pick .dd { flex: 1; }
     .game-pick .dd-btn { min-width: 0; }
   }
+
+  /* ---- first-visit welcome: three steps, shown once, reopened from "How it works" ---- */
+  .help-btn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--line); padding: 10px 14px; border-radius: 3px; cursor: pointer; }
+  .help-btn:hover { color: var(--ink); border-color: #3d4050; }
+  #welcome { width: min(760px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
+  #welcome[open] { display: flex; flex-direction: column; }
+  .w-step { flex: 1 0 auto; }
+  #welcome::backdrop { background: rgba(5, 6, 8, .78); }
+  #welcome[open] { animation: w-in .45s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes w-in { from { opacity: 0; transform: translateY(12px); } }
+  .w-top { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .w-track { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
+  .w-track li { font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .w-track li::before { content: ""; display: block; height: 3px; margin-bottom: 8px; border-radius: 1px; background: var(--line); transition: background-color .4s cubic-bezier(.16, 1, .3, 1); }
+  .w-track li.done::before { background: #6b7080; }
+  .w-track li[aria-current="step"] { color: var(--ink); }
+  .w-track li[aria-current="step"]::before { background: var(--purple); }
+  .w-x { flex: none; width: 36px; height: 36px; display: grid; place-items: center; background: none; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); cursor: pointer; }
+  .w-x:hover { color: var(--ink); border-color: #3d4050; }
+  .w-x svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 1.6; fill: none; }
+  .w-step { padding: 26px 24px 8px; }
+  .w-step[hidden] { display: none; }
+  .w-step.enter { animation: w-step .5s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes w-step { from { opacity: 0; transform: translateX(var(--from, 18px)); } }
+  .w-step h2 { font: 700 34px/1.02 var(--figure); letter-spacing: -.01em; text-transform: none; margin: 0 0 10px; max-width: 20ch; text-wrap: balance; }
+  .w-lede { color: var(--muted); font-size: 16px; line-height: 1.45; margin: 0 0 22px; max-width: 58ch; }
+  .w-lede b { color: var(--ink); font-weight: 600; }
+  .w-grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 24px; align-items: start; }
+  .w-rows { list-style: none; margin: 0; padding: 0; }
+  .w-rows li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0 14px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--grid); }
+  .w-rows li:first-child { border-top: 1px solid var(--grid); }
+  .w-rows .k { font: 700 12px/1.1 var(--label); letter-spacing: .1em; text-transform: uppercase; padding-top: 4px; }
+  .w-rows .v { font-size: 15px; line-height: 1.4; color: var(--muted); }
+  .w-rows .v b { color: var(--ink); font-weight: 600; }
+  /* the small live example beside each step (clearly marked as an example) */
+  .w-step[data-step="0"] .w-demo { margin-top: 4px; }
+  .w-demo { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px 16px; }
+  .w-demo-head { display: flex; justify-content: space-between; font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+  .w-demo-head b { color: var(--ink); font: 700 15px/1 var(--figure); letter-spacing: 0; }
+  .w-q { font: 700 38px/1 var(--figure); white-space: nowrap; }
+  .w-q .typed { display: inline-block; min-width: 2.2ch; border-bottom: 2px solid var(--purple); color: var(--ink); }
+  .w-q .typed.ok { border-color: var(--green); }
+  .w-demo-foot { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+  .w-bar-head { margin: 22px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .w-demo .rail { margin: 0; }
+  .w-demo .rail-fill { transition: none; }
+  .w-demo .tower li { height: auto; grid-template-columns: 16px 4px 38px minmax(0, 1fr) 46px; gap: 0 8px; padding: 8px 4px 8px 0; }
+  .w-demo .track i { transition: none; }
+  .w-demo .tower .pos { font-size: 14px; }
+  .w-demo .tower .code { font-size: 14px; }
+  .w-demo .tower .stripe { height: 18px; }
+  .w-demo .tower .time { font-size: 16px; }
+  .w-demo .tower .track { height: 6px; }
+  .w-foot { display: flex; align-items: center; gap: 10px; padding: 18px 24px 20px; margin-top: 18px; border-top: 1px solid var(--line); }
+  .w-foot .count { margin-right: auto; font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .w-foot button, .w-foot a { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; padding: 12px 18px; border-radius: 3px; cursor: pointer; text-decoration: none; }
+  .w-ghost { background: none; color: var(--muted); border: 1px solid var(--line); }
+  .w-ghost:hover { color: var(--ink); border-color: #3d4050; }
+  .w-go { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
+  .w-go:hover { background: #fff; }
+  .w-foot [hidden] { display: none; }
+  .w-foot .is-placeholder { visibility: hidden; }
+  #welcome :focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+  @media (max-width: 640px) {
+    .w-top { padding: 14px 16px; }
+    .w-step { padding: 16px 16px 0; }
+    .w-lede { margin-bottom: 16px; }
+    .w-step h2 { font-size: 28px; }
+    .w-grid { grid-template-columns: 1fr; gap: 18px; }
+    .w-demo { order: -1; }
+    .w-step[data-step="2"] .w-demo { display: none; }
+    .w-bar-head, .w-bar-head ~ * { display: none; }  /* the 80+ line is in the text above */
+    .w-step[data-step="0"] .w-demo-foot { display: none; }  /* room on a phone; the typing example shows it */  /* the rows say it; the example doesn't fit a phone */
+    .w-rows li { grid-template-columns: 80px minmax(0, 1fr); gap: 0 10px; }
+    #welcome { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
+    .w-foot { padding: 14px 16px 16px; flex-wrap: wrap; }
+    .w-foot .count { width: 100%; margin-bottom: 4px; }
+    .w-foot button, .w-foot a { flex: 1; text-align: center; white-space: nowrap; }
+    .w-foot .w-go { order: 1; flex-basis: 100%; }
+    .w-foot .w-ghost { order: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #welcome[open], .w-step.enter { animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -368,6 +455,7 @@
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="practice.html">Practice</a>
     </nav>
+    <button class="help-btn" id="help-open" type="button">How it works</button>
   </header>
 
   <div class="banner" id="banner">Can't reach the tracker server. Start it with <code>./zetamac tracker</code> and reload.</div>
@@ -535,6 +623,81 @@
     </section>
 </main>
 
+
+<dialog id="welcome" aria-labelledby="w-title-0">
+  <div class="w-top">
+    <ol class="w-track" aria-label="Steps">
+      <li aria-current="step">Zetamac</li><li>The games</li><li>Your tracker</li>
+    </ol>
+    <button class="w-x" type="button" data-w="close" aria-label="Close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></button>
+  </div>
+
+  <section class="w-step" data-step="0" aria-labelledby="w-title-0">
+    <div class="w-grid">
+      <div>
+      <h2 id="w-title-0">Two minutes. As many sums as you can.</h2>
+      <p class="w-lede">Zetamac is a speed drill for mental arithmetic. You get <b>120 seconds</b> of addition, subtraction, multiplication and division, and your score is how many you get right.</p>
+      <ul class="w-rows">
+        <li class="plain"><span class="k">Interviews</span><span class="v">Quant and trading interviews often include a <b>timed arithmetic test</b> like this. Many people training for them aim for <b>80+</b>.</span></li>
+        <li class="plain"><span class="k">Speed</span><span class="v">Daily rounds make the <b>common facts automatic</b>, so you stop working out 7&nbsp;×&nbsp;8 and just know it.</span></li>
+        <li class="plain"><span class="k">One number</span><span class="v">Every day ends with <b>one honest score</b> to beat tomorrow.</span></li>
+      </ul>
+      </div>
+      <div class="w-demo" aria-hidden="true">
+        <div class="w-demo-head"><span>Example round</span><span>Score <b id="w-score">0</b></span></div>
+        <div class="w-q"><span id="w-prob">47 + 38</span> = <span class="typed" id="w-typed"></span></div>
+        <p class="w-demo-foot">A right answer counts the moment it’s typed. No Enter.</p>
+        <div class="w-demo-head w-bar-head"><span>The bar to beat</span></div>
+        <div class="rail"><div class="rail-scale"><span>0</span><span>100</span></div><div class="rail-track"></div>
+          <div class="rail-fill" style="width:58%"></div><div class="rail-mark" style="left:80%"></div><span class="rail-label" style="left:80%">TARGET 80</span></div>
+        <p class="w-demo-foot">Example: a 58 today. The tracker keeps every score against the 80 line.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="w-step" data-step="1" aria-labelledby="w-title-1" hidden>
+    <h2 id="w-title-1">Three games. Every question timed.</h2>
+    <p class="w-lede">Pick a game and a length on its start screen, then press <b>Enter</b>. Every question is timed, so the tracker can see where your time goes.</p>
+    <ul class="w-rows">
+      <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock and records seconds per problem.</span></li>
+      <li class="plain"><span class="k">Squares</span><span class="v">Two-digit or three-digit squares, with a <b>hard mode</b> that skips the easy ones.</span></li>
+      <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, like <b>subtraction with borrowing</b>. Untimed by default.</span></li>
+      <li class="plain"><span class="k">Guided</span><span class="v">An arithmetic option that shows <b>what to picture in your head</b> for each problem. Kept apart from your real scores.</span></li>
+    </ul>
+  </section>
+
+  <section class="w-step" data-step="2" aria-labelledby="w-title-2" hidden>
+    <h2 id="w-title-2">Your tracker shows what’s slowing you down.</h2>
+    <p class="w-lede" id="w-store">Every game you play saves itself here.</p>
+    <div class="w-grid">
+      <ul class="w-rows">
+        <li class="plain"><span class="k">Weak spots</span><span class="v">Operations ranked <b>slowest first</b>, and the question types that cost you most.</span></li>
+        <li class="plain"><span class="k">2-min score</span><span class="v">Your best this week against the <b>80 target</b>, plus your last 10 games.</span></li>
+        <li class="plain"><span class="k">Chart</span><span class="v">Daily bests over a month, 3 months or a year. 30-second rounds show projected ×4.</span></li>
+        <li class="plain"><span class="k">Results</span><span class="v">Every game. <b>Open one</b> to see how long each question took.</span></li>
+        <li class="plain"><span class="k">Log a score</span><span class="v">Add rounds you played on the real zetamac site.</span></li>
+      </ul>
+      <div class="w-demo" aria-hidden="true">
+        <div class="w-demo-head"><span>Example weak spots</span></div>
+        <ol class="tower">
+          <li class="op-div s-yellow"><span class="pos">1</span><span class="stripe"></span><span class="code">DIV</span><span class="track"><i style="width:100%"></i></span><span class="time">2.06<small>s</small></span></li>
+          <li class="op-add s-yellow"><span class="pos">2</span><span class="stripe"></span><span class="code">ADD</span><span class="track"><i style="width:87%"></i></span><span class="time">1.79<small>s</small></span></li>
+          <li class="op-mul s-green"><span class="pos">3</span><span class="stripe"></span><span class="code">MUL</span><span class="track"><i style="width:76%"></i></span><span class="time">1.57<small>s</small></span></li>
+          <li class="op-sub s-purple"><span class="pos">4</span><span class="stripe"></span><span class="code">SUB</span><span class="track"><i style="width:72%"></i></span><span class="time">1.49<small>s</small></span></li>
+        </ol>
+        <p class="w-demo-foot">Seconds per question. Purple is your fastest, green got faster, yellow got slower.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="w-foot">
+    <span class="count" id="w-count">1 of 3</span>
+    <button class="w-ghost" type="button" data-w="back">Back</button>
+    <button class="w-ghost" type="button" data-w="close" id="w-look" hidden>Look around</button>
+    <button class="w-go" type="button" data-w="next" autofocus>Next</button>
+    <a class="w-go" href="play.html" id="w-play" hidden>Play a 2-minute round</a>
+  </div>
+</dialog>
 <script>
 const $ = s => document.querySelector(s);
 const DAY = 864e5;
@@ -1440,6 +1603,84 @@ document.addEventListener('keydown', e => {
 });
 
 load().then(openFromHash);
+
+// ---------- first-visit welcome (three steps; "How it works" reopens it) ----------
+(() => {
+  const dlg = $('#welcome');
+  const steps = [...dlg.querySelectorAll('.w-step')];
+  const track = [...dlg.querySelectorAll('.w-track li')];
+  const btn = name => dlg.querySelector(`[data-w="${name}"]:not(#w-look)`);
+  let at = 0;
+  if (window.ZM_WEB) $('#w-store').textContent = 'Every game you play saves itself here, in this browser only, so each person who visits starts with an empty tracker.';
+
+  const show = (i, dir = 1) => {
+    at = Math.max(0, Math.min(steps.length - 1, i));
+    steps.forEach((s, k) => { s.hidden = k !== at; s.classList.remove('enter'); });
+    steps[at].style.setProperty('--from', `${dir * 18}px`);
+    void steps[at].offsetWidth;
+    steps[at].classList.add('enter');
+    track.forEach((li, k) => { li.classList.toggle('done', k < at); k === at ? li.setAttribute('aria-current', 'step') : li.removeAttribute('aria-current'); });
+    dlg.setAttribute('aria-labelledby', `w-title-${at}`);
+    $('#w-count').textContent = `${at + 1} of ${steps.length}`;
+    const last = at === steps.length - 1;
+    // Back keeps its place on step one (invisible), so the buttons never move under a finger.
+    btn('back').classList.toggle('is-placeholder', at === 0);
+    btn('back').disabled = at === 0;
+    btn('next').hidden = last;
+    $('#w-look').hidden = !last;
+    $('#w-play').hidden = !last;
+    (last ? $('#w-play') : btn('next')).focus();
+  };
+  const seen = () => { try { localStorage.setItem('zm-welcome-seen', '1'); } catch {} };
+  const open = () => { show(0); dlg.showModal(); show(0); demo.start(); };
+  dlg.addEventListener('close', () => { seen(); demo.stop(); });
+  dlg.addEventListener('click', e => {
+    const w = e.target.closest('[data-w]')?.dataset.w;
+    if (w === 'next') show(at + 1, 1);
+    else if (w === 'back') show(at - 1, -1);
+    else if (w === 'close') dlg.close();
+    else if (e.target === dlg) dlg.close();  // a click on the backdrop
+  });
+  $('#w-play').addEventListener('click', seen);
+  dlg.addEventListener('keydown', e => {
+    if (e.target.closest('a, button') && (e.key === 'Enter' || e.key === ' ')) return;
+    if (e.key === 'ArrowRight') show(at + 1, 1);
+    else if (e.key === 'ArrowLeft') show(at - 1, -1);
+  });
+  $('#help-open').addEventListener('click', open);
+
+  // The example round on step one: a problem is typed out and taken the moment it's right.
+  const demo = (() => {
+    const probs = [['47 + 38', '85'], ['9 × 64', '576'], ['132 – 57', '75'], ['378 ÷ 7', '54'], ['86 + 29', '115']];
+    let timer = 0, running = false;
+    const typed = $('#w-typed'), prob = $('#w-prob'), score = $('#w-score');
+    const run = (i, n) => {
+      const [q, a] = probs[i % probs.length];
+      prob.textContent = q; typed.textContent = ''; typed.classList.remove('ok');
+      let k = 0;
+      const type = () => {
+        if (!running) return;
+        typed.textContent = a.slice(0, ++k);
+        if (k < a.length) { timer = setTimeout(type, 170); return; }
+        typed.classList.add('ok'); score.textContent = n + 1;
+        timer = setTimeout(() => run(i + 1, n + 1), 650);
+      };
+      timer = setTimeout(type, 500);
+    };
+    return {
+      start() {
+        running = true; clearTimeout(timer);
+        if (reduceMotion.matches) { prob.textContent = '47 + 38'; typed.textContent = '85'; typed.classList.add('ok'); score.textContent = '1'; return; }
+        score.textContent = '0'; run(0, 0);
+      },
+      stop() { running = false; clearTimeout(timer); },
+    };
+  })();
+
+  let first = false;
+  try { first = !localStorage.getItem('zm-welcome-seen'); } catch {}
+  if (first) open();
+})();
 </script>
 </body>
 </html>

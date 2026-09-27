@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <script src="store.js"></script>
+<link rel="stylesheet" href="launch.css">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Squares Game</title>
@@ -21,22 +22,6 @@
   a { color: var(--link); }
   input, select, button { font: inherit; color: var(--ink); }
 
-  /* ---- settings screen ---- */
-  #settings { width: 478px; max-width: 100%; margin: 0 auto; background: var(--box); padding: 41px 20px 20px; line-height: 17px; }
-  h1 { font-size: 28px; line-height: 32px; margin: 0 0 19px; }
-  #settings p { margin: 0 0 17px; }
-  .op + .op { margin-top: 8px; }
-  .op label { display: inline-flex; align-items: center; gap: 7px; }
-  .op input { width: 13px; height: 13px; margin: 0 0 0 4px; accent-color: #1a66d6; }
-  .group { margin-bottom: 14px; }
-  .detail { margin: 0 0 0 40px; }
-  .duration { margin-top: 12px; }
-  .duration select { height: 20px; padding: 0 2px; border: 1px solid #999; border-radius: 3px; background: #fff; }
-  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
-  .foot a { font-size: 13px; }
-  #start { height: 21px; padding: 0 6px; border: 1px solid #888; border-radius: 3px; background: #f4f4f4; cursor: pointer; line-height: 1; }
-  .custom-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
-  .custom-note:empty { display: none; }
 
   /* ---- game screen ---- */
   #game { display: none; }
@@ -55,8 +40,6 @@
 
   @media (max-width: 600px) {
     body { font-size: 16px; }
-    #settings { margin-top: 0; padding: 28px 14px 16px; }
-    .detail { margin-left: 18px; }
     .band { margin-top: 90px; font-size: 30px; }
     #answer { width: 150px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
@@ -64,35 +47,56 @@
   }
 </style>
 </head>
-<body>
+<body class="launch">
 
-<div id="settings">
-  <h1>Squares Game</h1>
-  <p>Square as many numbers as you can before the time runs out. Games at 120 or 30 seconds save to your progress tracker.</p>
+<div id="settings" class="lt">
+  <header class="lt-strip">
+    <h1 class="lt-brand">Zetamac<span>Squares</span></h1>
+    <a class="lt-progress" href="./">View progress</a>
+    <nav class="lt-tabs" aria-label="Games">
+      <a href="play.html">Arithmetic</a>
+      <a href="squares.html" aria-current="page">Squares</a>
+      <a href="practice.html">Practice</a>
+    </nav>
+  </header>
 
-  <div class="group">
-    <div class="op"><label><input type="radio" name="range" value="99" checked> Two-digit squares <span style="color:var(--muted)">(1–99)</span></label></div>
-    <div class="op"><label><input type="radio" name="range" value="999"> Three-digit squares <span style="color:var(--muted)">(100–999)</span></label></div>
-  </div>
-  <div class="op">
-    <label><input type="checkbox" id="hard"> Hard mode</label>
-    <div class="detail" id="hard-detail"></div>
-  </div>
+  <div class="lt-grid">
+    <section class="lt-panel" aria-labelledby="ops-title">
+      <div class="lt-head"><h2 id="ops-title">Squares</h2><span class="sub">each mode keeps its own chart</span></div>
+      <ol class="lt-tower">
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2D</span>
+          <span class="lt-body"><span class="lt-name">Two-digit squares</span><span class="lt-detail">1–99</span></span>
+          <input type="radio" class="pick" name="range" value="99" checked aria-label="Two-digit squares">
+        </li>
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">3D</span>
+          <span class="lt-body"><span class="lt-name">Three-digit squares</span><span class="lt-detail">100–999</span></span>
+          <input type="radio" class="pick" name="range" value="999" aria-label="Three-digit squares">
+        </li>
+        <li class="lt-row team-sq mod">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Hrd</span>
+          <span class="lt-body"><span class="lt-name">Hard mode</span><span class="lt-detail" id="hard-detail"></span></span>
+          <input type="checkbox" class="switch" id="hard" aria-label="Hard mode">
+        </li>
+      </ol>
+    </section>
 
-  <div class="duration">Duration:
-    <select id="duration">
-      <option value="30">30 seconds</option>
-      <option value="120" selected>120 seconds</option>
-      <option value="0">Endless</option>
-    </select>
-  </div>
-  <div class="custom-note" id="custom-note"></div>
-
-  <div class="foot">
-    <span><a href="./">View progress</a> · <a href="play.html">Arithmetic game</a> · <a href="practice.html">Practice</a></span>
-    <button id="start">Start</button>
+    <section class="lt-panel" aria-labelledby="len-title">
+      <p class="lt-lede">Square as many numbers as you can before time runs out.</p>
+      <div class="lt-head"><h2 id="len-title">Length</h2><span class="sub lt-best" id="lt-best"></span></div>
+      <div class="lt-seg" role="radiogroup" aria-labelledby="len-title">
+        <label><input type="radio" name="len" value="30"><b>0:30</b><small>30 seconds</small></label>
+        <label><input type="radio" name="len" value="120" checked><b>2:00</b><small>2 minutes</small></label>
+        <label><input type="radio" name="len" value="0"><b>∞</b><small>Endless</small></label>
+      </div>
+      <input type="hidden" id="duration" value="120">
+      <p class="lt-save"><span class="custom-note" id="custom-note" data-default="Saves to your squares tracker."></span></p>
+      <button id="start"><span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="lt-go"><b>Start</b><span>Enter</span></span></button>
+    </section>
   </div>
 </div>
+<script src="launch.js"></script>
 
 <div id="game">
   <div class="bar">
@@ -144,7 +148,7 @@ function readSettings() {
 function updateNote() {
   const s = readSettings();
   $('#hard-detail').textContent = s.range === '99'
-    ? 'Skips numbers ending in 5, and 1–20.'
+    ? 'Skips numbers ending in 5, and 1\u2060–\u206020.'
     : 'Skips numbers ending in 5.';
   $('#custom-note').textContent = !s.tracked ? 'Only 120-second, 30-second and endless games save to your tracker.'
     : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : '';

@@ -27,8 +27,8 @@ The real zetamac shows one score and forgets it. This keeps every round, times e
 
 - Single local C++ server (`./zetamac tracker`) serving static HTML pages and a small JSON API; data in `scores.csv` plus `details/*.json` per-question timings. No build step, no external JS libraries; pages are plain HTML/CSS/JS.
 - Dashboard features to preserve: per-game stats and score chart (range tabs, toggleable lines, 30-second projection overlay), practice drill table, endless-run records, days-played calendar, manual score logging, recent games with filters, sorting, per-question breakdowns, hidden edit/delete.
-- The game pages deliberately copy arithmetic.zetamac.com's look and are out of scope for dashboard design work.
-- Multi-user / public hosting is planned but undecided (per-browser storage vs accounts).
+- The in-game question and end screens deliberately copy arithmetic.zetamac.com's white look; the games' start screens use the dashboard's live-timing world.
+- Public hosting is a static site (GitHub Pages): with no server, `store.js` keeps each visitor's scores in their own browser, so everyone starts with an empty tracker.
 
 ## Evidence on Hand
 

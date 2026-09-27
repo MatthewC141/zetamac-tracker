@@ -673,15 +673,17 @@ static void handle_client(int fd) {
   static const std::map<std::string, std::string> kPages = {
       {"/", "index.html"},          {"/index.html", "index.html"},     {"/play", "play.html"},
       {"/play.html", "play.html"},  {"/squares", "squares.html"},      {"/squares.html", "squares.html"},
-      {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"}};
+      {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"},
+      {"/launch.js", "launch.js"},  {"/launch.css", "launch.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);
     std::ifstream f(g_home / page);
     if (!f) return respond_error(fd, "500 Internal Server Error", page + " not found next to zetamac");
     std::stringstream ss;
     ss << f.rdbuf();
-    const bool js = page == "store.js";
-    return respond(fd, "200 OK", js ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8", ss.str());
+    const std::string ext = page.substr(page.rfind('.'));
+    const char* type = ext == ".js" ? "text/javascript; charset=utf-8" : ext == ".css" ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
+    return respond(fd, "200 OK", type, ss.str());
   }
   if (method == "GET" && path.rfind("/fonts/", 0) == 0) {  // self-hosted webfonts for the dashboard
     std::string name = path.substr(7);
