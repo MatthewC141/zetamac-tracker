@@ -10,7 +10,7 @@ The owner (primary): a student training mental arithmetic for quant and trading 
 
 ## Product Purpose
 
-A zetamac clone plus a progress tracker. The games (arithmetic, squares, subtraction practice, guided mode) record every round and every question's timing; the tracker turns that record into a clear answer to "am I getting faster, and what's holding me back?" Success is reaching and holding a 2-minute arithmetic score of 80+, the common bar for trading-firm screens.
+A zetamac clone plus a progress tracker. The games (arithmetic, squares, subtraction practice) record every round and every question's timing; the tracker turns that record into a clear answer to "am I getting faster, and what's holding me back?" Success is reaching and holding a 2-minute arithmetic score of 80+, the common bar for trading-firm screens.
 
 ## Positioning
 
@@ -20,7 +20,7 @@ The real zetamac shows one score and forgets it. This keeps every round, times e
 
 - Played in short daily sessions; the dashboard is opened between rounds or at the end of a session.
 - Scores come from the browser games (auto-saved), the C++ terminal game, or are logged by hand from the real arithmetic.zetamac.com.
-- Game modes: arithmetic (zetamac defaults: add/sub 2–100, mul/div 2–12 × 2–100), two- and three-digit squares (normal and hard), subtraction drills (with / without borrowing), guided arithmetic (saved but hidden from the tracker for now).
+- Game modes: arithmetic (zetamac defaults: add/sub 2–100, mul/div 2–12 × 2–100), two- and three-digit squares (normal and hard), subtraction drills (with / without borrowing), guided arithmetic (off the start screen for now; earlier guided games stay saved but hidden).
 - Lengths: 120 seconds (the canonical score), 30 seconds (projected ×4 to 2 minutes), and endless (questions answered and seconds per problem).
 
 ## Capabilities and Constraints

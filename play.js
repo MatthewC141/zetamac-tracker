@@ -20,7 +20,7 @@ function readSettings() {
     if (!ranged(lo, hi)) return { error: 'Each range needs a low number that is not above the high number.' };
   if ((ops.includes('div')) && r['mul-a-lo'] <= 0 && r['mul-a-hi'] >= 0) return { error: 'Division ranges can’t include 0.' };
   const duration = parseInt($('#duration').value, 10);
-  const guided = $('#guided').checked;
+  const guided = !!$('#guided')?.checked;  // guided mode's switch is off the start screen for now
   // Guided games are saved separately, so they may leave operations out.
   const defaultRanges = (guided || ops.length === 4) && Object.keys(DEFAULTS).every(k => r[k] === DEFAULTS[k]);
   const tracked = defaultRanges && [120, 30, 0].includes(duration);
@@ -129,6 +129,9 @@ function applyGuideColors() {
   $('#gc-on').checked = guideColors.on;
   try { localStorage.setItem('zm-guide-colors', JSON.stringify(guideColors)); } catch {}
 }
+// Guided mode is taken off the start screen for now; its code stays so the option can come back
+// by restoring the #guided row and the #guide-colors panel in play.html.
+if ($('#guided')) {
 for (const op in GUIDE_COLOR_DEFAULTS) $(`#gc-${op}`).addEventListener('input', e => { guideColors[op] = e.target.value; applyGuideColors(); });
 $('#gc-on').addEventListener('change', e => { guideColors.on = e.target.checked; applyGuideColors(); });
 $('#gc-reset').addEventListener('click', e => { e.preventDefault(); Object.assign(guideColors, { on: true, ...GUIDE_COLOR_DEFAULTS }); applyGuideColors(); });
@@ -137,6 +140,7 @@ const showGuideColors = () => { $('#guide-colors').hidden = !$('#guided').checke
 $('#guided').addEventListener('change', showGuideColors);
 showGuideColors();
 applyGuideColors();
+}
 
 function renderGuide() {
   if (!cfg.guided || !problem) return;
