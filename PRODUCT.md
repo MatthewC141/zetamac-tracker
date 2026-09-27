@@ -21,6 +21,7 @@ The real zetamac shows one score and forgets it. This keeps every round, times e
 - Played in short daily sessions; the dashboard is opened between rounds or at the end of a session.
 - Scores come from the browser games (auto-saved), the C++ terminal game, or are logged by hand from the real arithmetic.zetamac.com.
 - Game modes: arithmetic (zetamac defaults: add/sub 2–100, mul/div 2–12 × 2–100), two- and three-digit squares (normal and hard), subtraction drills (with / without borrowing), guided arithmetic (off the start screen for now; earlier guided games stay saved but hidden).
+- Website accounts (username + password, no email; Supabase) sync scores across devices; a public leaderboard (leaderboard.html) shows personal bests per board, counting only games played on the site whose question logs pass server-side checks.
 - A method guide (guide.html) teaches the quickest mental route for each operation and has a times-table grid and drill; it replaces guided mode as the teaching surface and saves nothing.
 - Lengths: 120 seconds (the canonical score), 30 seconds (projected ×4 to 2 minutes), and endless (questions answered and seconds per problem).
 

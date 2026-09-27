@@ -1,7 +1,9 @@
 // Website mode. On a static host such as GitHub Pages there is no tracker server, so this answers
-// the pages' /api/* requests itself and keeps scores in the visitor's own browser (localStorage).
-// Every visitor starts with an empty tracker and nobody sees anyone else's scores. It follows the
-// same rules as the C++ server (zetamac.cpp). Opened from ./zetamac tracker, it does nothing.
+// the pages' /api/* requests itself. Signed out, scores stay in the visitor's own browser
+// (localStorage): every visitor starts with an empty tracker and nobody sees anyone else's scores.
+// Signed in (cloud.js), the same requests go to the player's account instead, so their scores
+// follow them between devices. Both follow the rules of the C++ server (zetamac.cpp). Opened from
+// ./zetamac tracker, it does nothing.
 (() => {
   // Never run inside another site's frame (GitHub Pages can't send X-Frame-Options): hide the page
   // and take over the whole tab instead, so no one can dress it up and trick a click.
@@ -37,27 +39,75 @@
     typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
     whole(e.score, 999999) && [0, 30, 120].includes(e.seconds) && whole(e.elapsed, 999999) &&
     (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode);
-  const load = () => {
-    try {
-      const list = JSON.parse(localStorage.getItem(SCORES) || '[]');
-      return Array.isArray(list)
-        ? list.filter(validRow).map(({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed }))
-        : [];
-    } catch { return []; }
-  };
-  const store = list => localStorage.setItem(SCORES, JSON.stringify(list));
-  const hasDetail = ts => { try { return localStorage.getItem(DETAIL + ts) !== null; } catch { return false; } };
-  const view = list => list.map((e, i) => ({ i, ...e, detail: hasDetail(e.ts) }));
+  const fields = ({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed });
 
   const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   const fail = (status, error) => reply(status, { error });
+  class Refused extends Error {}  // a request the rules turn down (answered 400, like the server)
 
   const entry = (score, date, source, seconds, mode) => {
     const now = new Date();
     return { ts: date === dateKey(now) ? stamp(now) : `${date}T12:00:00`, date, score, seconds, source, mode, elapsed: 0 };
   };
 
-  function handle(route, method, url, body) {
+  // A new score from a POST, checked as the server checks it. Returns { e, detail } or throws Refused.
+  function newScore(route, form) {
+    const get = k => form.get(k) || '';
+    if (route === 'scores') {  // a score logged by hand
+      const score = parseInt6(get('score'));
+      const date = form.has('date') ? get('date') : dateKey(new Date());
+      if (score === null || score > 500) throw new Refused('Score must be a whole number from 0 to 500.');
+      if (!validDate(date)) throw new Refused('Date must be YYYY-MM-DD.');
+      if (date > dateKey(new Date())) throw new Refused('That date is in the future.');
+      const seconds = parseSeconds(get('seconds'));
+      if (!seconds) throw new Refused('Game length must be 30 or 120 seconds.');
+      const mode = parseMode(get('mode'));
+      if (!mode) throw new Refused('Unknown game mode.');
+      return { e: entry(score, date, 'manual', seconds, mode), detail: null };
+    }
+    // a finished round, always today; seconds=0 is an endless run
+    const endless = get('seconds') === '0';
+    const score = parseInt6(get('score'));
+    if (score === null || score > (endless ? 999999 : 500)) throw new Refused('Score is out of range.');
+    const seconds = endless ? 0 : parseSeconds(get('seconds'));
+    if (!endless && !seconds) throw new Refused('Game length must be 30 or 120 seconds.');
+    const elapsed = endless ? parseInt6(get('elapsed')) : 0;
+    if (elapsed === null) throw new Refused('Endless runs need an elapsed time in seconds.');
+    const mode = parseMode(get('mode'));
+    if (!mode) throw new Refused('Unknown game mode.');
+    const e = entry(score, dateKey(new Date()), 'game', seconds, mode);
+    e.elapsed = elapsed;
+    const d = get('detail');
+    const detail = d.length >= 2 && d.length <= 2000000 && d[0] === '[' && d.at(-1) === ']' ? d : null;
+    return { e, detail };
+  }
+
+  // Rows from an export file, checked like every other row. Returns [{ e, detail }] or throws Refused.
+  function importRows(body) {
+    let data;
+    try { data = JSON.parse(body || ''); } catch { throw new Refused('That file isn’t a tracker export.'); }
+    if (!data || data.app !== 'zetamac-tracker' || !Array.isArray(data.scores)) throw new Refused('That file isn’t a tracker export.');
+    return data.scores.slice(0, 100000).map(raw => {
+      const e = raw && fields({ ...raw, elapsed: raw.elapsed ?? 0 });
+      if (!validRow(e)) return null;
+      const detail = Array.isArray(raw.detail) && e.source === 'game' ? JSON.stringify(raw.detail) : null;
+      return { e, detail: detail && detail.length <= 2000000 ? detail : null };
+    });
+  }
+  const sameKey = e => `${e.ts}|${e.score}|${e.seconds}|${e.mode}|${e.source}`;
+
+  // ---- this browser (signed out) ----
+  const load = () => {
+    try {
+      const list = JSON.parse(localStorage.getItem(SCORES) || '[]');
+      return Array.isArray(list) ? list.filter(validRow).map(fields) : [];
+    } catch { return []; }
+  };
+  const store = list => localStorage.setItem(SCORES, JSON.stringify(list));
+  const hasDetail = ts => { try { return localStorage.getItem(DETAIL + ts) !== null; } catch { return false; } };
+  const view = list => list.map((e, i) => ({ i, ...e, detail: hasDetail(e.ts) }));
+
+  function local(route, method, url, body) {
     if (method === 'GET' && route === 'scores') return reply(200, view(load()));
     if (method === 'GET' && route === 'detail') {
       const ts = url.searchParams.get('ts') || '';
@@ -68,65 +118,134 @@
       return reply(200, { ts, questions });
     }
     if (method !== 'POST') return fail(404, 'not found');
-    const form = new URLSearchParams(body || '');
-    const get = k => form.get(k) || '';
     const list = load();
-
-    if (route === 'scores') {  // a score logged by hand
-      const score = parseInt6(get('score'));
-      const date = form.has('date') ? get('date') : dateKey(new Date());
-      if (score === null || score > 500) return fail(400, 'Score must be a whole number from 0 to 500.');
-      if (!validDate(date)) return fail(400, 'Date must be YYYY-MM-DD.');
-      if (date > dateKey(new Date())) return fail(400, 'That date is in the future.');
-      const seconds = parseSeconds(get('seconds'));
-      if (!seconds) return fail(400, 'Game length must be 30 or 120 seconds.');
-      const mode = parseMode(get('mode'));
-      if (!mode) return fail(400, 'Unknown game mode.');
-      list.push(entry(score, date, 'manual', seconds, mode));
-      store(list);
-      return reply(200, view(list));
-    }
-    if (route === 'game') {  // a finished round, always today; seconds=0 is an endless run
-      const endless = get('seconds') === '0';
-      const score = parseInt6(get('score'));
-      if (score === null || score > (endless ? 999999 : 500)) return fail(400, 'Score is out of range.');
-      const seconds = endless ? 0 : parseSeconds(get('seconds'));
-      if (!endless && !seconds) return fail(400, 'Game length must be 30 or 120 seconds.');
-      const elapsed = endless ? parseInt6(get('elapsed')) : 0;
-      if (elapsed === null) return fail(400, 'Endless runs need an elapsed time in seconds.');
-      const mode = parseMode(get('mode'));
-      if (!mode) return fail(400, 'Unknown game mode.');
-      const e = entry(score, dateKey(new Date()), 'game', seconds, mode);
-      e.elapsed = elapsed;
+    if (route === 'scores' || route === 'game') {
+      const { e, detail } = newScore(route, new URLSearchParams(body || ''));
       list.push(e);
       store(list);
-      const detail = get('detail');
-      if (detail.length >= 2 && detail.length <= 2000000 && detail[0] === '[' && detail.at(-1) === ']') {
-        try { localStorage.setItem(DETAIL + e.ts, detail); } catch {}  // the score still counts if the log doesn't fit
-      }
+      if (detail) { try { localStorage.setItem(DETAIL + e.ts, detail); } catch {} }  // the score still counts if the log doesn't fit
       return reply(200, view(list));
     }
     if (route === 'delete') {
-      const index = parseInt6(get('index'));
-      if (index === null || index >= list.length) return fail(400, 'No such entry.');
-      if (get('ts') !== list[index].ts) return fail(409, 'Scores changed since the page loaded — refresh and try again.');
+      const form = new URLSearchParams(body || '');
+      const index = parseInt6(form.get('index'));
+      if (index === null || index >= list.length) throw new Refused('No such entry.');
+      if (form.get('ts') !== list[index].ts) return fail(409, 'Scores changed since the page loaded — refresh and try again.');
+      // Only games have question logs; a hand-logged score with the same timestamp must not take one.
       if (list[index].source === 'game') localStorage.removeItem(DETAIL + list[index].ts);
       list.splice(index, 1);
       store(list);
       return reply(200, view(list));
     }
+    if (route === 'import') {  // a file exported from any copy of the tracker: merged in, duplicates skipped
+      const seen = new Set(list.map(sameKey));
+      let added = 0, skipped = 0;
+      for (const row of importRows(body)) {
+        if (!row || seen.has(sameKey(row.e))) { skipped++; continue; }
+        seen.add(sameKey(row.e));
+        list.push(row.e);
+        added++;
+        if (row.detail && !hasDetail(row.e.ts)) { try { localStorage.setItem(DETAIL + row.e.ts, row.detail); } catch {} }
+      }
+      list.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+      store(list);
+      return reply(200, { added, skipped, scores: view(list) });
+    }
     return fail(404, 'not found');
   }
+
+  // ---- the player's account (signed in) ----
+  const cloud = () => window.ZM_CLOUD?.ready && window.ZM_CLOUD.user() ? window.ZM_CLOUD : null;
+  const COLS = 'id,ts,date,score,seconds,source,mode,elapsed,has_detail';
+  async function accountRows(c) {  // every row, 1000 at a time (the database's page size)
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      const page = await c.rest(`scores?select=${COLS}&order=ts.asc,id.asc&offset=${from}&limit=1000`);
+      rows.push(...page);
+      if (page.length < 1000) return rows;
+    }
+  }
+  const accountView = rows => rows.map((r, i) => ({ i, ts: r.ts, date: r.date, score: r.score, seconds: r.seconds, source: r.source, mode: r.mode, elapsed: r.elapsed, detail: r.has_detail }));
+  const insertRows = (c, rows) => c.rest('scores?on_conflict=user_id,ts,score,seconds,mode,source', {
+    method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: rows.map(({ e, detail }) => {
+      let log = null;
+      try { log = detail ? JSON.parse(detail) : null; } catch {}  // an unreadable log is dropped; the score still saves
+      return { ...e, detail: Array.isArray(log) ? log : null };
+    }),
+  });
+
+  async function account(c, route, method, url, body) {
+    if (method === 'GET' && route === 'scores') return reply(200, accountView(await accountRows(c)));
+    if (method === 'GET' && route === 'detail') {
+      const ts = url.searchParams.get('ts') || '';
+      if (!/^[\d:T-]{19}$/.test(ts)) return fail(400, 'Bad game timestamp.');
+      const [row] = await c.rest(`scores?select=detail&ts=eq.${encodeURIComponent(ts)}&source=eq.game&has_detail=is.true&limit=1`);
+      if (!row) return fail(404, 'No question-by-question data for this game.');
+      return reply(200, { ts, questions: Array.isArray(row.detail) ? row.detail : [] });
+    }
+    if (method !== 'POST') return fail(404, 'not found');
+    if (route === 'scores' || route === 'game') {
+      await insertRows(c, [newScore(route, new URLSearchParams(body || ''))]);
+      return reply(200, accountView(await accountRows(c)));
+    }
+    if (route === 'delete') {
+      const form = new URLSearchParams(body || '');
+      const rows = await accountRows(c);
+      const index = parseInt6(form.get('index'));
+      if (index === null || index >= rows.length) throw new Refused('No such entry.');
+      if (form.get('ts') !== rows[index].ts) return fail(409, 'Scores changed since the page loaded — refresh and try again.');
+      await c.rest(`scores?id=eq.${rows[index].id}`, { method: 'DELETE' });
+      rows.splice(index, 1);
+      return reply(200, accountView(rows));
+    }
+    if (route === 'import') {
+      const rows = importRows(body);
+      const good = rows.filter(Boolean);
+      let added = 0;
+      // A batch at a time, kept small enough that long question logs fit in one request.
+      for (let k = 0; k < good.length;) {
+        const batch = [];
+        let size = 0;
+        while (k < good.length && batch.length < 200 && (size === 0 || size + (good[k].detail?.length || 0) < 1500000)) {
+          size += good[k].detail?.length || 0;
+          batch.push(good[k++]);
+        }
+        added += (await insertRows(c, batch)).length;
+      }
+      return reply(200, { added, skipped: rows.length - added, scores: accountView(await accountRows(c)) });
+    }
+    return fail(404, 'not found');
+  }
+
+  // This browser's own games (for moving them into an account), and clearing them afterwards.
+  window.ZM_LOCAL = {
+    exportFile() {
+      const scores = load().map(e => {
+        let detail;
+        try { detail = JSON.parse(localStorage.getItem(DETAIL + e.ts) || 'null') ?? undefined; } catch {}
+        return { ...e, ...(detail && { detail }) };
+      });
+      return { app: 'zetamac-tracker', version: 1, exported: new Date().toISOString(), scores };
+    },
+    count: () => load().length,
+    clear() {
+      for (const e of load()) localStorage.removeItem(DETAIL + e.ts);
+      localStorage.removeItem(SCORES);
+    },
+  };
 
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
-    const m = url.origin === location.origin && url.pathname.match(/\/api\/(scores|game|delete|detail)$/);
+    const m = url.origin === location.origin && url.pathname.match(/\/api\/(scores|game|delete|detail|import)$/);
     if (!m) return realFetch(input, init);
+    const method = (init.method || 'GET').toUpperCase(), c = cloud();
     try {
-      return handle(m[1], (init.method || 'GET').toUpperCase(), url, init.body);
-    } catch {
-      return fail(500, 'Couldn’t save in this browser. Storage may be full or blocked (private windows can block it).');
+      return c ? await account(c, m[1], method, url, init.body) : local(m[1], method, url, init.body);
+    } catch (err) {
+      if (err instanceof Refused) return fail(400, err.message);
+      return fail(500, c ? `Couldn’t reach your account: ${err.message}` : 'Couldn’t save in this browser. Storage may be full or blocked (private windows can block it).');
     }
   };
 })();

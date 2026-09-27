@@ -439,6 +439,58 @@ const avgBy = (list, keyOf) => {
 };
 const secs2 = ms => (ms / 1000).toFixed(2);
 
+// Slowest question types: the top 6, or every × and ÷ fact from 2 to 12; outliers optionally dropped.
+let factsAll = false, factsTrim = false;
+try { factsAll = localStorage.getItem('zm-facts-all') === '1'; factsTrim = localStorage.getItem('zm-facts-trim') === '1'; } catch {}
+const TABLE = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+// Drops answers far slower than usual for their operation: above Q3 + 1.5 × IQR (Tukey's fence)
+// of that operation's times in the window. Operations with fewer than 4 answers are kept whole.
+function trimOutliers(list) {
+  const byOp = {};
+  for (const q of list) (byOp[q.o] ||= []).push(q.t);
+  const fence = {};
+  for (const [o, ts] of Object.entries(byOp)) {
+    if (ts.length < 4) continue;
+    const s = [...ts].sort((a, b) => a - b), at = p => s[Math.floor(p * (s.length - 1))];
+    fence[o] = at(.75) + 1.5 * (at(.75) - at(.25));
+  }
+  return list.filter(q => !(q.o in fence) || q.t <= fence[q.o]);
+}
+
+// A type needs this many answers to be ranked; fewer is shown dimmed, below the ranked ones.
+const MIN_FACT = 3;
+const factRow = (f, i, top) => {
+  const ranked = f.n >= MIN_FACT;
+  return `<li class="op-${f.op}${ranked ? '' : ' none'}"><span class="pos">${ranked ? i + 1 : ''}</span><span class="stripe"></span>` +
+    `<span class="fact-name">${esc(f.k)}</span><span class="track" aria-hidden="true"><i style="width:${ranked ? (f.avg / top * 100).toFixed(1) : 0}%"></i></span>` +
+    `<span class="time">${f.n ? `${secs2(f.avg)}<small>s</small>` : '—'}</span><span class="gap">${!f.n ? 'none yet' : ranked ? plural(f.n, 'q') : 'too few'}</span></li>`;
+};
+
+function factsHTML(qs) {
+  const used = factsTrim ? trimOutliers(qs) : qs;
+  const dropped = qs.length - used.length;
+  const avg = avgBy(used, factOf);
+  const head = `<div class="facts-head"><h3>Slowest question types</h3>` +
+    `<div class="facts-tools"><div class="seg" role="group" aria-label="Question types to show">` +
+      `<button type="button" data-facts="top" aria-pressed="${!factsAll}">Top 6</button><button type="button" data-facts="all" aria-pressed="${factsAll}" title="Every × and ÷ fact from 2 to 12">All facts</button></div>` +
+    `<div class="seg"><button type="button" data-facts="trim" aria-pressed="${factsTrim}" title="Leave out answers far slower than your usual for that operation">Exclude outliers</button></div></div></div>`;
+  const note = `<p class="facts-note">Seconds per question · types with fewer than ${MIN_FACT} answers aren’t ranked${factsTrim ? ` · ${dropped ? `${plural(dropped, 'unusually slow answer')} left out` : 'no outliers in this window'}, far slower than your usual for that operation` : ''}</p>`;
+  if (!factsAll) {
+    const top = Object.entries(avg).filter(([, f]) => f.n >= MIN_FACT).map(([k, f]) => ({ k, ...f })).sort((a, b) => b.avg - a.avg).slice(0, 6);
+    if (!top.length) return '';
+    return head + `<ol class="tower facts">${top.map((f, i) => factRow(f, i, top[0].avg)).join('')}</ol>` + note;
+  }
+  // Every fact, one column per operation, slowest first; facts not seen yet sit at the bottom.
+  const col = (op, sign, title) => {
+    const list = TABLE.map(n => ({ k: `${sign} ${n}`, op, n: 0, avg: 0, ...avg[`${sign} ${n}`] }))
+      .sort((a, b) => (b.n >= MIN_FACT) - (a.n >= MIN_FACT) || (b.n > 0) - (a.n > 0) || b.avg - a.avg);
+    const top = Math.max(...list.filter(f => f.n >= MIN_FACT).map(f => f.avg), 1);
+    return `<div class="facts-col"><h4>${title}</h4><ol class="tower facts">${list.map((f, i) => factRow(f, i, top)).join('')}</ol></div>`;
+  };
+  return head + `<div class="facts-all">${col('mul', '×', 'Multiplication')}${col('div', '÷', 'Division')}</div>` + note;
+}
+
 async function renderWeak() {
   const run = ++weakRun;
   const el = $('#weak');
@@ -459,8 +511,6 @@ async function renderWeak() {
   if (!rows.length) { el.innerHTML = emptyMsg; return; }
   const fastest = Math.min(...rows.map(r => r.avg)), slowest = rows[0].avg;
   const sector = r => r.avg === fastest ? 's-purple' : before[r.op] ? (r.avg < before[r.op].avg ? 's-green' : 's-yellow') : '';
-  const facts = Object.entries(avgBy(qs, factOf)).filter(([, f]) => f.n >= 2)
-    .map(([k, f]) => ({ k, ...f })).sort((a, b) => b.avg - a.avg).slice(0, 6);
 
   // Remember where each row was so the new order can slide into place.
   const was = new Map([...el.querySelectorAll('.tower li')].map(li => [li.dataset.op, { top: li.getBoundingClientRect().top, sector: li.dataset.sector }]));
@@ -473,10 +523,7 @@ async function renderWeak() {
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    (facts.length ? `<div class="facts-head"><h3>Slowest question types</h3><span class="sub">seconds per question</span></div>` +
-      `<ol class="tower facts">${facts.map((f, i) => `<li class="op-${f.op}"><span class="pos">${i + 1}</span><span class="stripe"></span>` +
-        `<span class="fact-name">${esc(f.k)}</span><span class="track" aria-hidden="true"><i style="width:${(f.avg / facts[0].avg * 100).toFixed(1)}%"></i></span>` +
-        `<span class="time">${secs2(f.avg)}<small>s</small></span><span class="gap">${plural(f.n, 'q')}</span></li>`).join('')}</ol>` : '');
+    factsHTML(qs);
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;
@@ -488,6 +535,15 @@ async function renderWeak() {
     if (old.sector !== li.dataset.sector) li.classList.add('flash');
   }
 }
+
+$('#weak').addEventListener('click', e => {
+  const b = e.target.closest('[data-facts]');
+  if (!b) return;
+  if (b.dataset.facts === 'trim') factsTrim = !factsTrim;
+  else factsAll = b.dataset.facts === 'all';
+  try { localStorage.setItem('zm-facts-all', factsAll ? '1' : '0'); localStorage.setItem('zm-facts-trim', factsTrim ? '1' : '0'); } catch {}
+  renderWeak();
+});
 
 document.querySelectorAll('[data-window]').forEach(b => b.addEventListener('click', () => {
   weakWindow = b.dataset.window;
@@ -701,8 +757,21 @@ $('#chart-game').addEventListener('change', e => {
   renderStats(); renderChart();
 });
 
+// A note carried over from the account page (after signing up or logging in).
+try {
+  const flash = sessionStorage.getItem('zm-flash');
+  if (flash) { $('#flash').textContent = flash; $('#flash').hidden = false; sessionStorage.removeItem('zm-flash'); }
+} catch {}
+// On the website: the account button, and whose scores these are.
+if (window.ZM_WEB && window.ZM_CLOUD?.ready) {
+  const u = window.ZM_CLOUD.user();
+  $('#acct-btn').hidden = false;
+  $('#acct-btn').textContent = u ? u.name : 'Sign up';
+}
 // On the website, scores live only in this browser; say so where scores go in.
-if (window.ZM_WEB) $('#log-note').textContent = 'For scores from the zetamac website. Games played here save themselves, in this browser only; clearing site data erases them';
+if (window.ZM_WEB) $('#log-note').textContent = window.ZM_CLOUD?.user()
+  ? `For scores from the zetamac website. Games played here save to your account (${window.ZM_CLOUD.user().name})`
+  : 'For scores from the zetamac website. Games played here save themselves, in this browser only; clearing site data erases them';
 $('#f-date').value = dateKey(today());
 $('#f-date').max = dateKey(today());
 $('#add').addEventListener('submit', async e => {
@@ -736,6 +805,54 @@ $('#recent').addEventListener('click', async e => {
   } catch (err) {
     alert(err.message);
     load();
+  }
+});
+
+// ---------- moving scores between copies of the tracker ----------
+// Export: every score with its question log, as one JSON file. Import (website only): merges a file in.
+if (window.ZM_WEB) {
+  $('#import-label').hidden = false;
+  $('#move-note').textContent = 'Bring your history over: export it from the tracker on your computer (./zetamac tracker), then import the file here. Export also makes a backup of this browser’s scores.';
+}
+$('#export').addEventListener('click', async () => {
+  const msg = $('#move-msg');
+  msg.className = 'msg'; msg.textContent = 'Gathering your games…';
+  try {
+    const rows = await api('api/scores');
+    const scores = [];
+    for (const g of rows) {
+      const { ts, date, score, seconds, source, mode, elapsed } = g;
+      const row = { ts, date, score, seconds, source, mode, elapsed };
+      if (g.detail) { try { row.detail = (await api(`api/detail?ts=${encodeURIComponent(ts)}`)).questions; } catch {} }
+      scores.push(row);
+    }
+    const file = new Blob([JSON.stringify({ app: 'zetamac-tracker', version: 1, exported: new Date().toISOString(), scores })], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = `zetamac-scores-${dateKey(today())}.json`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    msg.className = 'msg ok'; msg.textContent = `Exported ${plural(scores.length, 'game')}.`;
+  } catch (err) {
+    msg.className = 'msg err'; msg.textContent = `Couldn’t export: ${err.message}`;
+  }
+});
+$('#import').addEventListener('change', async e => {
+  const file = e.target.files[0], msg = $('#move-msg');
+  e.target.value = '';
+  if (!file) return;
+  msg.className = 'msg'; msg.textContent = 'Importing…';
+  try {
+    const r = await fetch('api/import', { method: 'POST', headers: { 'X-Zetamac': '1' }, body: await file.text() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Import failed');
+    detailCache.clear();
+    setGames(data.scores);
+    render();
+    msg.className = 'msg ok';
+    msg.textContent = `Imported ${plural(data.added, 'game')}${data.skipped ? ` · ${data.skipped} already here or unreadable, skipped` : ''}.`;
+  } catch (err) {
+    msg.className = 'msg err'; msg.textContent = err.message;
   }
 });
 
@@ -923,7 +1040,9 @@ load().then(openFromHash);
   const track = [...dlg.querySelectorAll('.w-track li')];
   const btn = name => dlg.querySelector(`[data-w="${name}"]:not(#w-look)`);
   let at = 0;
-  if (window.ZM_WEB) $('#w-store').textContent = 'Every game you play saves itself here, in this browser only, so each person who visits starts with an empty tracker.';
+  if (window.ZM_WEB) $('#w-store').textContent = window.ZM_CLOUD?.user()
+    ? 'Every game you play saves itself to your account, so your tracker is the same on every device.'
+    : 'Every game you play saves itself here, in this browser only. Sign up (no email) to keep your scores on every device and get on the leaderboard.';
 
   const show = (i, dir = 1) => {
     at = Math.max(0, Math.min(steps.length - 1, i));

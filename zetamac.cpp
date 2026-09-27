@@ -594,7 +594,8 @@ static void respond(int fd, const std::string& status, const std::string& type, 
                   "\r\nContent-Length: " + std::to_string(body.size()) +
                   "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY"
                   "\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                  "img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+                  "img-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; "
+                  "form-action 'self'; frame-ancestors 'none'"
                   "\r\nReferrer-Policy: no-referrer"
                   "\r\nConnection: close\r\n\r\n" + body;
   const char* p = r.data();
@@ -684,7 +685,10 @@ static void handle_client(int fd) {
       {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"},
       {"/launch.js", "launch.js"},  {"/launch.css", "launch.css"},       {"/dashboard.js", "dashboard.js"},
       {"/play.js", "play.js"},      {"/squares.js", "squares.js"},      {"/practice.js", "practice.js"},
-      {"/guide", "guide.html"},     {"/guide.html", "guide.html"},      {"/guide.js", "guide.js"}};
+      {"/guide", "guide.html"},     {"/guide.html", "guide.html"},      {"/guide.js", "guide.js"},
+      {"/leaderboard", "leaderboard.html"}, {"/leaderboard.html", "leaderboard.html"}, {"/leaderboard.js", "leaderboard.js"},
+      {"/account", "account.html"}, {"/account.html", "account.html"},  {"/account.js", "account.js"},
+      {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);
     std::ifstream f(g_home / page);

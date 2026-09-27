@@ -86,6 +86,8 @@ slowest first). The **See breakdown** link on the end screen opens the same view
 - **30-second games:** a separate chart with a second line projecting each score to a 2-minute game
   (score × 4).
 - **Days played:** a calendar of the past year, shaded by each day's best score.
+- **Slowest question types:** the six slowest kinds of question, or every × and ÷ fact from 2 to
+  12 (**All facts**), with an option to leave out unusually slow answers.
 - **Stats:** all-time best, best and average for the chosen range, last 7 days compared with the week
   before, and your streak.
 - **How it works:** a short guide that opens on your first visit and from the button in the header.
@@ -111,3 +113,27 @@ usual.
 
 To publish: on GitHub, **Settings → Pages → Deploy from a branch**, branch `main`, folder `/ (root)`.
 The site appears at `https://<user>.github.io/<repo>/`.
+
+### Moving your history to the website
+
+On the dashboard of the tracker on your computer, **Export scores** (under Log a score) saves every
+game and its question timings to a file. On the website, **Import a file** in the same place merges
+it in, skipping anything already there.
+
+## Accounts and leaderboard
+
+On the website, **Sign up** with a name and a password (no email) to keep your scores in an account,
+so they're the same on every device, and to put your personal bests on the **Leaderboard**: 2-minute
+and 30-second arithmetic, the four squares modes, and endless. Only games played on the site count,
+each checked against its question-by-question times; hand-logged scores stay off the board. With no
+email there's no password reset.
+
+Accounts use a free [Supabase](https://supabase.com) project:
+
+1. Create a project, then under **Authentication → Sign In / Providers → Email** turn off
+   **Confirm email**.
+2. In the **SQL editor**, run `schema.sql` (tables, security rules, the leaderboard view).
+3. Put the project URL and its public (anon) key in `cloud.js`. They're meant to be public; what
+   each visitor can read or change is decided by the rules in `schema.sql`.
+
+Without those two values the site works as before, with scores kept in each browser.

@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -90,6 +91,8 @@
   .play-btn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
   .play-btn.go:hover { background: #fff; }
 
+  .flash { margin: 0 0 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--ink); font-size: 15px; }
+  .flash::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 10px; vertical-align: 1px; }
   .banner { background: #2a1214; border: 1px solid var(--red); color: #ffd3d0; padding: 12px 16px; border-radius: 3px; margin-bottom: 16px; display: none; }
   code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--raise); padding: 1px 5px; border-radius: 3px; }
 
@@ -133,7 +136,16 @@
   .key span { display: inline-flex; align-items: center; gap: 6px; }
   .key span::before { content: ""; width: 10px; height: 4px; border-radius: 1px; background: var(--sector); }
 
-  .facts-head { display: flex; justify-content: space-between; align-items: baseline; margin: 22px 0 8px; }
+  .facts-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 22px 0 10px; }
+  .facts-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+  .facts-tools .seg button { padding: 6px 9px; }
+  .facts-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+  .facts-all { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+  .facts-col h4 { font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .facts-all .tower.facts li { grid-template-columns: 22px 4px 44px minmax(0, 1fr) 58px 50px; gap: 0 9px; height: 34px; }
+  .facts-all .tower.facts .time { font-size: 16px; }
+  .tower.facts li.none .fact-name, .tower.facts li.none .time, .tower.facts li.none .gap { color: var(--muted); }
+  .tower.facts li.none .stripe { opacity: .35; }
   .facts-head h3 { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; margin: 0; color: var(--muted); }
   .tower.facts li { grid-template-columns: 26px 4px 128px minmax(0, 1fr) 70px 64px; height: 38px; }
   .tower.facts .stripe { height: 20px; }
@@ -248,6 +260,15 @@
   .msg { font-size: 14px; min-height: 1.2em; margin: 0; }
   .msg.err { color: var(--red); }
   .msg.ok { color: var(--green); }
+  .move { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .move p { margin: 0; font-size: 14px; color: var(--muted); max-width: 70ch; }
+  .move .msg { grid-column: 1 / -1; }
+  .move-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .move-actions label { position: relative; }
+  .move-actions [hidden] { display: none !important; }
+  .move-actions label:focus-within { outline: 2px solid var(--purple); outline-offset: 2px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (max-width: 640px) { .move { grid-template-columns: minmax(0, 1fr); } }
   .hint { font-size: 13px; color: var(--muted); margin: 10px 0 0; line-height: 1.5; }
 
   table { width: 100%; border-collapse: collapse; font-size: 15px; }
@@ -334,13 +355,7 @@
   }
   @media (max-width: 640px) {
     main { padding: 0 12px 56px; }
-    .strip { gap: 12px 16px; }
-    .nav { margin-left: 0; width: 100%; }
-    .nav .play-btn { flex: 1; text-align: center; }
-    .brand { flex: 1; }
-    .help-btn { order: -1; margin-left: auto; padding: 9px 12px; }
-    .help-btn + .help-btn { margin-left: -10px; }
-    .brand { order: -2; }
+    .facts-all { grid-template-columns: minmax(0, 1fr); gap: 16px; }
     .panel { padding: 16px 14px 16px; }
     .readout { gap: 6px 18px; }
     /* Stats tables become one block per row, each value labelled, so no column hides off-screen. */
@@ -392,7 +407,21 @@
   .help-btn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--line); padding: 10px 14px; border-radius: 3px; cursor: pointer; }
   .help-btn:hover { color: var(--ink); border-color: #3d4050; }
   a.help-btn { text-decoration: none; }
-  .help-btn + .help-btn { margin-left: -16px; }
+  .help-btn[hidden] { display: none !important; }
+  .acct-btn { color: var(--ink); }
+  .strip .help-btn + .help-btn { margin-left: -16px; }
+  @media (max-width: 640px) {
+    /* Phones: wordmark with the account at its right, the date line, the three games, then
+       Leaderboard / Guide / How it works as three equal buttons. */
+    .strip { gap: 10px 6px; }
+    .brand { order: -3; flex: 1; white-space: nowrap; }
+    .session { order: -1; width: 100%; }
+    .nav { order: 0; margin-left: 0; width: 100%; }
+    .nav .play-btn { flex: 1; text-align: center; }
+    .help-btn { order: 1; flex: 1 1 0; text-align: center; padding: 9px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
+    .strip .help-btn + .help-btn { margin-left: 0; }
+    .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
+  }
   #welcome { width: min(760px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
   #welcome[open] { display: flex; flex-direction: column; }
   .w-step { flex: 1 0 auto; }
@@ -485,10 +514,13 @@
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="practice.html">Practice</a>
     </nav>
+    <a class="help-btn" href="leaderboard.html">Leaderboard</a>
     <a class="help-btn" href="guide.html">Guide</a>
     <button class="help-btn" id="help-open" type="button">How it works</button>
+    <a class="help-btn acct-btn" href="account.html" id="acct-btn" hidden>Sign up</a>
   </header>
 
+  <p class="flash" id="flash" role="status" hidden></p>
   <div class="banner" id="banner">Can't reach the tracker server. Start it with <code>./zetamac tracker</code> and reload.</div>
 
   <div class="top">
@@ -610,6 +642,14 @@
         <button class="primary" type="submit">Add score</button>
         <p class="msg" id="f-msg" aria-live="polite"></p>
       </form>
+      <div class="move">
+        <p id="move-note">Export every score and its question timings to a file, then import it into the website version of the tracker to take your history with you.</p>
+        <div class="move-actions">
+          <button class="help-btn" type="button" id="export">Export scores</button>
+          <label class="help-btn" id="import-label" hidden>Import a file<input type="file" id="import" accept=".json,application/json" class="sr"></label>
+        </div>
+        <p class="msg" id="move-msg" aria-live="polite"></p>
+      </div>
     </section>
 
     <section class="panel">
