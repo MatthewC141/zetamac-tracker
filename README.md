@@ -13,7 +13,7 @@ make            # builds ./zetamac (needs a C++17 compiler)
 
 | Command | What it does |
 |---|---|
-| `./zetamac tracker` | Opens the dashboard at http://127.0.0.1:8777. Click **Play** for the browser game. |
+| `./zetamac tracker` | Opens the dashboard at [https://matthewc141.github.io/zetamac-tracker/](url). Click **Play** for the browser game. |
 | `./zetamac` | Plays in the terminal. Enter/Space to go again after each round, `q` to quit. |
 | `./zetamac add 52` | Logs a 2-minute score by hand for today (or `./zetamac add 52 2026-09-20`). |
 | `./zetamac stats` | Prints today's games, best score, streak and a sparkline. |
