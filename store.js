@@ -110,7 +110,7 @@
       const index = parseInt6(get('index'));
       if (index === null || index >= list.length) return fail(400, 'No such entry.');
       if (get('ts') !== list[index].ts) return fail(409, 'Scores changed since the page loaded — refresh and try again.');
-      localStorage.removeItem(DETAIL + list[index].ts);
+      if (list[index].source === 'game') localStorage.removeItem(DETAIL + list[index].ts);
       list.splice(index, 1);
       store(list);
       return reply(200, view(list));

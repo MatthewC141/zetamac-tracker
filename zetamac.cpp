@@ -593,7 +593,9 @@ static void respond(int fd, const std::string& status, const std::string& type, 
   std::string r = "HTTP/1.1 " + status + "\r\nContent-Type: " + type +
                   "\r\nContent-Length: " + std::to_string(body.size()) +
                   "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY"
-                  "\r\nContent-Security-Policy: frame-ancestors 'none'\r\nReferrer-Policy: no-referrer"
+                  "\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                  "img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+                  "\r\nReferrer-Policy: no-referrer"
                   "\r\nConnection: close\r\n\r\n" + body;
   const char* p = r.data();
   size_t left = r.size();
@@ -639,6 +641,7 @@ static bool allowed_host(const std::string& lower_head) {
 static void handle_client(int fd) {
   timeval tv{3, 0};
   setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);  // nor one that stops reading the reply
   // One request at a time, so a client that trickles bytes must not hold the server for long.
   const auto deadline = Clock::now() + std::chrono::seconds(10);
 
@@ -679,7 +682,8 @@ static void handle_client(int fd) {
       {"/", "index.html"},          {"/index.html", "index.html"},     {"/play", "play.html"},
       {"/play.html", "play.html"},  {"/squares", "squares.html"},      {"/squares.html", "squares.html"},
       {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"},
-      {"/launch.js", "launch.js"},  {"/launch.css", "launch.css"}};
+      {"/launch.js", "launch.js"},  {"/launch.css", "launch.css"},       {"/dashboard.js", "dashboard.js"},
+      {"/play.js", "play.js"},      {"/squares.js", "squares.js"},      {"/practice.js", "practice.js"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);
     std::ifstream f(g_home / page);
@@ -760,7 +764,9 @@ static void handle_client(int fd) {
       if (form["ts"] != list[static_cast<size_t>(index)].ts)
         return respond_error(fd, "409 Conflict", "Scores changed since the page loaded — refresh and try again.");
       std::error_code ec;
-      if (valid_ts(list[static_cast<size_t>(index)].ts)) fs::remove(detail_path(list[static_cast<size_t>(index)].ts), ec);
+      // Only games have question logs; a hand-logged score with the same timestamp must not take one.
+      const Entry& gone = list[static_cast<size_t>(index)];
+      if (gone.source == "game" && valid_ts(gone.ts)) fs::remove(detail_path(gone.ts), ec);
       list.erase(list.begin() + index);
       if (!save_all(list)) return respond_error(fd, "500 Internal Server Error", "Could not write scores.csv.");
       return respond(fd, "200 OK", "application/json", scores_json());
