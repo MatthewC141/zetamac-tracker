@@ -4,7 +4,7 @@
 <script src="store.js"></script>
 <link rel="stylesheet" href="launch.css">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Practice</title>
 <style>
   /* Same look as play.html (the zetamac clone). Untimed by default. */
@@ -44,6 +44,19 @@
     #answer { width: 150px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
     #end .links { font-size: 17px; }
+  }
+  /* ---- phones: sizing only ---- */
+  .bar { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+  /* Thumb-sized end-screen links and Stop on touch screens. */
+  @media (pointer: coarse) {
+    #end .links a { display: inline-block; padding: 12px 8px; }
+    #stop { display: inline-block; padding: 10px 14px; margin: -10px 0; }
+  }
+  /* A phone on its side: the answer row sits high so the keyboard can't cover it. */
+  @media (max-height: 500px) {
+    .bar { padding-top: 8px; }
+    .band { margin-top: 20px; min-height: 60px; }
+    #answer { height: 42px; }
   }
 </style>
 </head>

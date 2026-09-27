@@ -3,7 +3,7 @@
 <head>
 <script src="store.js"></script>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Zetamac Live Timing</title>
 <style>
@@ -358,6 +358,31 @@
     .game-pick { width: 100%; }
     .game-pick .dd { flex: 1; }
     .game-pick .dd-btn { min-width: 0; }
+  }
+
+  /* ---- phones and touch screens: sizing only ---- */
+  /* Clear of the notch and home bar when a phone is on its side. */
+  main { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); padding-bottom: max(72px, env(safe-area-inset-bottom)); }
+  @media (max-width: 640px) {
+    main { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+    /* 16px text so phones don't zoom into the field when it's tapped */
+    .legend button, .legend-note { font-size: 14px; }
+  }
+  /* Every control a thumb can hit: at least 44px tall on touch screens, and 16px text in fields
+     so phones don't zoom into them when tapped. */
+  @media (pointer: coarse) {
+    #add input, #add select, .dd-btn { font-size: 16px; }
+    .empty-state a { display: inline-block; padding: 12px 4px; margin: -12px -4px; }
+    #recent tr.has-detail > td { padding-top: 11px; padding-bottom: 11px; }
+    .play-btn, .help-btn, .edit-toggle { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .seg button { min-height: 40px; padding: 7px 13px; }
+    .legend button { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+    .fold { min-height: 44px; }
+    .primary { min-height: 48px; }
+    .dd-btn, .dd-opt { min-height: 44px; }
+    .bd-sort { min-height: 44px; }
+    #welcome .w-x { width: 44px; height: 44px; }
+    .w-foot button, .w-foot a { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
   }
 
   /* ---- first-visit welcome: three steps, shown once, reopened from "How it works" ---- */

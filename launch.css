@@ -141,6 +141,37 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
   .lt input.num { width: 48px; }
   .lt-go b { font-size: 46px; }
 }
+
+/* ---- touch screens: sizing only ---- */
+#settings.lt { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); }
+@media (max-width: 600px) {
+  #settings.lt { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+}
+/* Smallest phones: range boxes narrow a little so each pair stays clear of its row's switch. */
+@media (max-width: 400px) {
+  .lt input.num { width: 42px; padding: 0 5px; }
+  .lt-range { gap: 2px; }
+  .lt-row { gap: 0 8px; }
+  /* Rows with range boxes: the boxes take the full row width under the name, and the switch
+     sits level with the name. */
+  .lt-row:has(.lt-range) { align-items: start; }
+  .lt-row:has(.lt-range) .lt-body { grid-column: 4 / 6; grid-row: 1; }
+  .lt-row:has(.lt-range) > input.switch { grid-column: 5; grid-row: 1; position: relative; z-index: 1; }
+  .lt-row:has(.lt-range) .lt-range { margin-top: 10px; }
+  .lt-row:has(.lt-range) :is(.lt-pos, .lt-stripe, .lt-code) { align-self: center; }
+}
+@media (pointer: coarse) {
+  .lt-tabs a, .lt-progress { min-height: 44px; display: flex; align-items: center; justify-content: center; }
+  .lt input.num { height: 44px; }
+  .lt input.switch { width: 52px; height: 30px; }
+  .lt input.switch::after { width: 24px; height: 24px; }
+  .lt input.switch:checked::after { transform: translateX(22px); }
+  .lt input.pick { width: 30px; height: 30px; }
+  .lt input.pick:checked::after { inset: 6px; }
+  .lt-colors .cc { min-height: 44px; }
+  .lt-colors input[type=color] { width: 44px; height: 36px; }
+  .lt-colors a { padding: 14px 8px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .lt-row, .lt-stripe, .lt input.switch, .lt input.switch::after { transition: none; }
 }
