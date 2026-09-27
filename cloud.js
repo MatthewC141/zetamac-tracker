@@ -2,8 +2,8 @@
 // URL and public key below are meant to be public: what each visitor can read or change is decided
 // by the database's own rules, not by this file. Leave them empty to run without accounts.
 (() => {
-  const SUPABASE_URL = '';
-  const SUPABASE_KEY = '';
+  const SUPABASE_URL = 'https://ktjcczwwpzzigwfbsynq.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_3iaOg9pYNOgsEnqM8CIQrg_tEBQf_n1';
 
   const SESSION = 'zm-session';
   const nameOk = s => /^[A-Za-z0-9_]{3,20}$/.test(s);
