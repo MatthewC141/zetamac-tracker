@@ -13,6 +13,8 @@ colors:
   menu-active: "#2a2c38"
   figure-white: "#f2f3f5"
   muted-grey: "#9a9eab"
+  prose: "#c7cad3"
+  dim: "#4a4d58"
   projection-silver: "#b9bfcc"
   neutral-bar: "#6b7080"
   sector-purple: "#b561ff"
@@ -68,6 +70,39 @@ typography:
     fontWeight: 500
     lineHeight: 1.4
     fontFeature: "tnum"
+  guide-headline:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "42px"
+    fontWeight: 700
+    lineHeight: 1.02
+    letterSpacing: "-0.01em"
+  bench-figure:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "54px"
+    fontWeight: 700
+    lineHeight: 1
+    letterSpacing: "-0.01em"
+    fontFeature: "tnum"
+  method-heading:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "23px"
+    fontWeight: 700
+    lineHeight: 1.1
+  lede:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 500
+    lineHeight: 1.5
+  step-title:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: 1.3
+  prose:
+    fontFamily: "Barlow Semi Condensed, Titillium Web, system-ui, sans-serif"
+    fontSize: "16px"
+    fontWeight: 500
+    lineHeight: 1.55
   wordmark:
     fontFamily: "Titillium Web, Barlow Semi Condensed, system-ui, sans-serif"
     fontSize: "20px"
@@ -259,6 +294,59 @@ components:
     backgroundColor: "{colors.neutral-bar}"
   step-bar-current:
     backgroundColor: "{colors.sector-purple}"
+  bay-bar:
+    backgroundColor: "{colors.timing-black}"
+    rounded: "{rounded.control}"
+    padding: "2px"
+  bay-tab:
+    textColor: "{colors.muted-grey}"
+    rounded: "{rounded.inner}"
+    padding: "12px 14px 12px 12px"
+  bay-tab-selected:
+    backgroundColor: "{colors.raise}"
+    textColor: "{colors.figure-white}"
+  step-row:
+    textColor: "{colors.prose}"
+    typography: "{typography.prose}"
+    padding: "14px 8px 14px 0"
+  bench-button:
+    backgroundColor: "{colors.raise}"
+    textColor: "{colors.figure-white}"
+    typography: "{typography.label-control}"
+    rounded: "{rounded.control}"
+    padding: "12px 14px"
+  mark-chip:
+    backgroundColor: "{colors.raise}"
+    textColor: "{colors.figure-white}"
+    rounded: "{rounded.inner}"
+    padding: "3px 5px"
+  answer-field:
+    backgroundColor: "{colors.timing-black}"
+    textColor: "{colors.figure-white}"
+    rounded: "{rounded.control}"
+    padding: "0 10px"
+    width: "150px"
+    height: "56px"
+  answer-field-right:
+    textColor: "{colors.sector-green}"
+  table-cell:
+    backgroundColor: "{colors.raise}"
+    textColor: "{colors.prose}"
+    rounded: "{rounded.inner}"
+    height: "38px"
+  table-cell-here:
+    backgroundColor: "{colors.figure-white}"
+    textColor: "{colors.timing-black}"
+  drill-start:
+    backgroundColor: "{colors.figure-white}"
+    textColor: "{colors.timing-black}"
+    rounded: "{rounded.panel}"
+    padding: "18px 20px"
+  aside-note:
+    backgroundColor: "{colors.raise}"
+    textColor: "{colors.prose}"
+    rounded: "{rounded.control}"
+    padding: "12px 16px"
 ---
 
 # Design System: Zetamac Live Timing
@@ -273,7 +361,9 @@ The screen is dense and quick to read. Numbers carry the page; labels stay small
 
 The same world carries the pre-session moment. Each game's start screen is the timing tower before the race: every operation or mode is a driver row you switch in or out, the length is a segmented control of big figures, and START is a white slab carrying a five-light gantry. A first-visit welcome dialog on the dashboard explains the product in three steps inside the same flat, hairlined panel language.
 
-Scope: this system governs the tracker dashboard (`index.html`, including its welcome dialog) and the start/settings screen of all three games (`play.html`, `squares.html`, `practice.html`). On the game pages it applies only while the start screen shows: the page body carries a launch state then, and the dark ground, fonts and tokens are scoped to it. The in-game question screen and the end screen deliberately keep arithmetic.zetamac.com's plain white look. They sit outside this system and must not take on its tokens, and this system must not be bent to match them.
+The same world also carries a read-mode surface: the guide is the garage. Each operation (and the times table) is a bay, picked from a five-tab bay bar. A bay reads as a short article (one-line headline, lede, numbered steps) beside a worked problem that fills in step by step and a problem you solve yourself. Reading is the one place long-form prose appears, so it takes a softer prose ink and a larger, looser body size; figures, labels, stripes and sector colors behave exactly as on the dashboard.
+
+Scope: this system governs the tracker dashboard (`index.html`, including its welcome dialog), the guide (`guide.html`) and the start/settings screen of all three games (`play.html`, `squares.html`, `practice.html`). On the game pages it applies only while the start screen shows: the page body carries a launch state then, and the dark ground, fonts and tokens are scoped to it. The in-game question screen and the end screen deliberately keep arithmetic.zetamac.com's plain white look. They sit outside this system and must not take on its tokens, and this system must not be bent to match them.
 
 **Key Characteristics:**
 - Near-black ground, flat panels, 1px hairline rules; no drop shadows on surfaces.
@@ -296,7 +386,7 @@ A greyscale timing screen with two small families of saturated ink: sector seman
 - **Signal Red** (signal-red): errors (the server banner edge, form errors, delete hover, the save-line dot and white text for a settings error), the session dot in the timing strip, and the lit sockets of the start gantry.
 
 ### Tertiary (team colors)
-- **Team Add Cyan** (team-add), **Team Sub Red** (team-sub), **Team Mul Blue** (team-mul), **Team Div Pink** (team-div), **Team Squares Orange** (team-sq): each operation's identity. They fill the 4px tower stripe (dashboard and start screens), the breakdown operation keys and bars, and the per-game tags in results (30 s games in add cyan, squares in orange, practice drills in sub red). Squares start-screen rows all take the orange stripe; practice drills take sub red. Team Sub Red is the same value as Signal Red.
+- **Team Add Cyan** (team-add), **Team Sub Red** (team-sub), **Team Mul Blue** (team-mul), **Team Div Pink** (team-div), **Team Squares Orange** (team-sq): each operation's identity. They fill the 4px tower stripe (dashboard and start screens), the breakdown operation keys and bars, and the per-game tags in results (30 s games in add cyan, squares in orange, practice drills in sub red). Squares start-screen rows all take the orange stripe; practice drills take sub red. Team Sub Red is the same value as Signal Red. On the guide, the times-table bay (not an operation) takes a figure-white stripe.
 
 ### Neutral
 - **Timing Black** (timing-black): page ground, and the inset well behind segmented controls, game tabs, inputs, range fields, dropdown buttons, the start gantry and the welcome's example panels.
@@ -304,6 +394,8 @@ A greyscale timing screen with two small families of saturated ink: sector seman
 - **Raise** (raise): one step up: lap tiles, selected segment or tab, secondary nav buttons, hovered and open result rows, the expanded breakdown, and the unlit start-light sockets.
 - **Grid Rule** (grid-rule) and **Hairline** (hairline): row dividers and chart gridlines use grid-rule; panel borders, control borders, table header rules and the switch's "off" track use hairline. **Hairline Hover** (hairline-hover) is the border on hover, the dialog's border, the unchecked choice ring and the light-socket ring.
 - **Neutral Bar** (neutral-bar): a bar with no comparison yet (the tower bar fallback) and completed steps in the welcome track.
+- **Prose** (prose): long-form reading text on the guide: the lede, method paragraphs, step bodies, aside notes, and the times-table cell figures. It sits between muted grey and figure white so paragraphs read comfortably without competing with the figures; key figures inside a sentence lift to figure white 600.
+- **Dim** (dim): what isn't known or isn't available yet: placeholder answer digits before a step fills them, the "=" between problem and answer, disabled controls, the hide-answers dot in the times table, and the ENTER hint on a white START slab.
 - **Menu Surface / Menu Edge / Menu Active**: the floating dropdown menu, its border, and the keyboard/pointer-active option.
 - **Muted Grey** (muted-grey): labels, units, gaps, axis text, secondary copy, the switch thumb when off.
 - **Projection Silver** (projection-silver): the dotted 30-second ×4 projection line and the Endless tag.
@@ -313,7 +405,9 @@ A greyscale timing screen with two small families of saturated ink: sector seman
 ### Named Rules
 **The Sector Rule.** Purple, green and yellow mean best, improved and slower (and, on the start screen, counts / won't save / changed-from-default). They are never used for decoration, and a number only takes a sector color when the data or the setting earned it. A row with no comparison yet stays neutral grey (neutral-bar).
 
-**The Team Stripe Rule.** An operation never appears without its team color. The color sits on a 4px stripe or a small tag, never as a fill for the whole row.
+**The Team Stripe Rule.** An operation never appears without its team color. The color sits on a 4px stripe or a small tag, never as a fill for the whole row and never on a figure: Team Sub Red is Signal Red, and a red number reads as an error.
+
+**The Dim Rule.** Dim ink marks what is not there yet (a placeholder digit, a disabled control, the equals sign). It is never used for text someone has to read to proceed; instructions and step numbers stay at muted grey or brighter.
 
 **The Greyscale Archive Rule.** Chart lines, the calendar heat ramp and table text stay white and grey. Color in the archive is reserved for sector and team meaning, target purple and PB marks.
 
@@ -331,6 +425,8 @@ A greyscale timing screen with two small families of saturated ink: sector seman
 - **Headline** (700, 30px): the gap to target ("9 to go"). Sibling figures at 38px (the welcome's example problem), 26px (endless summary, the length figures 0:30 / 2:00 / ∞) and 19px (breakdown stats) sit around headline and title.
 - **Title** (700, 21px): tower times. Fact times drop to 18px, lap tiles are 18px (15px on mobile), and emphasized inline figures in the readout, form average and table scores are 17px. Start-screen row names are Barlow 600 17px; range-field figures are 600 16px.
 - **Body** (500, 15px, line-height 1.4): body copy, table cells, inputs, dropdown options. Secondary copy is 13-14px in muted grey; the welcome lede is 16px at 1.45, capped at 58ch, with key phrases lifted to white 600. Empty-state copy is capped at 46ch; the start-screen lede at 60ch.
+- **Reading surface (guide):** Guide Headline (Barlow 700, 42px, 1.02, -0.01em, balanced, max 21ch; 32px under 600px) states each bay's method in one line. Lede (500, 18px, 1.5, max 58ch; 17px under 600px) in prose ink. Method Heading (700, 23px, 1.1) with its example in muted 500 beside it. Step Title (600, 18px, 1.3) in white over Prose body (500, 16px, 1.55, max 62ch). Step numbers are 700 26px (22px under 600px). Aside notes are 15px.
+- **Guide figures:** the worked-problem Bench Figure (700, 54px, 1, -0.01em; 44px under 600px), the Try one row at 40px with a 34px answer field, the drill question at 56px (44px under 600px), and the drill result at 64px (0.9, -0.02em) with a 0.4em muted unit. The "In your head" held value is 600 21px; ledger lines are 500 18px.
 - **Wordmark** (Titillium 700, 20px, 0.02em, uppercase): "ZETAMAC". Its suffix ("Live timing" on the dashboard, the game name on start screens) is 13px, muted, tracked.
 - **Label** (Titillium, uppercase, tracked): panel titles 700 13px at 0.12em; sub-heads 700 12px at 0.12em in muted grey; control text (segments, tabs, nav, outline and dialog buttons, edit) 700 11-12px at 0.12-0.14em; field labels, table headers and welcome row keys 600-700 11-12px at 0.1em; micro labels (breakdown stats, dropdown groups, mobile stacked-cell labels) 600-700 10px at 0.1-0.14em.
 - **Operation codes** (Titillium 700, 17px, 0.06em; 15px on phone start screens): ADD / SUB / MUL / DIV in the tower, and the three-letter row codes on start screens.
@@ -352,6 +448,8 @@ Start screens reuse the dashboard's shape at a narrower max-width (1080px, 24px 
 
 The welcome dialog is a fixed frame (min(760px, 100vw − 32px) by min(660px, 100dvh − 32px)) so its controls never move between steps: a top bar with the step track and close, a step body (a text column beside a 250px example well), and a footer with the step count left and the buttons right. A placeholder keeps Back's slot on step one.
 
+The guide uses the dashboard's 1240px column with 24px side padding: a strip (wordmark with GUIDE, the white Play button, View progress), the full-width bay bar (five equal columns, 14px below), then a bay as a 7fr / 5fr grid with a 14px gap. The left column is one panel split into an intro (30px 34px padding) and the methods; the right column is the bench and Try one (or the grid tools and drill) stacked 14px apart and sticky 14px from the top, so the worked problem stays beside the steps it illustrates. Methods are divided by hairlines with 24px above each, and every bay ends with a Next link to the following bay. At 1000px and below the bay becomes one column in reading order (intro, methods, then the bench, which Work one scrolls to); at 760px the bay tabs drop their name and example and keep stripe and code; at 600px the stripe turns horizontal (22 by 4px) above the code, side padding drops to 16px, intro and methods padding to 22px 18px, and the grid cells to 30px.
+
 Responsive: at 1000px and below the dashboard's first-viewport grid collapses to one column and the log form becomes two columns. At 640px and below, side padding drops to 12px, panel padding to 16px 14px, and the nav buttons stretch to share a full-width row; "How it works" moves up beside the wordmark. The tower's columns tighten. The practice and endless tables become stacked tables: each row is a two-column block, and each value carries its own tiny uppercase label, so no column hides off-screen. The calendar opens scrolled to today, with a 28px fade at its left edge to show it scrolls. Start screens collapse to one column at 860px with the LENGTH / START panel moved first, so a phone can start without scrolling; at 600px the tabs take a full row and share it equally, row columns tighten, and panel padding drops to 16px 14px. Under 640px the welcome dialog fills the viewport less 8px each side, the example well moves above the text (and the third step's example and the rail example drop out), and the primary button takes the full footer row above the ghosts.
 
 ## Elevation & Depth
@@ -363,6 +461,7 @@ The system is flat. Depth comes from tone (timing black → panel → raise → 
 - **Tooltip lift** (`box-shadow: 0 8px 24px rgba(0, 0, 0, .45)`): the chart hover tooltip.
 - **Selected-segment underline** (`box-shadow: inset 0 -2px 0 #b561ff`): not elevation. It is the 2px purple underline on a selected segment, game tab or length option.
 - **Light-socket ring** (`box-shadow: inset 0 0 0 1px #3d4050`, red when lit): not elevation. It draws the rim of each start-light socket.
+- **Mark-chip ring** (`box-shadow: inset 0 0 0 1px #3d4050`): not elevation. It outlines the small carry / borrow chip on the guide's worked problem.
 
 ### Named Rules
 **The Flat Panel Rule.** Panels, rows, tiles, buttons and dialogs never cast shadows. A shadow means a small layer floats above the page and will close; a modal gets the scrim instead.
@@ -376,11 +475,11 @@ Hard, instrument-like corners. Bars, stripes, tracks and step bars use 1px; inne
 ### Timing Strip (navigation)
 - **Style:** full-width flex row under a hairline. The wordmark is on the left. The session line (uppercase, 12px, muted, with key values in white) is led by a 7px red dot with a soft 3px halo.
 - **Nav buttons:** raise background, hairline border, 3px corners, 11-12px tracked uppercase. Play is the "go" variant: solid figure white with timing-black text, turning pure white on hover. Secondary buttons brighten their border to hairline-hover on hover (150ms).
-- **How it works:** an outline button (see Buttons) after the nav; it reopens the welcome dialog.
+- **How it works / Guide:** two outline buttons (see Buttons) after the nav, sitting together; How it works reopens the welcome dialog, Guide opens the guide. The welcome dialog's rows include a Guide row pointing to it.
 - **Mobile:** the buttons take a full row and split it equally; How it works sits beside the wordmark.
 
 ### Start-Screen Strip (game navigation)
-- Wordmark with the game name as its muted suffix; the three games as an inset segmented tab set (timing-black well, 2px padding, 12px tracked options, the current game on raise with the purple underline); "View progress" as an outline link pushed right.
+- Wordmark with the game name as its muted suffix; the three games as an inset segmented tab set (timing-black well, 2px padding, 12px tracked options, the current game on raise with the purple underline); "Guide" and "View progress" as outline links pushed right and sitting together.
 
 ### Panels (cards / containers)
 - **Corner Style:** 4px. **Background:** panel. **Border:** 1px hairline. **Shadow:** none. **Padding:** 18px 20px 20px on the dashboard, 20px on start screens (16px 14px on mobile).
@@ -447,6 +546,38 @@ Hard, instrument-like corners. Bars, stripes, tracks and step bars use 1px; inne
 - **Example wells:** timing-black insets (hairline border, 4px, 14px 16px 16px padding) headed by a muted tracked label naming them as examples. Step one types a round (38px figures, the answer underlined in purple, turning green when right, the score ticking up) above a TARGET 80 rail; step three shows a small weak-spots tower. The typed round becomes a static solved problem under reduced motion.
 - **Footer:** on a hairline, the "1 of 3" count on the left, ghost buttons (Back, Look around; 12px 18px padding) and one white primary (Next, then "Play a 2-minute round").
 
+### Guide Bay Bar (tabs)
+- **Style:** the inset segmented control widened into a five-column tablist: timing-black well, hairline border, 3px corners, 2px padding and gap. Each tab is a 4px by 32px team stripe (50% opacity until hovered or selected), the three-letter code (Titillium 700 17px), the name (13px muted) under it, and the bay's example problem on the right (600 15px).
+- **State:** hover turns the text white on a 2% white wash. Selected takes the raise fill, white text, the 2px purple underline and a full-opacity stripe. Arrow keys move between tabs.
+- **Motion:** the new bay panel rises 10px and fades in over 500ms; the right column follows 60ms later.
+
+### Numbered Steps
+- **Structure:** a list of rows divided by grid-rule hairlines: a right-aligned step number (700 26px), a 4px team stripe, and a white step title over prose body. The sequence is the method, so the numbers stay.
+- **Active step:** as the bench reaches a step, its row takes a 2.5% white wash, its number turns white and its stripe scales in from the top (scaleY 0 to 1, 450ms). The article and the worked problem always move together.
+
+### Worked-Problem Bench (signature)
+- **Frame:** a panel whose heading is led by a 4px by 18px team stripe, the only team color on the bench. A segmented control picks the method where a bay has several.
+- **Problem:** the bench figure line (54px). Answer digits start as dim placeholders and drop in (12px, 500ms) as each step settles them; the "=" stays dim. Carry and borrow are small mark chips ("1", "−1") written above the first number's tens digit: raise fill, 2px corners, 15px bold figure, the hairline-hover inset ring, dropping in the same way.
+- **In your head:** a row between grid-rule hairlines with a tracked muted key and the held value in 600 21px white.
+- **Ledger:** one line per step taken (500 18px, muted, the current line white), each rising 8px as it arrives, with small step numbers.
+- **Controls:** a count on the left ("Step 2 of 3"), then raise-filled bench buttons (Next step, New problem) with hairline borders; hover lifts the border to hairline-hover. "Work one" in the article is the ghost version.
+- **Motion:** on first view each bench plays its example once, one step every 1.5s. Under reduced motion every step shows at once and nothing animates.
+
+### Try One
+- A panel with a 40px problem, a dim "=", and a 150 by 56px timing-black answer field (34px figures, purple caret and border on focus). Like zetamac, the answer is taken the moment it's right: the field's border and figure turn sector green and the time appears in green 700 18px. A muted line counts problems solved and the average time; Walk through this one hands the problem to the bench.
+
+### Times-Table Grid
+- **Structure:** 2–12 by 2–12 cells (38px tall, 2px apart, 2px corners) on raise with prose figures; squares on the diagonal are bold white. Row headers are buttons.
+- **Crosshair:** hovering or focusing a cell lifts its row and column to a slightly brighter raise (#23242e) and turns the cell itself figure white with timing-black ink.
+- **Picked rows:** a picked row header takes raise, white text and the purple underline; its cells take a faint purple tint (#211d2c). Picked rows feed the drill.
+- **Hide answers:** a square switch hides every figure behind a centered 4px dim dot; tapping a cell peeks at it.
+
+### Drill Panel
+- Segmented options (full-width equal columns) under tracked field labels, then a compact START slab: the same white slab and five-light gantry as the start screens at a smaller size (18px sockets, 44px START, 18px 20px padding), lighting red before the drill begins. Running, it shows a count, a 2px purple progress rail and a 56px question with the same answer field. Results show the average at 64px, and the slowest facts as rows with sector-yellow bars and yellow times.
+
+### Aside Note
+- A raise-filled 3px box (12px 16px padding) under a method, in prose ink at 15px, opened by an inline uppercase tracked run-in label in muted grey. No border stripe: stripes belong to operations.
+
 ### Results Table and Per-Question Breakdown
 - **Table:** 11px tracked uppercase headers over a hairline; 9px 8px cells divided by grid-rule. Scores are right-aligned and 17px bold, preceded by game-type tags in team colors (11px tracked uppercase) and followed by a purple PB badge (timing-black text, 2px corners).
 - **Rows with detail:** hover and open states use the raise background. A CSS chevron rotates on open.
@@ -469,6 +600,8 @@ Hard, instrument-like corners. Bars, stripes, tracks and step bars use 1px; inne
 - **Do** give every animation the cubic-bezier(.16, 1, .3, 1) ease-out and remove it under `prefers-reduced-motion`.
 - **Do** keep the 1-4px corner scale; 4px is the largest radius on any surface or control.
 - **Do** scope the system on game pages to the start screen only: switch the page dark while the settings screen shows and hand back to zetamac's white for play and results.
+- **Do** set long-form reading text (guide ledes, step bodies, asides) in prose ink at 16-18px with 1.5-1.55 line height, and lift figures inside a sentence to white 600.
+- **Do** keep a worked problem and its numbered steps in step: advancing one lights the other.
 - **Do** keep every start-screen control a real form control (checkbox, radio, number field) with the id the game reads; the styling dresses it, it never replaces it.
 
 ### Don't:
@@ -477,4 +610,6 @@ Hard, instrument-like corners. Bars, stripes, tracks and step bars use 1px; inne
 - **Don't** put drop shadows on panels, rows, tiles, buttons or dialogs; shadows belong only to the dropdown menu and the chart tooltip.
 - **Don't** color the lap-chart lines or the calendar ramp beyond white, grey, silver, the target purple and PB purple; per-question breakdown bars are the one chart that takes team colors.
 - **Don't** apply this system to the game pages' in-game question screen or end screen; they deliberately keep arithmetic.zetamac.com's white look. Only the start screen belongs to this world.
+- **Don't** set a figure, answer or number in a team color; team color lives on stripes and tags only.
+- **Don't** use dim ink for instructions or anything a reader must read; it is for placeholders, the equals sign and disabled states.
 - **Don't** use pill controls, rounded switches or radii above 4px on surfaces and controls; full circles are reserved for dots, start lights and the single-choice ring.

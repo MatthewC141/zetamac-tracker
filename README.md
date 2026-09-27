@@ -52,6 +52,15 @@ seconds are options). Problems come from zetamac's subtraction range:
 
 The dashboard's **Practice** section shows each drill's games, bests, and average time per question.
 
+## Guide
+
+`guide.html` (the **Guide** button) explains the quickest mental method for each operation, one tab
+each: carrying in addition; subtraction with and without borrowing (counting up, or taking the
+leftover from 10); multiplication by splitting the big number, plus the × 11 shortcut; and division
+by finding the round multiple underneath. Each tab has a worked problem you can step through and a
+**Try one** box. The **Times table** tab has a 2–12 grid (hide it to test yourself) and a drill that
+ends with your slowest facts. Nothing on the guide page is saved to the tracker.
+
 ## Endless mode
 
 Pick **Endless** as the length in any of the three games to play with no timer. The clock counts up, and you

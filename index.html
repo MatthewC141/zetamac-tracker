@@ -339,6 +339,7 @@
     .nav .play-btn { flex: 1; text-align: center; }
     .brand { flex: 1; }
     .help-btn { order: -1; margin-left: auto; padding: 9px 12px; }
+    .help-btn + .help-btn { margin-left: -10px; }
     .brand { order: -2; }
     .panel { padding: 16px 14px 16px; }
     .readout { gap: 6px 18px; }
@@ -390,6 +391,8 @@
   /* ---- first-visit welcome: three steps, shown once, reopened from "How it works" ---- */
   .help-btn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--line); padding: 10px 14px; border-radius: 3px; cursor: pointer; }
   .help-btn:hover { color: var(--ink); border-color: #3d4050; }
+  a.help-btn { text-decoration: none; }
+  .help-btn + .help-btn { margin-left: -16px; }
   #welcome { width: min(760px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
   #welcome[open] { display: flex; flex-direction: column; }
   .w-step { flex: 1 0 auto; }
@@ -482,6 +485,7 @@
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="practice.html">Practice</a>
     </nav>
+    <a class="help-btn" href="guide.html">Guide</a>
     <button class="help-btn" id="help-open" type="button">How it works</button>
   </header>
 
@@ -689,6 +693,7 @@
       <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock and records seconds per problem.</span></li>
       <li class="plain"><span class="k">Squares</span><span class="v">Two-digit or three-digit squares, with a <b>hard mode</b> that skips the easy ones.</span></li>
       <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, like <b>subtraction with borrowing</b>. Untimed by default.</span></li>
+      <li class="plain"><span class="k">Guide</span><span class="v">The quickest way to do <b>each operation in your head</b>, step by step, plus a times-table drill. Open <b>Guide</b> from the header.</span></li>
     </ul>
   </section>
 

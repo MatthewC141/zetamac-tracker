@@ -35,6 +35,7 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 .lt-tabs a[aria-current="page"] { background: var(--lt-raise); color: var(--lt-ink); box-shadow: inset 0 -2px 0 var(--lt-purple); }
 .lt-progress { order: 3; margin-left: auto; font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none !important; color: var(--lt-muted) !important; border: 1px solid var(--lt-line); border-radius: 3px; padding: 10px 14px; }
 .lt-progress:hover { color: var(--lt-ink) !important; border-color: var(--lt-line-hi); }
+.lt-guide + .lt-progress { margin-left: -18px; }  /* Guide and Progress sit together at the right */
 
 /* ---- two panels: the tower of rows, and length + start ---- */
 .lt-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 14px; align-items: start; }
