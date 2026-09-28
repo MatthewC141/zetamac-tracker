@@ -42,17 +42,25 @@
     return s;
   };
 
-  // A valid access token for the signed-in player, refreshed when it's about to run out.
-  async function token() {
+  // A valid access token for the signed-in player, renewed when it's about to run out (or when the
+  // database turned the current one down). Requests that need a renewal at the same moment share
+  // one. If the session can't be renewed, the player is signed out and the error says so.
+  let renewing = null;
+  async function token(force = false) {
     const s = read();
-    if (!s) return null;
-    if (Date.now() < s.expires) return s.access;
-    try {
-      return keep(await call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: s.refresh } }), s.name).access;
-    } catch (err) {
-      if (err.status >= 400 && err.status < 500) write(null);  // the session is gone: signed out
-      throw err;
-    }
+    if (!s) throw Object.assign(new Error('You’re signed out.'), { signedOut: true });
+    if (!force && Date.now() < s.expires) return s.access;
+    renewing ||= (async () => {
+      try {
+        return keep(await call('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: { refresh_token: s.refresh } }), s.name).access;
+      } catch (err) {
+        if (err.status >= 400 && err.status < 500) { write(null); err.signedOut = true; }
+        throw err;
+      } finally {
+        renewing = null;
+      }
+    })();
+    return renewing;
   }
 
   window.ZM_CLOUD = {
@@ -78,8 +86,16 @@
       await call('/rest/v1/rpc/delete_me', { method: 'POST', token: await token(), body: {} });
       write(null);
     },
-    // Signed-in database calls (rows are limited to the player's own by the database).
-    async rest(path, opts = {}) { return call(`/rest/v1/${path}`, { ...opts, token: await token() }); },
+    // Signed-in database calls (rows are limited to the player's own by the database). A token the
+    // database refuses is renewed once and the call retried.
+    async rest(path, opts = {}) {
+      try {
+        return await call(`/rest/v1/${path}`, { ...opts, token: await token() });
+      } catch (err) {
+        if (err.status !== 401) throw err;
+        return call(`/rest/v1/${path}`, { ...opts, token: await token(true) });
+      }
+    },
     // Public: every player's best verified game per board.
     leaderboard: () => call('/rest/v1/leaderboard?select=username,mode,seconds,score,elapsed,date'),
   };

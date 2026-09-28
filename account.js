@@ -27,6 +27,8 @@
     const r = await fetch('api/import', { method: 'POST', headers: { 'X-Zetamac': '1' }, body: JSON.stringify(window.ZM_LOCAL.exportFile()) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Couldn’t move your games.');
+    // Clear this browser's copy only once the account holds the games.
+    if (!cloud.user()) throw new Error('You were signed out before your games could move. Log in again; they’re still here.');
     window.ZM_LOCAL.clear();
     return data.added;
   }
@@ -76,7 +78,12 @@
     try {
       if (mode === 'up') await cloud.signUp(name, pass); else await cloud.logIn(name, pass);
       let moved = 0;
-      if (!$('#move-field').hidden && $('#move').checked) moved = await moveLocal();
+      if (!$('#move-field').hidden && $('#move').checked) {
+        try { moved = await moveLocal(); }
+        catch (err) {  // signed in, but the games stayed here: say so where "Move them" can retry
+          return showIn(`You’re signed in, but this browser’s games didn’t move: ${err.message} Try “Move them” below.`, true);
+        }
+      }
       const news = `${mode === 'up' ? 'Welcome' : 'Welcome back'}, ${cloud.user().name}. ${moved ? `Moved ${plural(moved, 'game')} from this browser into your account. ` : ''}Your games now save to your account.`;
       try { sessionStorage.setItem('zm-flash', news); } catch {}
       location.href = './';
@@ -88,19 +95,21 @@
   });
 
   // ---- signed in ----
-  async function showIn(note = '') {
+  async function showIn(note = '', isError = false) {
+    const name = cloud.user().name;
     $('#out').hidden = true;
     $('#in').hidden = false;
-    $('#me-name').textContent = cloud.user().name;
-    showPlaces();
+    $('#me-name').textContent = name;
+    showPlaces(name);
     const im = $('#in-msg');
-    im.className = note ? 'msg ok' : 'msg'; im.textContent = note;
+    im.className = note ? `msg ${isError ? 'err' : 'ok'}` : 'msg'; im.textContent = note;
     const n = localCount();
     $('#move-row').hidden = !n;
     $('#move-count').textContent = `${plural(n, 'game')} saved here before you signed in.`;
     try {
       const r = await fetch('api/scores');
       const rows = await r.json();
+      if (!cloud.user()) return expired();  // the sign-in ran out and couldn't be renewed
       if (!r.ok) throw new Error(rows.error);
       const played = rows.filter(g => g.source === 'game').length;
       $('#me-sub').textContent = `Signed in · ${plural(rows.length, 'game')} in your account${rows.length ? `, ${played} played on the site` : ''}.`;
@@ -108,6 +117,14 @@
       $('#me-sub').textContent = err.message || 'Couldn’t load your games.';
     }
   }
+  function expired() {
+    $('#in').hidden = true;
+    $('#out').hidden = false;
+    setMode('in');
+    $('#msg').className = 'msg err';
+    $('#msg').textContent = 'Your sign-in ran out. Log in again.';
+  }
+
   // Where you stand on each board you're on.
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
@@ -115,8 +132,8 @@
     ['sq999|120', 'Three-digit squares', '2:00', 't-sq'], ['sq999h|120', 'Three-digit squares, hard', '2:00', 't-sq'],
     ['standard|0', 'Arithmetic', 'Endless', 't-end'],
   ];
-  async function showPlaces() {
-    const me = cloud.user().name.toLowerCase();
+  async function showPlaces(name) {
+    const me = name.toLowerCase();
     try {
       const rows = await cloud.leaderboard();
       const mine = BOARDS.map(([key, name, len, team]) => {

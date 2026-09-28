@@ -693,6 +693,7 @@ function render() {
   const t = today();
   $('#session-date').textContent = `${t.toLocaleDateString(undefined, { weekday: 'short' })} ${t.getDate()} ${MONTHS[t.getMonth()]}`;
   $('#updated').innerHTML = `<b>${allGames.length}</b> games logged`;
+  syncAccount();
 }
 
 // ---------- data ----------
@@ -762,12 +763,14 @@ try {
   const flash = sessionStorage.getItem('zm-flash');
   if (flash) { $('#flash').textContent = flash; $('#flash').hidden = false; sessionStorage.removeItem('zm-flash'); }
 } catch {}
-// On the website: the account button, and whose scores these are.
-if (window.ZM_WEB && window.ZM_CLOUD?.ready) {
+// On the website: the account button (kept in step with the sign-in, which can run out).
+const syncAccount = () => {
+  if (!window.ZM_WEB || !window.ZM_CLOUD?.ready) return;
   const u = window.ZM_CLOUD.user();
   $('#acct-btn').hidden = false;
   $('#acct-btn').textContent = u ? u.name : 'Sign up';
-}
+};
+syncAccount();
 // On the website, scores live only in this browser; say so where scores go in.
 if (window.ZM_WEB) $('#log-note').textContent = window.ZM_CLOUD?.user()
   ? `For scores from the zetamac website. Games played here save to your account (${window.ZM_CLOUD.user().name})`
@@ -841,6 +844,7 @@ $('#import').addEventListener('change', async e => {
   const file = e.target.files[0], msg = $('#move-msg');
   e.target.value = '';
   if (!file) return;
+  if (file.size > 50e6) { msg.className = 'msg err'; msg.textContent = 'That file is too big to be a tracker export (over 50 MB).'; return; }
   msg.className = 'msg'; msg.textContent = 'Importing…';
   try {
     const r = await fetch('api/import', { method: 'POST', headers: { 'X-Zetamac': '1' }, body: await file.text() });

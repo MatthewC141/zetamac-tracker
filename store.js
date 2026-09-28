@@ -37,8 +37,8 @@
   const whole = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
   const validRow = e => e && typeof e === 'object' &&
     typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
-    whole(e.score, 999999) && [0, 30, 120].includes(e.seconds) && whole(e.elapsed, 999999) &&
-    (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode);
+    whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120].includes(e.seconds) && whole(e.elapsed, 999999) &&
+    e.ts.slice(0, 10) === e.date && (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode);
   const fields = ({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed });
 
   const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -169,9 +169,10 @@
   const insertRows = (c, rows) => c.rest('scores?on_conflict=user_id,ts,score,seconds,mode,source', {
     method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
     body: rows.map(({ e, detail }) => {
+      // A log that's unreadable or longer than the database keeps (5,000 answers) is dropped; the score still saves.
       let log = null;
-      try { log = detail ? JSON.parse(detail) : null; } catch {}  // an unreadable log is dropped; the score still saves
-      return { ...e, detail: Array.isArray(log) ? log : null };
+      try { log = detail ? JSON.parse(detail) : null; } catch {}
+      return { ...e, detail: Array.isArray(log) && log.length <= 5000 ? log : null };
     }),
   });
 
@@ -245,6 +246,13 @@
       return c ? await account(c, m[1], method, url, init.body) : local(m[1], method, url, init.body);
     } catch (err) {
       if (err instanceof Refused) return fail(400, err.message);
+      // Signed out mid-session (the sign-in ran out): carry on in this browser, so a finished game
+      // is never lost. The account page offers to move it in after logging back in.
+      // (Only for saving a game or score, and for reads; never for an import, which moves games out
+      // of this browser and must fail rather than land back here.)
+      if (err.signedOut && (method === 'GET' || m[1] === 'game' || m[1] === 'scores')) {
+        try { return local(m[1], method, url, init.body); } catch (e2) { if (e2 instanceof Refused) return fail(400, e2.message); }
+      }
       return fail(500, c ? `Couldn’t reach your account: ${err.message}` : 'Couldn’t save in this browser. Storage may be full or blocked (private windows can block it).');
     }
   };
