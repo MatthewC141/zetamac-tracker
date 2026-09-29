@@ -1,4 +1,4 @@
-/* Start screen for the three games, in the dashboard's live-timing world (see DESIGN.md).
+/* Start screen for the three games.
    Only #settings and the page while it shows (body.launch) use this; the game and end screens
    keep each page's own zetamac styles. */
 @font-face { font-family: "Titillium Web"; font-weight: 600; font-display: swap; src: url(fonts/TitilliumWeb-600.woff2) format("woff2"); }

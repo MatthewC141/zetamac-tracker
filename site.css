@@ -1,4 +1,4 @@
-/* Shared base for the account and leaderboard pages: the dashboard's live-timing world (DESIGN.md). */
+/* Shared base styles for the account and leaderboard pages. */
 @font-face { font-family: "Titillium Web"; font-weight: 600; font-display: swap; src: url(fonts/TitilliumWeb-600.woff2) format("woff2"); }
 @font-face { font-family: "Titillium Web"; font-weight: 700; font-display: swap; src: url(fonts/TitilliumWeb-700.woff2) format("woff2"); }
 @font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url(fonts/BarlowSemiCondensed-500.woff2) format("woff2"); }
