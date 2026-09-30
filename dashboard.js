@@ -570,37 +570,27 @@ function renderScore() {
   const pb = Math.max(...full.map(g => g.score));
   const last = full[full.length - 1];
 
-  // Each of the last 10 games against what came before it: purple = a new best at the time,
-  // green = above the average of the 5 games before it, yellow = below.
+  // The last 10 games and their average: purple = a new best at the time, green = at or above
+  // that average, yellow = below it.
   const SECTORS = [['s-purple', 'New best'], ['s-green', 'Above avg'], ['s-yellow', 'Below avg']];
-  const recent = full.slice(-10).map(g => {
-    const k = full.indexOf(g), before = full.slice(0, k), prev5 = before.slice(-5);
-    const bestBefore = before.reduce((m, x) => Math.max(m, x.score), -1);
-    const avg = prev5.length ? prev5.reduce((t, x) => t + x.score, 0) / prev5.length : null;
-    return { g, cls: g.score > bestBefore ? 's-purple' : avg == null ? '' : g.score >= avg ? 's-green' : 's-yellow' };
+  const last10 = full.slice(-10), avg = last10.reduce((t, g) => t + g.score, 0) / last10.length;
+  const recent = last10.map(g => {
+    const bestBefore = full.slice(0, full.indexOf(g)).reduce((m, x) => Math.max(m, x.score), -1);
+    return { g, cls: g.score > bestBefore ? 's-purple' : g.score >= avg ? 's-green' : 's-yellow' };
   });
-  const scores = recent.map(r => r.g.score);
-  const lo = Math.max(0, Math.min(...scores) - 8), hi = Math.max(...scores);
-  const height = v => `${(16 + 84 * (v - lo) / Math.max(1, hi - lo)).toFixed(1)}%`;
   const lastCls = recent[recent.length - 1].cls;
   const lastNote = last.score >= pb ? 'your personal best' : `${pb - last.score} off your best of ${pb}`;
-  const last5 = full.slice(-5), avg5 = last5.reduce((t, g) => t + g.score, 0) / last5.length;
 
   el.innerHTML =
     `<div class="sb-figs">` +
       `<div class="sb-fig main"><span class="lbl">${week.length ? 'Best this week' : 'Latest game'}</span><b>${head}</b></div>` +
       `<div class="sb-fig last ${lastCls}"><span class="lbl">Last game</span><b>${last.score}</b>` +
         `<small>${esc(shortDate(parseDate(last.date)))} · ${lastNote}</small>` +
-        `<span class="sb-avg"><b>${round1(avg5)}</b> average of your last ${last5.length}</span></div>` +
+        `<span class="sb-avg"><b>${round1(avg)}</b> average of your last ${last10.length}</span></div>` +
     `</div>` +
-    `<div class="sb-laps-head"><h3 title="Each game against the average of the 5 before it">Last ${recent.length} games</h3>` +
+    `<div class="sb-laps-head"><h3>Last ${recent.length} games</h3>` +
       `<span class="key">${SECTORS.map(([cls, label]) => `<span class="${cls}">${label}</span>`).join('')}</span></div>` +
-    `<ol class="sb-laps">${recent.map((r, i) => {
-      const now = i === recent.length - 1, name = SECTORS.find(x => x[0] === r.cls)?.[1];
-      return `<li class="${r.cls}${now ? ' now' : ''}" title="${longDate(parseDate(r.g.date))}: ${r.g.score}${name ? ` · ${name.toLowerCase()}` : ''}">` +
-        `<span class="v">${r.g.score}</span><span class="sb-track"><i style="height:${height(r.g.score)}"></i></span>` +
-        `<small>${now ? 'Last' : esc(shortDate(parseDate(r.g.date)))}</small></li>`;
-    }).join('')}</ol>`;
+    `<ol class="laps">${recent.map(r => `<li class="${r.cls}" title="${longDate(parseDate(r.g.date))}">${r.g.score}<small>${esc(shortDate(parseDate(r.g.date)))}</small></li>`).join('')}</ol>`;
 }
 
 // ---------- per-question breakdown (expands under a recent game) ----------
