@@ -1,4 +1,4 @@
-// 1v1 matches (duel.html). The database pairs players, keeps the clock and decides the winner
+// Duels (duel.html), one player against another. The database pairs players, keeps the clock and decides the winner
 // (see "1v1 matches" in schema.sql); this page shows the lobby, plays the questions both players
 // share (problems.js), and reports each correct answer.
 (() => {

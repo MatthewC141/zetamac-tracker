@@ -1,4 +1,4 @@
-// Seeded question lists for 1v1 (duel.html): both players build the same list from the match's
+// Seeded question lists for duels (duel.html): both players build the same list from the match's
 // seed. The problems match the solo games: zetamac's default arithmetic, the combined game's four
 // kinds, and the squares modes.
 window.ZM_PROBLEMS = (() => {
@@ -60,6 +60,6 @@ window.ZM_PROBLEMS = (() => {
     return out;
   }
 
-  const NAMES = { standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares, hard', sq999: 'Three-digit squares', sq999h: 'Three-digit squares, hard' };
+  const NAMES = { standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
   return { list, NAMES };
 })();
