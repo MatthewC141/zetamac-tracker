@@ -64,9 +64,9 @@ create table if not exists public.scores (
   ts text not null check (ts ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$'),
   date date not null,
   score int not null check (score between 0 and 999999),
-  seconds int not null check (seconds in (0, 30, 120)),
+  seconds int not null check (seconds in (0, 30, 120, 480)),
   source text not null check (source in ('game', 'manual')),
-  mode text not null check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed')),
+  mode text not null check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80')),
   elapsed int not null default 0 check (elapsed between 0 and 999999),
   detail jsonb check (detail is null or (jsonb_typeof(detail) = 'array' and pg_column_size(detail) < 2000000)),
   has_detail boolean generated always as (detail is not null) stored,
@@ -81,7 +81,13 @@ alter table public.scores drop constraint if exists scores_timed_max;
 alter table public.scores add constraint scores_timed_max check (seconds = 0 or score <= 500);
 alter table public.scores drop constraint if exists scores_mode_check;
 alter table public.scores add constraint scores_mode_check
-  check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed'));
+  check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80'));
+-- Game lengths: endless (0), 30 s, 2 minutes, and 8 minutes for the 80-in-8 test only.
+alter table public.scores drop constraint if exists scores_seconds_check;
+alter table public.scores add constraint scores_seconds_check
+  check (seconds in (0, 30, 120) or (seconds = 480 and mode = 'o80'));
+alter table public.scores drop constraint if exists scores_o80_length;
+alter table public.scores add constraint scores_o80_length check (mode <> 'o80' or (seconds = 480 and score <= 80));
 alter table public.scores drop constraint if exists scores_detail_len;
 alter table public.scores add constraint scores_detail_len check (detail is null or jsonb_array_length(detail) <= 5000);
 -- A question takes about 75 bytes in the log; 200 each leaves plenty of room. Measured before
@@ -116,10 +122,12 @@ grant select on public.profiles to authenticated;
 -- game counts for the leaderboard: it was played in the browser game, scored at least a point, and
 -- its question log holds up, with one entry per point scored, every answer timed at 150 ms or more,
 -- and the times adding up to no more than the game's length (the run's length for endless).
+-- The 80-in-8 test is marked right minus wrong, so its log holds every question answered or
+-- skipped (at most 80, each marked r = y, n or s) and the score must be rights minus wrongs.
 -- Hand-logged scores never count.
 create or replace function public.check_score() returns trigger
 language plpgsql set search_path = '' as $$
-declare n int; bad int; total numeric; fastest numeric;
+declare n int; bad int; total numeric; fastest numeric; rights int; wrongs int;
 begin
   if (select count(*) from public.scores where user_id = new.user_id) >= 20000 then
     raise exception 'This account has reached its limit of 20,000 games.';
@@ -143,6 +151,14 @@ begin
   n := jsonb_array_length(new.detail);
   select count(*) filter (where coalesce(jsonb_typeof(q -> 't'), '') <> 'number') into bad
     from jsonb_array_elements(new.detail) q;
+  if new.mode = 'o80' then
+    if new.seconds <> 480 or new.score = 0 or n > 80 or bad > 0 then return new; end if;
+    select count(*) filter (where q ->> 'r' = 'y'), count(*) filter (where q ->> 'r' = 'n'),
+           coalesce(sum((q ->> 't')::numeric), 0), coalesce(min((q ->> 't')::numeric) filter (where q ->> 'r' <> 's'), 150)
+      into rights, wrongs, total, fastest from jsonb_array_elements(new.detail) q;
+    new.verified := new.score = greatest(0, rights - wrongs) and fastest >= 150 and total <= 482000;
+    return new;
+  end if;
   if new.score = 0 or n <> new.score or bad > 0 then return new; end if;
   select coalesce(sum((q ->> 't')::numeric), 0), coalesce(min((q ->> 't')::numeric), 150)
     into total, fastest from jsonb_array_elements(new.detail) q;

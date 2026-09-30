@@ -239,6 +239,7 @@
   .len { font: 700 11px/1 var(--label); letter-spacing: .08em; text-transform: uppercase; color: var(--t-add); margin-right: 8px; white-space: nowrap; display: inline-block; }
   .len.sq { color: var(--t-sq); }
   .len.mx { color: var(--t-mix); }
+  .len.o8 { color: var(--purple); }
   .len.end { color: var(--proj); }
   .len.pr { color: var(--t-sub); }
   .practice td, .practice th, .runs td, .runs th { white-space: nowrap; }
@@ -356,6 +357,8 @@
   .op-div { --team: var(--t-div); background: var(--t-div); fill: var(--t-div); }
   .op-sq { --team: var(--t-sq); background: var(--t-sq); fill: var(--t-sq); }
   .op-mix { --team: var(--t-mix); background: var(--t-mix); fill: var(--t-mix); }
+  .op-dec { --team: #c9a7ff; background: #c9a7ff; fill: #c9a7ff; }
+  .op-pct { --team: #ffd21f; background: #ffd21f; fill: #ffd21f; }
   .tower li.op-add, .tower li.op-sub, .tower li.op-mul, .tower li.op-div { background: none; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -453,7 +456,7 @@
     .strip .help-btn + .help-btn { margin-left: -8px; }
     .strip .help-btn.acct-btn { order: -1; margin-left: 0; }
   }
-  @media (min-width: 641px) and (max-width: 760px) {
+  @media (min-width: 641px) and (max-width: 860px) {
     .strip .play-btn, .strip .help-btn:not(.acct-btn) { padding: 10px 6px; font-size: 11px; letter-spacing: .06em; }
   }
   @media (max-width: 640px) {
@@ -466,7 +469,8 @@
     .brand span { display: inline; }
     .nav { order: 0; margin-left: 0; width: 100%; }
     .nav .play-btn { flex: 1 1 auto; min-width: 0; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
-    @media (max-width: 380px) { .nav .play-btn { padding: 10px 3px; letter-spacing: .03em; } }
+    /* The narrowest phones: the six games as two rows of three. */
+    @media (max-width: 380px) { .nav { flex-wrap: wrap; } .nav .play-btn { flex: 1 1 30%; padding: 10px 3px; letter-spacing: .03em; } }
     .help-btn { order: 1; flex: 1 1 0; text-align: center; padding: 9px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
     .strip .help-btn + .help-btn { margin-left: 0; }
     .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
@@ -565,6 +569,7 @@
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="mixed.html">Combined</a>
       <a class="play-btn" href="practice.html">Practice</a>
+      <a class="play-btn" href="optiver.html">80 in 8</a>
       <a class="play-btn" href="duel.html">Duel</a>
     </nav>
     <a class="help-btn" href="leaderboard.html">Leaderboard</a>
@@ -614,6 +619,7 @@
           <select id="chart-game">
             <option value="standard">Arithmetic (zetamac)</option>
             <option value="mixed">Combined operations</option>
+            <option value="o80">80 in 8</option>
             <optgroup label="Squares">
               <option value="sq99h">Two-digit squares</option>
               <option value="sq999h">Three-digit squares</option>
@@ -715,6 +721,7 @@
             <option value="sq99">Two-digit squares, all numbers (older)</option>
             <option value="sq999">Three-digit squares, all numbers (older)</option>
             <option value="mixed">Combined operations</option>
+            <option value="o80">80 in 8</option>
             <option value="sub-borrow">Borrowing practice</option>
             <option value="sub-easy">No-borrow practice</option>
           </select>

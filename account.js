@@ -162,6 +162,7 @@
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
     ['mixed|120', 'Combined operations', '2:00', 't-mix'],
+    ['o80|480', '80 in 8', '8:00', 't-o80'],
     ['sq99h|120', 'Two-digit squares', '2:00', 't-sq'], ['sq999h|120', 'Three-digit squares', '2:00', 't-sq'],
     ['standard|0', 'Arithmetic', 'Endless', 't-end'],
   ];

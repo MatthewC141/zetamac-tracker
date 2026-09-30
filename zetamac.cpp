@@ -44,6 +44,7 @@ using Clock = std::chrono::steady_clock;
 // Division:        multiplication problems in reverse
 // Duration:        120 seconds; a correct answer is accepted as soon as it's typed.
 constexpr int kDuration = 120;
+constexpr int kO80Seconds = 480;  // the 80-in-8 test: 80 questions in 8 minutes
 constexpr int kAddLo = 2, kAddHi = 100;
 constexpr int kMulLeftLo = 2, kMulLeftHi = 12;
 constexpr int kMulRightLo = 2, kMulRightHi = 100;
@@ -133,9 +134,9 @@ struct Entry {
 // Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 5,
 // and no 1–20 in the 1–99 range). Practice drills: subtraction with / without borrowing, and
 // "guided" (the arithmetic game with guided mode on, kept apart from real scores), and "mixed"
-// (combined operations, like (5 + 2) × (15 + 9)).
+// (combined operations, like (5 + 2) × (15 + 9)), and "o80" (the Optiver 80-in-8 test).
 static const std::set<std::string> kModes = {"standard", "sq99",     "sq99h",  "sq999", "sq999h",
-                                             "sub-borrow", "sub-easy", "guided", "mixed"};
+                                             "sub-borrow", "sub-easy", "guided", "mixed", "o80"};
 
 static const char* kHeader = "timestamp,date,score,seconds,source,mode,elapsed";
 
@@ -174,7 +175,7 @@ static std::vector<Entry> load_scores() {
     // Hand-edited rows outside what the tracker ever writes are skipped (huge values would
     // overflow the stats maths).
     if (e.score < 0 || e.score > 999999 || e.elapsed < 0 || e.elapsed > 999999 ||
-        (e.seconds != 0 && e.seconds != 30 && e.seconds != kDuration))
+        (e.seconds != 0 && e.seconds != 30 && e.seconds != kDuration && e.seconds != kO80Seconds))
       continue;
     if (e.source.empty()) e.source = "manual";
     if (e.mode.empty()) e.mode = "standard";  // rows from before modes existed
@@ -613,11 +614,18 @@ static void respond_error(int fd, const std::string& status, const std::string& 
   respond(fd, status, "application/json", "{\"error\":\"" + json_escape(msg) + "\"}");
 }
 
-// Game length for a posted score: 120 (the default) or 30 seconds. Returns 0 if invalid.
+// Game length for a posted score: 120 (the default) or 30 seconds, or 480 for the 80-in-8 test.
+// Returns 0 if invalid (see length_fits for which lengths go with which game).
 static int parse_seconds(const std::map<std::string, std::string>& form) {
   auto it = form.find("seconds");
   if (it == form.end() || it->second.empty() || it->second == "120") return 120;
+  if (it->second == "480") return kO80Seconds;
   return it->second == "30" ? 30 : 0;
+}
+
+// The 80-in-8 test is always 8 minutes (and scores at most 80); nothing else is.
+static bool length_fits(const std::string& mode, int seconds, int score) {
+  return mode == "o80" ? seconds == kO80Seconds && score <= 80 : seconds != kO80Seconds;
 }
 
 // Game mode for a posted score: "standard" unless a known squares mode is given. Empty if invalid.
@@ -692,6 +700,7 @@ static void handle_client(int fd) {
       {"/mixed", "mixed.html"},     {"/mixed.html", "mixed.html"},      {"/mixed.js", "mixed.js"},
       {"/duel", "duel.html"},       {"/duel.html", "duel.html"},        {"/duel.js", "duel.js"},
       {"/problems.js", "problems.js"}, {"/matches.js", "matches.js"}, {"/duel-history.js", "duel-history.js"},
+      {"/optiver", "optiver.html"}, {"/optiver.html", "optiver.html"}, {"/optiver.js", "optiver.js"},
       {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);
@@ -742,6 +751,7 @@ static void handle_client(int fd) {
       if (!seconds) return respond_error(fd, "400 Bad Request", "Game length must be 30 or 120 seconds.");
       std::string mode = parse_mode(form);
       if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
+      if (!length_fits(mode, seconds, score)) return respond_error(fd, "400 Bad Request", "That game length doesn't fit that game.");
       if (!append_score(make_entry(score, date, "manual", seconds, mode)))
         return respond_error(fd, "500 Internal Server Error", "Could not write scores.csv.");
       return respond(fd, "200 OK", "application/json", scores_json());
@@ -758,6 +768,8 @@ static void handle_client(int fd) {
         return respond_error(fd, "400 Bad Request", "Endless runs need an elapsed time in seconds.");
       std::string mode = parse_mode(form);
       if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
+      if (!endless && !length_fits(mode, seconds, score)) return respond_error(fd, "400 Bad Request", "That game length doesn't fit that game.");
+      if (endless && mode == "o80") return respond_error(fd, "400 Bad Request", "The 80-in-8 test has no endless version.");
       Entry e = make_entry(score, today(), "game", seconds, mode);
       e.elapsed = elapsed;
       if (!append_score(e))

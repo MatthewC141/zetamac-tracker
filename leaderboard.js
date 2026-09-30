@@ -12,6 +12,7 @@
     { key: 'standard|120', name: 'Arithmetic', len: '2:00', team: 't-arith' },
     { key: 'standard|30', name: 'Arithmetic', len: '0:30', team: 't-arith' },
     { key: 'mixed|120', name: 'Combined operations', len: '2:00', team: 't-mix' },
+    { key: 'o80|480', name: '80 in 8', len: '8:00', team: 't-o80', play: 'an 80-in-8 test' },
     { key: 'sq99h|120', name: 'Two-digit squares', len: '2:00', team: 't-sq' },
     { key: 'sq999h|120', name: 'Three-digit squares', len: '2:00', team: 't-sq' },
     { key: 'standard|0', name: 'Arithmetic', len: 'Endless', team: 't-end', endless: true },
@@ -65,7 +66,7 @@
       return `<li class="${b.team}${you ? ' me' : ''}"><span class="pos">${pl[i]}</span><span class="stripe"></span>` +
         `<span class="who">${esc(r.username)}${you ? '<span class="you">You</span>' : ''}${ahead ? `<span class="to-pass">${ahead.score - r.score + 1} to pass ${esc(ahead.username)}</span>` : ''}</span>` +
         `<span class="figure${pl[i] === 1 ? ' p1' : ''}">${figure(b, r)}</span><span class="gap">${behind(b, r, list[0])}</span><span class="date">${dateText(r.date)}</span></li>`;
-    }).join('') : `<li class="empty-row"><p class="empty">No one on this board yet. Play ${b.endless ? 'an endless run' : `a ${b.len} ${b.name.toLowerCase()} game`} on the site while signed in to set the first mark.</p></li>`;
+    }).join('') : `<li class="empty-row"><p class="empty">No one on this board yet. Play ${b.play || (b.endless ? 'an endless run' : `a ${b.len} ${b.name.toLowerCase()} game`)} on the site while signed in to set the first mark.</p></li>`;
     if (animate && !reduceMotion.matches) { tower.classList.remove('enter'); void tower.offsetWidth; tower.classList.add('enter'); }
     const row = tower.querySelector('li.me');
     if (animate && row && innerWidth > 900) row.scrollIntoView({ block: 'nearest', behavior: reduceMotion.matches ? 'auto' : 'smooth' });

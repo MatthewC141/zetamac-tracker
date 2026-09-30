@@ -17,7 +17,7 @@
 
   const SCORES = 'zm-web-scores';
   const DETAIL = 'zm-web-detail:';  // + timestamp → that game's question log (JSON text)
-  const MODES = new Set(['standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed']);
+  const MODES = new Set(['standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80']);
 
   const pad = n => String(n).padStart(2, '0');
   const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -29,16 +29,19 @@
     return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d;
   };
   const parseInt6 = s => (/^\d{1,6}$/.test(s || '') ? Number(s) : null);
-  const parseSeconds = s => (!s || s === '120' ? 120 : s === '30' ? 30 : 0);
+  const parseSeconds = s => (!s || s === '120' ? 120 : s === '30' ? 30 : s === '480' ? 480 : 0);
   const parseMode = s => (!s ? 'standard' : MODES.has(s) ? s : '');
+  // The 80-in-8 test is always 8 minutes (and scores at most 80); nothing else is.
+  const lengthFits = (mode, seconds, score) => (mode === 'o80' ? seconds === 480 && score <= 80 : seconds !== 480);
 
   // Saved rows are read back as untrusted: a row is kept only if every field has the shape the
   // server itself would write, and only those fields are kept, so nothing else reaches the page.
   const whole = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
   const validRow = e => e && typeof e === 'object' &&
     typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
-    whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120].includes(e.seconds) && whole(e.elapsed, 999999) &&
-    e.ts.slice(0, 10) === e.date && (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode);
+    whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120, 480].includes(e.seconds) && whole(e.elapsed, 999999) &&
+    e.ts.slice(0, 10) === e.date && (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode) &&
+    (e.seconds === 0 ? e.mode !== 'o80' : lengthFits(e.mode, e.seconds, e.score));
   const fields = ({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed });
 
   const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -63,6 +66,7 @@
       if (!seconds) throw new Refused('Game length must be 30 or 120 seconds.');
       const mode = parseMode(get('mode'));
       if (!mode) throw new Refused('Unknown game mode.');
+      if (!lengthFits(mode, seconds, score)) throw new Refused('That game length doesn’t fit that game.');
       return { e: entry(score, date, 'manual', seconds, mode), detail: null };
     }
     // a finished round, always today; seconds=0 is an endless run
@@ -75,6 +79,7 @@
     if (elapsed === null) throw new Refused('Endless runs need an elapsed time in seconds.');
     const mode = parseMode(get('mode'));
     if (!mode) throw new Refused('Unknown game mode.');
+    if (endless ? mode === 'o80' : !lengthFits(mode, seconds, score)) throw new Refused('That game length doesn’t fit that game.');
     const e = entry(score, dateKey(new Date()), 'game', seconds, mode);
     e.elapsed = elapsed;
     const d = get('detail');

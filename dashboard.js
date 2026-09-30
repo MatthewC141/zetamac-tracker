@@ -16,7 +16,10 @@ const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borr
 const HIDDEN_MODES = new Set(['guided']);
 // Table lookups by own key only, so a stray name like "toString" never matches a mode.
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
-const modeName = m => has(SQ_MODES, m) ? SQ_MODES[m] : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : 'Arithmetic';
+const modeName = m => has(SQ_MODES, m) ? SQ_MODES[m] : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : m === 'o80' ? '80 in 8' : 'Arithmetic';
+// The length that counts as a full game: 8 minutes for the 80-in-8 test, 2 minutes for everything else.
+const mainSeconds = m => (m === 'o80' ? 480 : 120);
+const mainLabel = m => (m === 'o80' ? '80-in-8 test' : '2-minute game');
 // The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99h').
 let chartGame = 'standard';
 try { chartGame = localStorage.getItem('zm-chart-game') || chartGame; } catch {}
@@ -88,7 +91,7 @@ function renderStats() {
   const s = streak();
   const r = RANGE_SHORT[range];
   const items = [
-    ...(chartGame === 'standard' ? [] : [[allBest || '—', `all-time best (${plural(games.length, '2-minute game')})`], [rangeBest || '—', `best · ${r}`]]),
+    ...(chartGame === 'standard' ? [] : [[allBest || '—', `all-time best (${plural(games.length, mainLabel(chartGame))})`], [rangeBest || '—', `best · ${r}`]]),
     [inRange.length ? round1(avg) : '—', `average · ${r}`],
     [w1.length ? round1(mean(w1)) : '—', `last 7 days${delta ? ` (${delta})` : ''}`],
     [inRange.length, `games on ${plural(days.length, 'day')} · ${r}`],
@@ -217,6 +220,11 @@ const TARGET = 80;
 
 function renderChart() {
   $('#legend [data-series="target"]').hidden = chartGame !== 'standard';
+  // The 80-in-8 test has one length (8 minutes), so its legend names that and drops the 30-second line.
+  const o80 = chartGame === 'o80';
+  $('#legend [data-series="best"]').textContent = o80 ? '80-in-8 daily best' : '2-minute daily best';
+  $('#legend [data-series="games"]').textContent = o80 ? 'Individual 80-in-8 tests' : 'Individual 2-minute games';
+  $('#legend [data-series="proj"]').hidden = o80;
   document.querySelectorAll('.tabs button[data-range]').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === range));
   $('#chart-title').innerHTML = `${esc(modeName(chartGame))} <span class="h-note">${RANGE_NAMES[range]}</span>`;
   const from = startOf();
@@ -326,7 +334,7 @@ function renderHeatmap() {
   const cuts = yearBests.length ? [q(0.25), q(0.5), q(0.75)] : [];
   const level = v => 1 + cuts.filter(c => v > c).length;
   // What was played each day, for the hover card: games by kind, and the day's arithmetic best.
-  const kind = g => g.seconds === 0 ? 'endless' : (g.mode || 'standard') === 'standard' ? 'arithmetic'
+  const kind = g => g.seconds === 0 ? 'endless' : g.mode === 'o80' ? '80 in 8' : (g.mode || 'standard') === 'standard' ? 'arithmetic'
     : has(SQ_MODES, g.mode) ? 'squares' : has(PRACTICE_MODES, g.mode) ? 'practice' : g.mode === 'mixed' ? 'combined' : null;
   const perDay = new Map();
   for (const g of allGames) {
@@ -378,7 +386,7 @@ function renderHeatmap() {
   const show = rect => {
     const cell = heatDays[Number(rect.dataset.i)];
     if (!cell || !rect.isConnected) return hide();
-    const day = cell.day, order = ['arithmetic', 'squares', 'combined', 'practice', 'endless'];
+    const day = cell.day, order = ['arithmetic', 'squares', 'combined', 'practice', '80 in 8', 'endless'];
     // Arithmetic shows its real best: the 2-minute one, or the 0:30 one if that's all there was.
     const best = day.best[120] != null ? `, best ${day.best[120]}` : day.best[30] != null ? `, best ${day.best[30]} in 0:30` : '';
     const lines = order.filter(k => day.kinds.has(k)).map(k => `<span>${day.kinds.get(k)} ${k}${k === 'arithmetic' ? best : ''}</span>`).join('');
@@ -424,7 +432,7 @@ function renderRecent() {
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.mode === 'o80' ? '<span class="len o8">80 in 8</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -647,7 +655,7 @@ function renderScore() {
 }
 
 // ---------- per-question breakdown (expands under a recent game) ----------
-const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined' };
+const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined', dec: 'Decimals', pct: 'Percentages' };
 const detailCache = new Map();
 const openGames = new Set();
 const secs = ms => (ms / 1000).toFixed(ms < 10000 ? 2 : 1);
@@ -762,7 +770,7 @@ function setGames(list) {
   allGames = list;
   // games / sprints: the chosen game's 2-minute and 30-second scores, for the tiles and chart.
   const chosen = list.filter(g => (g.mode || 'standard') === chartGame);
-  games = chosen.filter(g => g.seconds === 120);
+  games = chosen.filter(g => g.seconds === mainSeconds(chartGame));
   sprints = chosen.filter(g => g.seconds === 30);
   endless = list.filter(g => g.seconds === 0);
 }
