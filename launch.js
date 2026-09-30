@@ -94,3 +94,60 @@
     }, 90 * lights.length + 160);
   }, true);
 })();
+
+// Fullscreen keeps the game where it was on the screen. Two things move the page's top edge:
+// hiding the tabs and toolbar in fullscreen (the page gets taller at the top by their height),
+// and leaving the window (the page starts higher on the screen). In fullscreen the game screen is
+// pushed down by whichever of these is larger:
+//  - how much taller the page is than it was in fullscreen with the tabs showing, which every
+//    browser reports truthfully, and
+//  - how much higher the page starts than it did in the window, from the window's position on
+//    the screen, when the browser reports that truthfully. (Brave doesn't: to stop
+//    fingerprinting it reports a toolbar a few pixels tall, so its window position is ignored.)
+// (This file loads above the game screen, so the game screen is looked up each time.)
+(() => {
+  const fullMedia = matchMedia('(display-mode: fullscreen)');
+  const isFull = () => fullMedia.matches || !!document.fullscreenElement;
+  const height = () => document.documentElement.clientHeight;
+  const pageTop = () => window.screenY + (window.outerHeight - window.innerHeight);  // the page's top edge, on the screen
+  const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+  const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  // Remembered between visits, for a game opened while already in fullscreen.
+  let windowed = load('zm-windowed');       // { top, chrome }: where the page started, and the toolbar's height
+  let tabsShown = load('zm-full-height');   // { w, h }: the page's height in fullscreen with the tabs showing
+  let settle = 0;
+  const remember = () => {
+    if (!isFull()) {
+      windowed = { top: pageTop(), chrome: window.outerHeight - window.innerHeight };
+      save('zm-windowed', windowed);
+    } else if (!tabsShown || tabsShown.w !== innerWidth || height() < tabsShown.h) {
+      // The shortest fullscreen page at this width is the one with the tabs showing.
+      tabsShown = { w: innerWidth, h: height() };
+      save('zm-full-height', tabsShown);
+    }
+  };
+  const place = () => {
+    const game = document.querySelector('#game');
+    if (!game) return;
+    let shift = 0;
+    if (isFull()) {
+      const byTabs = tabsShown && tabsShown.w === innerWidth ? height() - tabsShown.h : 0;
+      const byWindow = windowed && windowed.chrome >= 20 ? windowed.top - pageTop() : 0;
+      shift = Math.min(240, Math.max(0, byTabs, byWindow));
+    }
+    game.style.paddingTop = shift ? `${shift}px` : '';
+  };
+  // Switching animates through in-between sizes (and the last size event can come before the
+  // window stops moving), so the new sizes are only remembered once it settles, and the game is
+  // placed again then.
+  const hold = () => {
+    place();
+    clearTimeout(settle);
+    settle = setTimeout(() => { remember(); place(); }, 600);
+  };
+  addEventListener('resize', hold);
+  fullMedia.addEventListener('change', hold);
+  document.addEventListener('fullscreenchange', hold);
+  const first = () => { remember(); place(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', first, { once: true }); else first();
+})();
