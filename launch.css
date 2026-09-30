@@ -28,6 +28,9 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 /* ---- top strip: wordmark, game tabs, progress ---- */
 .lt-strip { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; padding: 18px 0 16px; margin-bottom: 18px; border-bottom: 1px solid var(--lt-line); }
 .lt-brand { order: 1; font: 700 20px/1 var(--lt-label); letter-spacing: .02em; text-transform: uppercase; margin: 0; }
+/* The wordmark links back to the progress tracker. */
+.lt-brand a.home { color: inherit; text-decoration: none; }
+.lt-brand a.home:hover span { color: var(--lt-ink); }
 .lt-brand span { font-weight: 600; font-size: 13px; letter-spacing: .12em; color: var(--lt-muted); margin-left: 8px; }
 .lt-tabs { order: 2; display: inline-flex; border: 1px solid var(--lt-line); border-radius: 3px; padding: 2px; background: var(--lt-bg); }
 .lt-tabs a { font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; color: var(--lt-muted); padding: 10px 14px; border-radius: 2px; }

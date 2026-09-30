@@ -46,7 +46,10 @@
   /* ---- strip ---- */
   .strip { display: flex; align-items: center; gap: 12px 10px; flex-wrap: wrap; padding: 18px 0 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
   .brand { font: 700 20px/1 var(--label); letter-spacing: .02em; text-transform: uppercase; margin: 0 auto 0 0; }
-  .brand span { font-weight: 600; font-size: 13px; letter-spacing: .12em; color: var(--muted); margin-left: 8px; }
+  /* The wordmark links back to the progress tracker. */
+.brand a.home { color: inherit; text-decoration: none; }
+.brand a.home:hover span { color: var(--ink); }
+.brand span { font-weight: 600; font-size: 13px; letter-spacing: .12em; color: var(--muted); margin-left: 8px; }
   .navbtn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 10px 14px; }
   .navbtn:hover { color: var(--ink); border-color: var(--line-hi); }
   .navbtn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -284,7 +287,7 @@
 <body>
 <main>
   <header class="strip">
-    <h1 class="brand">Zetamac <span>Guide</span></h1>
+    <h1 class="brand"><a class="home" href="./" title="Your progress">Zetamac <span>Guide</span></a></h1>
     <a class="navbtn go" href="play.html">Play</a>
     <a class="navbtn" href="./">View progress</a>
   </header>
