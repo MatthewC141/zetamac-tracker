@@ -142,10 +142,12 @@
   .facts-tools { display: flex; gap: 6px; flex-wrap: wrap; }
   .facts-tools .seg button { padding: 6px 9px; }
   .facts-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
-  .facts-all { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+  .facts-all { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; align-items: start; }
   .facts-col h4 { font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
   .facts-all .tower.facts li { grid-template-columns: 22px 4px 44px minmax(0, 1fr) 58px 50px; gap: 0 9px; height: 34px; }
   .facts-all .tower.facts .time { font-size: 16px; }
+  .facts-all .facts-col.words .tower.facts li { grid-template-columns: 22px 4px 76px minmax(0, 1fr) 58px 50px; }
+  .facts-all .facts-col.words { margin-bottom: 18px; }
   .tower.facts li.none .fact-name, .tower.facts li.none .time, .tower.facts li.none .gap { color: var(--muted); }
   .tower.facts li.none .stripe { opacity: .35; }
   .facts-head h3 { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; margin: 0; color: var(--muted); }
@@ -254,6 +256,10 @@
   #heat { display: block; }
   #heat text { fill: var(--muted); font: 500 11px var(--figure); }
   #heat rect { rx: 1.5; }
+  #heat rect.none { pointer-events: none; }
+  .heat-panel { position: relative; }
+  .heat-tip { transform: translate(-50%, -100%); }
+  .heat-tip span { display: block; color: #3b3e48; }
   .heat-legend { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
   .heat-legend i { width: 11px; height: 11px; border-radius: 1.5px; display: inline-block; }
 
@@ -552,7 +558,7 @@
   <header class="strip">
     <div class="ident">
       <h1 class="brand">Zetamac <span>Live timing</span></h1>
-      <div class="session"><span class="live" id="session-date">Session</span><span id="updated"></span></div>
+      <div class="session"><span class="live" id="session-date">Session</span></div>
     </div>
     <nav class="nav" aria-label="Games">
       <a class="play-btn go" href="play.html">Play</a>
@@ -590,10 +596,11 @@
       </section>
       <section class="panel heat-panel" aria-labelledby="heat-title">
         <div class="panel-head">
-          <h2 id="heat-title">Days played</h2>
+          <h2 id="heat-title">Games played</h2>
           <div class="heat-legend">Lower best <i style="background:var(--heat-1)"></i><i style="background:var(--heat-2)"></i><i style="background:var(--heat-3)"></i><i style="background:var(--heat-4)"></i> Higher best</div>
         </div>
-        <div class="heat-scroll"><svg id="heat"></svg></div>
+        <div class="heat-scroll"><svg id="heat" role="img"></svg></div>
+        <div class="tip heat-tip" id="heat-tip" aria-hidden="true"></div>
       </section>
     </div>
   </div>

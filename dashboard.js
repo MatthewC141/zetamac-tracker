@@ -302,17 +302,19 @@ function renderEndless() {
 }
 
 // ---------- heatmap (past year, one square per day) ----------
+let heatDays = [];  // one entry per square, for the hover card
 function renderHeatmap() {
   const end = today();
-  // Squares grow to fill the panel's height when it is stretched beside the tower, then as many
-  // whole weeks as fit the width (up to a year) end with this week.
-  const left = 26, top = 16, gap = 3;
+  // The last 3 months: 13 weeks ending with this one. Squares grow to fill the panel's height
+  // when it is stretched beside the tower, as far as the width allows.
+  const left = 26, top = 16, gap = 3, weeks = 13;
   const svg = $('#heat');
   svg.setAttribute('height', 0);
   const room = svg.parentElement.clientWidth || 900;
   const tall = Math.floor((svg.parentElement.clientHeight - top) / 7) - gap;
-  const size = Math.max(10, Math.min(24, tall));
-  const weeks = Math.max(8, Math.min(53, Math.floor((room - left) / (size + gap))));
+  const wide = Math.floor((room - left) / weeks) - gap;
+  const cell = Math.max(10, Math.min(28, wide, tall > 10 ? tall : wide));
+  const pitch = cell + gap;
   const start = addDays(end, -(weeks - 1) * 7 - end.getDay());
   // Shade by standard-game score (30-second games projected); squares-only days get the lightest shade.
   const std = allGames.filter(g => (g.mode || 'standard') === 'standard' && g.seconds > 0);
@@ -322,14 +324,25 @@ function renderHeatmap() {
   const q = p => yearBests[Math.min(yearBests.length - 1, Math.floor(p * yearBests.length))];
   const cuts = yearBests.length ? [q(0.25), q(0.5), q(0.75)] : [];
   const level = v => 1 + cuts.filter(c => v > c).length;
+  // What was played each day, for the hover card: games by kind, and the day's arithmetic best.
+  const kind = g => g.seconds === 0 ? 'endless' : (g.mode || 'standard') === 'standard' ? 'arithmetic'
+    : has(SQ_MODES, g.mode) ? 'squares' : has(PRACTICE_MODES, g.mode) ? 'practice' : g.mode === 'mixed' ? 'combined' : null;
+  const perDay = new Map();
+  for (const g of allGames) {
+    const k = kind(g);
+    if (!k) continue;
+    const day = perDay.get(g.date) || perDay.set(g.date, { n: 0, kinds: new Map(), best: {} }).get(g.date);
+    day.n++;
+    day.kinds.set(k, (day.kinds.get(k) || 0) + 1);
+    if (k === 'arithmetic') day.best[g.seconds] = Math.max(day.best[g.seconds] ?? 0, g.score);
+  }
+  heatDays = [];
 
-  // Fill the panel's width; below 10px a cell stops being readable, so narrow panels show fewer weeks.
-  const cell = Math.max(10, Math.min(tall > 10 ? size : 20, Math.floor((room - left) / weeks) - gap));
-  const W = left + weeks * (cell + gap), H = top + 7 * (cell + gap);
+  const W = left + weeks * pitch, H = top + 7 * pitch;
   svg.setAttribute('width', W); svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   let h = '';
-  [['Mon', 1], ['Wed', 3], ['Fri', 5]].forEach(([l, r]) => { h += `<text x="0" y="${top + r * (cell + gap) + cell * .8}">${l}</text>`; });
+  [['Mon', 1], ['Wed', 3], ['Fri', 5]].forEach(([l, r]) => { h += `<text x="0" y="${top + r * pitch + cell * .8}">${l}</text>`; });
   let lastMonth = -1, played = 0;
   for (let d = start, i = 0; d <= end; d = addDays(d, 1), i++) {
     const col = Math.floor(i / 7), row = d.getDay();
@@ -341,15 +354,49 @@ function renderHeatmap() {
     const info = days.get(dateKey(d)), sq = sqDays.get(dateKey(d));
     if (info || sq) played++;
     const fill = info ? `var(--heat-${level(info.best)})` : sq ? 'var(--heat-1)' : 'var(--heat-0)';
-    const parts = [];
-    if (info) parts.push(`best ${round1(info.best)}, ${plural(info.n, 'game')}`);
-    if (sq) parts.push(`${plural(sq.n, 'squares, practice or endless game')}`);
-    const title = parts.length ? `${longDate(d)}: ${parts.join(' · ')}` : `${longDate(d)}: not played`;
-    h += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}"><title>${title}</title></rect>`;
+    // Only days with games answer to hovering; empty days are just squares.
+    const day = perDay.get(dateKey(d));
+    if (day) heatDays.push({ date: d, day });
+    h += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}"${day ? ` data-i="${heatDays.length - 1}"` : ' class="none"'}></rect>`;
   }
   svg.innerHTML = h;
-  $('#heat-title').innerHTML = `Days played <span class="h-note">${played} in the last ${weeks >= 52 ? 'year' : Math.round(weeks / 4.35) + ' months'}</span>`;
+  const games = heatDays.reduce((n, c) => n + c.day.n, 0);
+  $('#heat-title').innerHTML = `Games played <span class="h-note">${games} in the last 3 months</span>`;
+  svg.setAttribute('aria-label', `Games played: ${games} in the last 3 months, on ${plural(played, 'day')}. Hover or tap a day for its games.`);
   const sc = svg.parentElement; sc.scrollLeft = sc.scrollWidth;
+}
+
+// Hover a played day (or tap it) for a card with how many games were played and of which kinds.
+// The card waits 0.3 s on each day before it appears, and moving to another day starts the
+// wait over.
+{
+  const svg = $('#heat'), tip = $('#heat-tip'), panel = svg.closest('.heat-panel');
+  const DELAY = 300;
+  let showTimer = 0;
+  const hide = () => { clearTimeout(showTimer); showTimer = 0; tip.style.opacity = 0; };
+  const show = rect => {
+    const cell = heatDays[Number(rect.dataset.i)];
+    if (!cell || !rect.isConnected) return hide();
+    const day = cell.day, order = ['arithmetic', 'squares', 'combined', 'practice', 'endless'];
+    // Arithmetic shows its real best: the 2-minute one, or the 0:30 one if that's all there was.
+    const best = day.best[120] != null ? `, best ${day.best[120]}` : day.best[30] != null ? `, best ${day.best[30]} in 0:30` : '';
+    const lines = order.filter(k => day.kinds.has(k)).map(k => `<span>${day.kinds.get(k)} ${k}${k === 'arithmetic' ? best : ''}</span>`).join('');
+    tip.innerHTML = `<b>${plural(day.n, 'game')}</b> · ${esc(longDate(cell.date))}${lines}`;
+    const r = rect.getBoundingClientRect(), p = panel.getBoundingClientRect();
+    tip.style.left = `${Math.min(Math.max(r.left + r.width / 2 - p.left, 100), p.width - 100)}px`;
+    tip.style.top = `${r.top - p.top - 6}px`;
+    tip.style.opacity = 1;
+  };
+  svg.addEventListener('pointerover', e => {
+    const rect = e.target.closest('rect[data-i]');
+    if (!rect) return;
+    hide();
+    if (e.pointerType === 'mouse') showTimer = setTimeout(() => show(rect), DELAY);
+    else show(rect);  // a tap shows it at once
+  });
+  svg.addEventListener('pointerout', e => { if (e.pointerType === 'mouse' && e.target.closest('rect[data-i]')) hide(); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('#heat rect[data-i]')) hide(); });
+  svg.closest('.heat-scroll').addEventListener('scroll', hide, { passive: true });
 }
 
 // ---------- recent games ----------
@@ -415,13 +462,13 @@ if (!['1', '10', 'all'].includes(weakWindow)) weakWindow = '10';
 let weakRun = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-// The kind of question inside an operation, read from its text: "54 + 87" → "+ with a carry".
+// The kind of question inside an operation, read from its text: "54 + 87" → "+ carry".
 function factOf(q) {
   const m = /^(\d+) (\+|–|×|÷) (\d+)$/.exec(q.q || '');
   if (!m) return null;
   const a = Number(m[1]), b = Number(m[3]);
-  if (q.o === 'add') return a % 10 + b % 10 >= 10 ? '+ with a carry' : '+ no carry';
-  if (q.o === 'sub') return b % 10 > a % 10 ? '– with a borrow' : '– no borrow';
+  if (q.o === 'add') return a % 10 + b % 10 >= 10 ? '+ carry' : '+ no carry';
+  if (q.o === 'sub') return b % 10 > a % 10 ? '– borrow' : '– no borrow';
   if (q.o === 'mul') return `× ${a <= 12 ? a : b}`;
   if (q.o === 'div') return `÷ ${b}`;
   return null;
@@ -474,7 +521,7 @@ function factsHTML(qs) {
   const avg = avgBy(used, factOf);
   const head = `<div class="facts-head"><h3>Slowest question types</h3>` +
     `<div class="facts-tools"><div class="seg" role="group" aria-label="Question types to show">` +
-      `<button type="button" data-facts="top" aria-pressed="${!factsAll}">Top 6</button><button type="button" data-facts="all" aria-pressed="${factsAll}" title="Every × and ÷ fact from 2 to 12">All facts</button></div>` +
+      `<button type="button" data-facts="top" aria-pressed="${!factsAll}">Top 6</button><button type="button" data-facts="all" aria-pressed="${factsAll}" title="Carrying and borrowing for + and –, and every × and ÷ fact from 2 to 12">All facts</button></div>` +
     `<div class="seg"><button type="button" data-facts="trim" aria-pressed="${factsTrim}" title="Leave out answers far slower than your usual for that operation">Exclude outliers</button></div></div></div>`;
   const note = `<p class="facts-note">Seconds per question · types with fewer than ${MIN_FACT} answers aren’t ranked${factsTrim ? ` · ${dropped ? `${plural(dropped, 'unusually slow answer')} left out` : 'no outliers in this window'}, far slower than your usual for that operation` : ''}</p>`;
   if (!factsAll) {
@@ -482,14 +529,19 @@ function factsHTML(qs) {
     if (!top.length) return '';
     return head + `<ol class="tower facts">${top.map((f, i) => factRow(f, i, top[0].avg)).join('')}</ol>` + note;
   }
-  // Every fact, one column per operation, slowest first; facts not seen yet sit at the bottom.
-  const col = (op, sign, title) => {
-    const list = TABLE.map(n => ({ k: `${sign} ${n}`, op, n: 0, avg: 0, ...avg[`${sign} ${n}`] }))
+  // Every type, one column per operation, slowest first; types not seen yet sit at the bottom.
+  // Addition and subtraction split by carrying and borrowing; × and ÷ by the 2–12 fact.
+  const col = (op, rows, title, cls = '') => {
+    const list = rows.map(([key, label]) => ({ op, n: 0, avg: 0, ...avg[key], k: label }))
       .sort((a, b) => (b.n >= MIN_FACT) - (a.n >= MIN_FACT) || (b.n > 0) - (a.n > 0) || b.avg - a.avg);
     const top = Math.max(...list.filter(f => f.n >= MIN_FACT).map(f => f.avg), 1);
-    return `<div class="facts-col"><h4>${title}</h4><ol class="tower facts">${list.map((f, i) => factRow(f, i, top)).join('')}</ol></div>`;
+    return `<div class="facts-col ${cls}"><h4>${title}</h4><ol class="tower facts">${list.map((f, i) => factRow(f, i, top)).join('')}</ol></div>`;
   };
-  return head + `<div class="facts-all">${col('mul', '×', 'Multiplication')}${col('div', '÷', 'Division')}</div>` + note;
+  const table = sign => TABLE.map(n => [`${sign} ${n}`, `${sign} ${n}`]);
+  return head + `<div class="facts-all">` +
+    col('add', [['+ carry', 'Carry'], ['+ no carry', 'No carry']], 'Addition', 'words') +
+    col('sub', [['– borrow', 'Borrow'], ['– no borrow', 'No borrow']], 'Subtraction', 'words') +
+    col('mul', table('×'), 'Multiplication') + col('div', table('÷'), 'Division') + `</div>` + note;
 }
 
 async function renderWeak() {
@@ -695,7 +747,6 @@ function render() {
   renderStats(); renderChart(); renderPractice(); renderEndless(); renderHeatmap(); renderRecent();
   const t = today();
   $('#session-date').textContent = `${t.toLocaleDateString(undefined, { weekday: 'short' })} ${t.getDate()} ${MONTHS[t.getMonth()]}`;
-  $('#updated').innerHTML = `<b>${allGames.length}</b> games logged`;
   syncAccount();
 }
 
