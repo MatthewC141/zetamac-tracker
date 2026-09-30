@@ -22,7 +22,9 @@
   const rule = () => document.querySelector('input[name=rule]:checked').value;
   const them = m => (me === 1 ? m.p2_name : m.p1_name) || 'Opponent';
   const mine = (m, k) => m[`p${me}_${k}`], theirs = (m, k) => m[`p${3 - me}_${k}`];
-  const ruleText = m => `${P.NAMES[m.game]} · ${m.rule === 'race' ? `race to ${m.goal}, 2:00 limit` : `most answered in ${clock(m.seconds)}`}`;
+  const ruleText = m => `${m.ranked ? 'Ranked · ' : ''}${P.NAMES[m.game]} · ${m.rule === 'race' ? `race to ${m.goal}, 2:00 limit` : `most answered in ${clock(m.seconds)}`}`;
+  const M = window.ZM_MATCHES;
+  const ranked = () => document.querySelector('input[name=queue]:checked').value === 'ranked';
 
   function lobby(message = '', isError = false) {
     stopPolling();
@@ -31,6 +33,21 @@
     $('#msg').textContent = message;
     $('#msg').className = `d-msg${isError ? ' err' : ''}`;
     loadRecord();
+    loadRank();
+  }
+
+  // Your rank card: placement games first, then your rank, rating and the next rank's rating.
+  async function loadRank() {
+    try {
+      const r = await M.mine(), card = $('#rank-card');
+      const placing = r.games < M.PLACEMENT, k = M.rank(r.elo);
+      card.className = `d-rank rk-${placing ? 'none' : k.tier}`;
+      $('#rank-name').textContent = placing ? 'Unranked' : k.name;
+      $('#rank-note').textContent = placing ? `Placement: ${r.games} of ${M.PLACEMENT} matches played`
+        : k.next ? `${k.next - r.elo} to ${M.rank(k.next).name} · ${r.wins}–${r.losses}${r.draws ? `–${r.draws}` : ''}` : `The top rank · ${r.wins}–${r.losses}${r.draws ? `–${r.draws}` : ''}`;
+      $('#rank-elo').textContent = r.elo;
+      card.hidden = false;
+    } catch {}
   }
   function fail(err) {
     if (err?.signedOut || !cloud.user()) return show('st-need');
@@ -63,14 +80,29 @@
 
   async function queue() {
     if ($('#st-lobby').hidden || $('#lobby-view').hidden) return;  // not in the lobby (or looking at the history)
-    try { enter(await call('mm_queue', { p_game: game() })); } catch (err) { fail(err); }
+    try { enter(await call('mm_queue', { p_game: ranked() ? 'standard' : game(), p_ranked: ranked() })); } catch (err) { fail(err); }
   }
   $('#start').addEventListener('click', queue);
-  const showPick = () => { $('#pick-name').textContent = P.NAMES[game()]; };
-  document.querySelectorAll('input[name=game]').forEach(r => r.addEventListener('change', showPick));
+  // Ranked is always arithmetic, so the problem list locks; unranked can pick any row.
+  const showPick = () => {
+    const r = ranked();
+    $('#rank-card').style.display = r ? '' : 'none';
+    $('#games-title').closest('.lt-panel').classList.toggle('locked', r);
+    $('#games-sub').textContent = r ? 'ranked is always arithmetic' : 'both players get the same questions';
+    $('#pick-name').textContent = r ? 'Arithmetic' : P.NAMES[game()];
+    document.querySelector('.d-change').hidden = r;
+    $('#queue-text').textContent = r
+      ? 'A rated race to 25 with 2:00 on the clock, against the searching player closest to your rating. Wins raise it; losses lower it.'
+      : game() === 'any' ? 'A race to 25 against whoever’s searching, on their choice of problems (or arithmetic), with 2:00 on the clock.'
+      : 'A race to 25 against whoever else is looking for the same problems (or any), with 2:00 on the clock.';
+    try { localStorage.setItem('zm-queue', r ? 'ranked' : 'unranked'); } catch {}
+  };
+  try { if (localStorage.getItem('zm-queue') === 'unranked') document.querySelector('input[name=queue][value=unranked]').checked = true; } catch {}
+  document.querySelectorAll('input[name=game], input[name=queue]').forEach(r => r.addEventListener('change', showPick));
   showPick();
+  // A private match needs a set of problems: "any" means arithmetic.
   $('#create').addEventListener('click', async () => {
-    try { enter(await call('mm_create', { p_game: game(), p_rule: rule() })); } catch (err) { fail(err); }
+    try { enter(await call('mm_create', { p_game: game() === 'any' ? 'standard' : game(), p_rule: rule() })); } catch (err) { fail(err); }
   });
   $('#join-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -143,6 +175,12 @@
     show('st-found');
     $('#f-me').textContent = cloud.user().name;
     $('#f-them').textContent = them(m);
+    // Ranked: each player's rank from their rating when the match started.
+    for (const [el, elo] of [[$('#f-me-rank'), mine(m, 'elo')], [$('#f-them-rank'), theirs(m, 'elo')]]) {
+      const k = m.ranked && Number.isInteger(elo) ? M.rank(elo) : null;
+      el.textContent = k ? `${k.name} · ${elo}` : '';
+      el.className = `f-rank${k ? ` rk-${k.tier}` : ''}`;
+    }
     $('#f-sub').textContent = ruleText(m) + '.';
     qs = P.list(m.game, m.seed, m.rule === 'race' ? m.goal : 600);
     const startsAt = Date.parse(m.starts_at) - offset;  // this browser's clock
@@ -275,7 +313,10 @@
     r.className = `result ${draw ? '' : won ? 'win' : 'lose'}`;
     r.textContent = draw ? 'Draw' : won ? 'You win' : `${them(m)} wins`;
     $('#res-sub').textContent = ruleText(m);
+    showElo(m);
     standings(m);
+    rematchOffer = null;
+    showRematch(m);
     openChat(m);
     setTimeout(() => $('#again').focus(), 700);
   }
@@ -306,6 +347,83 @@
     }
   }
 
+  // Ranked: your rating before and after, and a line when it crosses into a new rank.
+  function showElo(m) {
+    const line = $('#elo-line');
+    line.replaceChildren();
+    const d = mine(m, 'delta'), before = mine(m, 'elo');
+    if (!m.ranked || !Number.isInteger(d) || !Number.isInteger(before)) return;
+    const after = before + d, change = document.createElement('span');
+    change.className = d > 0 ? 'up' : d < 0 ? 'down' : '';
+    change.textContent = d ? `${d > 0 ? '+' : '−'}${Math.abs(d)}` : '±0';
+    line.append(`Rating ${before} → ${after} (`, change, ')');
+    if (!d && m.winner !== 0) line.append(' · you’ve played each other 3 times in ranked today, so this one didn’t count');
+    // During placements the rank isn't shown yet, so say how far along they are; after that, a
+    // line when the rating crosses into a new rank (the fifth placement match reveals it).
+    const id = m.id;
+    M.mine().then(r => {
+      if (match?.id !== id) return;
+      const k0 = M.rank(before), k1 = M.rank(after), note = document.createElement('span');
+      note.className = 'rankup';
+      if (r.games < M.PLACEMENT) note.textContent = `Placement: ${r.games} of ${M.PLACEMENT}`;
+      else if (r.games === M.PLACEMENT) note.textContent = `Placed: ${k1.name}!`;
+      else if (k0.name !== k1.name) note.textContent = after > before ? `Up to ${k1.name}!` : `Down to ${k1.name}`;
+      else return;
+      if (after < before || r.games < M.PLACEMENT) note.style.color = 'inherit';
+      line.append(note);
+    }).catch(() => {});
+  }
+
+  // ---- rematch ----
+  // Either player can offer one; it's a private match with the same problems and rule, and the
+  // other player's Rematch accepts it. Both screens poll the finished match to see offers.
+  let rematchOffer = null;  // your own open offer (a waiting match)
+  function showRematch(old) {
+    const note = $('#rematch-note'), link = $('#rematch');
+    note.replaceChildren();
+    const theirs = old.rematch_code && old.rematch_by && old.rematch_by !== me && !rematchOffer;
+    if (rematchOffer) {
+      link.textContent = 'Cancel rematch';
+      note.append(`Rematch offered. Waiting for ${them(old)}…`);
+    } else if (theirs) {
+      link.textContent = 'Accept rematch';
+      const b = document.createElement('b');
+      b.textContent = `${them(old)} wants a rematch`;
+      note.append(b);
+    } else {
+      link.textContent = 'Rematch';
+    }
+    link.hidden = !old.p1 || !old.p2;
+  }
+  function startRematch(r) {
+    rematchOffer = null;
+    closeChat();
+    finished = false; playing = false;
+    $('#game').style.display = 'none';
+    $('#settings').style.display = 'block';
+    $('#history-view').hidden = true; $('#lobby-view').hidden = false;
+    enter(r);
+  }
+  $('#rematch').addEventListener('click', async e => {
+    e.preventDefault();
+    const old = match;
+    if (!old) return;
+    const note = $('#rematch-note');
+    try {
+      if (rematchOffer) {
+        const r = rematchOffer;
+        rematchOffer = null;
+        showRematch(old);
+        await rpc('mm_cancel', { p_id: r.id });
+        return;
+      }
+      const r = await call('mm_rematch', { p_id: old.id });
+      if (r.status === 'live') return startRematch(r);
+      rematchOffer = r;
+      showRematch(old);
+    } catch (err) { note.textContent = err.message || 'Couldn’t start a rematch.'; }
+  });
+
   // ---- chat after the match ----
   let chatTimer = 0, chatId = null, seen = 0;
   function openChat(m) {
@@ -327,6 +445,17 @@
       const rows = await cloud.rest(`match_messages?select=id,seat,body&match_id=eq.${encodeURIComponent(id)}&order=id.asc`);
       if (id !== chatId) return;
       for (const r of rows) if (r.id > seen) { addLine(r); seen = r.id; }
+      // Rematch offers: the finished match shows the other player's; your own offer is watched
+      // (which also keeps it open) until it starts or is closed.
+      const old = await call('mm_poll', { p_id: id });
+      if (id !== chatId) return;
+      match = old;
+      if (rematchOffer) {
+        const r = await call('mm_poll', { p_id: rematchOffer.id });
+        if (r.status === 'live') return startRematch(r);
+        if (r.status !== 'waiting') rematchOffer = null;
+      }
+      showRematch(old);
     } catch {}
   }
   function addLine(r) {
@@ -335,7 +464,10 @@
     li.className = mineMsg ? 'mine' : '';
     who.className = 'from';
     who.textContent = mineMsg ? 'You' : them(match);
-    li.append(who, document.createTextNode(' ' + r.body));
+    // <bdi> keeps a message's own text direction to itself (it can't flip the name beside it).
+    const body = document.createElement('bdi');
+    body.textContent = r.body;
+    li.append(who, ' ', body);
     list.append(li);
     list.scrollTop = list.scrollHeight;
   }
@@ -359,6 +491,7 @@
   function backToLobby() {
     finished = false; playing = false;
     closeChat();
+    if (rematchOffer) { rpc('mm_cancel', { p_id: rematchOffer.id }).catch(() => {}); rematchOffer = null; }
     $('#game').style.display = 'none';
     $('#settings').style.display = 'block';
     lobby();
@@ -369,7 +502,11 @@
     e.preventDefault();
     const m = match;
     backToLobby();
-    if (m?.is_public) { document.querySelector(`input[name=game][value="${m.game}"]`)?.click(); queue(); }
+    if (m?.is_public) {  // the same kind of search again
+      document.querySelector(`input[name=queue][value="${m.ranked ? 'ranked' : 'unranked'}"]`)?.click();
+      if (!m.ranked) document.querySelector(`input[name=game][value="${m.game}"]`)?.click();
+      queue();
+    }
     else if (m) {
       document.querySelector(`input[name=game][value="${m.game}"]`)?.click();
       document.querySelector(`input[name=rule][value="${m.rule}"]`)?.click();

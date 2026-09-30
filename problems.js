@@ -60,6 +60,6 @@ window.ZM_PROBLEMS = (() => {
     return out;
   }
 
-  const NAMES = { standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
+  const NAMES = { any: 'Any problems', standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
   return { list, NAMES };
 })();

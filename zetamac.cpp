@@ -770,6 +770,8 @@ static void handle_client(int fd) {
       if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
       if (!endless && !length_fits(mode, seconds, score)) return respond_error(fd, "400 Bad Request", "That game length doesn't fit that game.");
       if (endless && mode == "o80") return respond_error(fd, "400 Bad Request", "The 80-in-8 test has no endless version.");
+      // The 80-in-8 test keeps how long it took too (its leaderboard tie-break), up to its 8 minutes.
+      if (mode == "o80" && (!parse_int(form["elapsed"], elapsed) || elapsed > kO80Seconds)) elapsed = 0;
       Entry e = make_entry(score, today(), "game", seconds, mode);
       e.elapsed = elapsed;
       if (!append_score(e))

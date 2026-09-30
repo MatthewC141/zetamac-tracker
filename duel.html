@@ -45,6 +45,21 @@
   .d-msg.err { color: var(--lt-red); }
   .d-record { font: 600 13px/1 var(--lt-figure); color: var(--lt-muted); }
   .mh-panel { margin-top: 14px; }
+  /* Ranked: the tiers' colors, the queue switch and your rank card. */
+  .team-any { --team: #9a9eab; }
+  .rk-bronze { --team: #c98a5a; } .rk-silver { --team: #c3c8d4; } .rk-gold { --team: #ffd21f; }
+  .rk-platinum { --team: #7fe3d3; } .rk-diamond { --team: #6d8bff; } .rk-quant { --team: #b561ff; } .rk-none { --team: var(--lt-line-hi); }
+  .d-queue { grid-template-columns: repeat(2, 1fr); margin-bottom: 12px; }
+  .d-queue b { font-size: 20px; }
+  .d-rank { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; align-items: center; gap: 0 12px; padding: 10px 12px; margin-bottom: 12px; background: var(--lt-bg); border: 1px solid var(--lt-line); border-radius: 3px; }
+  .d-rank .lt-stripe { height: 30px; }
+  .d-rank b { display: block; font: 700 18px/1.1 var(--lt-figure); color: var(--team); }
+  .d-rank-body span { display: block; margin-top: 3px; font-size: 13px; color: var(--lt-muted); }
+  .d-rank-elo { font: 700 26px/1 var(--lt-figure); font-variant-numeric: tabular-nums; }
+  .lt-panel.locked .lt-row:not(.team-arith) { opacity: .35; pointer-events: none; }
+  .lt-panel.locked #any-row { display: none; }
+  .f-rank { display: block; margin-top: 4px; font: 600 12px/1 var(--lt-label); letter-spacing: .1em; text-transform: uppercase; color: var(--team, var(--lt-muted)); }
+  .f-rank:empty { display: none; }
   .mh-back { display: flex; margin-bottom: 14px; }
   .mh-panel[hidden] { display: none; }
   /* The full match history: a second view of this page (duel.html#history). */
@@ -118,6 +133,13 @@
   #end .result.win { color: var(--good); font-weight: bold; }
   #end .result.lose { color: var(--bad); }
   #end .res-sub { font-size: 15px; color: var(--muted); margin-top: 4px; }
+  #end .elo { font-size: 17px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  #end .elo:empty { display: none; }
+  #end .elo .up { color: var(--good); font-weight: bold; } #end .elo .down { color: var(--bad); font-weight: bold; }
+  #end .elo .rankup { display: block; margin-top: 4px; color: var(--good); font-weight: bold; }
+  #end .rematch-note { font-size: 15px; margin-top: 6px; }
+  #end .rematch-note:empty { display: none; }
+  #end .rematch-note b { color: var(--good); }
   .standings { margin: 12px auto 0; border-collapse: collapse; font-size: 17px; font-variant-numeric: tabular-nums; }
   .standings th { font-size: 12px; font-weight: normal; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 0 12px 4px; text-align: right; }
   .standings th:first-child, .standings td:first-child { text-align: left; }
@@ -191,8 +213,13 @@
   <div id="lobby-view">
   <div class="lt-grid">
     <section class="lt-panel" aria-labelledby="games-title">
-      <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub">both players get the same questions</span></div>
-      <ol class="lt-tower">
+      <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub" id="games-sub">both players get the same questions</span></div>
+      <ol class="lt-tower" id="game-rows">
+        <li class="lt-row team-any" id="any-row">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Any</span>
+          <span class="lt-body"><span class="lt-name">Any problems</span><span class="lt-detail">Paired with whoever’s searching; their choice, or arithmetic</span></span>
+          <input type="radio" class="pick" name="game" value="any" aria-label="Any problems">
+        </li>
         <li class="lt-row team-arith">
           <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Ari</span>
           <span class="lt-body"><span class="lt-name">Arithmetic</span><span class="lt-detail">Zetamac’s defaults: + – × ÷</span></span>
@@ -229,7 +256,16 @@
         <p class="lt-lede">Same questions, same clock. Whoever’s faster wins.</p>
         <div class="d-block">
           <div class="lt-head"><h2>Find an opponent</h2><span class="d-record" id="record"></span></div>
-          <p class="d-rule"><b id="pick-name">Arithmetic</b><a class="d-change" href="#games-title">Change</a><br>A race to 25 questions against whoever else is looking for the same problems, with 2:00 on the clock.</p>
+          <div class="lt-seg d-queue" id="queue-seg" role="radiogroup" aria-label="Kind of match">
+            <label><input type="radio" name="queue" value="ranked" checked><b>Ranked</b><small>Rated · arithmetic</small></label>
+            <label><input type="radio" name="queue" value="unranked"><b>Unranked</b><small>Just for fun</small></label>
+          </div>
+          <div class="d-rank" id="rank-card" hidden>
+            <span class="lt-stripe"></span>
+            <span class="d-rank-body"><b id="rank-name"></b><span id="rank-note"></span></span>
+            <span class="d-rank-elo" id="rank-elo"></span>
+          </div>
+          <p class="d-rule" id="queue-rule"><b id="pick-name">Arithmetic</b><a class="d-change" href="#games-title">Change</a><br><span id="queue-text"></span></p>
           <button id="start" type="button"><span class="lt-go"><b>Find match</b><span>Enter</span></span></button>
         </div>
         <div class="d-block">
@@ -269,9 +305,9 @@
       <div class="d-state d-found" id="st-found" hidden>
         <h2>Match found</h2>
         <div class="d-grid-vs">
-          <span class="lt-stripe" style="--team: var(--lt-purple)"></span><b id="f-me"></b>
+          <span class="lt-stripe" style="--team: var(--lt-purple)"></span><b><span id="f-me"></span><small class="f-rank" id="f-me-rank"></small></b>
           <span class="vs">versus</span>
-          <span class="lt-stripe"></span><b id="f-them"></b>
+          <span class="lt-stripe"></span><b><span id="f-them"></span><small class="f-rank" id="f-them-rank"></small></b>
         </div>
         <p class="d-sub" id="f-sub"></p>
         <span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
@@ -329,8 +365,10 @@
     <div id="end">
       <div class="result" id="result"></div>
       <div class="res-sub" id="res-sub"></div>
+      <div class="elo" id="elo-line"></div>
       <table class="standings" id="standings"></table>
-      <div class="links"><a href="#" id="again">Find another</a> <a href="#" id="lobby">Back to Duel</a> <a href="./">View progress</a></div>
+      <div class="links"><a href="#" id="rematch">Rematch</a> <a href="#" id="again">Find another</a> <a href="#" id="lobby">Back to Duel</a> <a href="./">View progress</a></div>
+      <div class="rematch-note" id="rematch-note" role="status"></div>
     </div>
   </div>
   <section id="chat" aria-label="Chat with your opponent" hidden>

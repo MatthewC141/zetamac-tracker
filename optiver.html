@@ -48,6 +48,13 @@
   #question { white-space: nowrap; }
   #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
   .hint { text-align: center; margin-top: 12px; font-size: 14px; color: var(--muted); }
+  /* Phones have no Tab key, and a number pad may have no Return key: an Enter button and a Skip link. */
+  .go { display: none; height: 47px; padding: 0 14px; font-size: 20px; background: #fff; border: 1px solid #767676; border-radius: 2px; cursor: pointer; }
+  @media (pointer: coarse) {
+    .go { display: inline-block; height: 48px; }
+    .hint .keys { display: none; }
+    .hint a { display: inline-block; padding: 10px 16px; font-size: 17px; }
+  }
   #end { display: none; text-align: center; padding: 14px 0; }
   #end .score { font-size: 37px; }
   #end .split { font-size: 17px; margin-top: 6px; font-variant-numeric: tabular-nums; }
@@ -148,6 +155,7 @@
     <div id="play" style="display:contents">
       <span id="question"></span><span>=</span>
       <input id="answer" type="text" inputmode="decimal" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Answer">
+      <button type="button" class="go" id="go">Enter</button>
     </div>
     <div id="end">
       <div class="score">Score: <span id="final"></span></div>
@@ -157,7 +165,7 @@
       <div class="saved" id="saved"></div>
     </div>
   </div>
-  <p class="hint" id="hint">Enter answers · Tab skips</p>
+  <p class="hint" id="hint"><span class="keys">Enter answers · Tab skips · </span><a href="#" id="skip">Skip</a></p>
   <section id="misses" hidden aria-labelledby="misses-title">
     <h2 id="misses-title">Wrong answers</h2>
     <ol id="miss-list"></ol>

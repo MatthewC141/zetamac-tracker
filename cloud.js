@@ -106,6 +106,8 @@
       }
     },
     // Public: every player's best verified game per board.
-    leaderboard: () => call('/rest/v1/leaderboard?select=username,mode,seconds,score,elapsed,date'),
+    leaderboard: () => call('/rest/v1/leaderboard?select=username,mode,seconds,score,elapsed,date,wrongs'),
+    // Public: ranked duel ratings of everyone past their placement matches.
+    ladder: () => call('/rest/v1/ladder?select=username,elo,games,wins,losses,draws&order=elo.desc&limit=1000'),
   };
 })();

@@ -156,7 +156,8 @@ begin
     select count(*) filter (where q ->> 'r' = 'y'), count(*) filter (where q ->> 'r' = 'n'),
            coalesce(sum((q ->> 't')::numeric), 0), coalesce(min((q ->> 't')::numeric) filter (where q ->> 'r' <> 's'), 150)
       into rights, wrongs, total, fastest from jsonb_array_elements(new.detail) q;
-    new.verified := new.score = greatest(0, rights - wrongs) and fastest >= 150 and total <= 482000;
+    new.verified := new.score = greatest(0, rights - wrongs) and fastest >= 150
+      and new.elapsed between 1 and 480 and total <= new.elapsed * 1000 + 2000;
     return new;
   end if;
   if new.score = 0 or n <> new.score or bad > 0 then return new; end if;
@@ -172,13 +173,15 @@ create trigger scores_check before insert on public.scores
   for each row execute function public.check_score();
 
 -- ---- leaderboard ---------------------------------------------------------------------------
--- Each player's best verified game per board: names and figures only, readable by anyone.
+-- Each player's best verified game per board: names and figures only, readable by anyone. On the
+-- 80-in-8 board a tie on score goes to fewer wrong answers, then the faster finish.
 create or replace view public.leaderboard with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
-    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date
+    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date,
+    case when s.mode = 'o80' then (select count(*)::int from jsonb_array_elements(s.detail) q where q ->> 'r' = 'n') end as wrongs
   from public.scores s join public.profiles p on p.id = s.user_id
   where s.verified and not p.private
-  order by s.user_id, s.mode, s.seconds, s.score desc, s.elapsed asc, s.ts asc;
+  order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
 revoke all on public.leaderboard from public;
 grant select on public.leaderboard to anon, authenticated;
 
@@ -231,12 +234,53 @@ create table if not exists public.matches (
 create index if not exists matches_queue on public.matches (game, created_at) where status = 'waiting' and is_public;
 create index if not exists matches_p1 on public.matches (p1, created_at);
 create index if not exists matches_p2 on public.matches (p2, created_at);
+-- Added later: ranked duels, "any problems" in the unranked queue, and rematches.
+alter table public.matches add column if not exists ranked boolean not null default false;
+alter table public.matches add column if not exists p1_elo int;    -- ranked: each player's rating when the match started
+alter table public.matches add column if not exists p2_elo int;
+alter table public.matches add column if not exists p1_delta int;  -- ranked: each player's rating change
+alter table public.matches add column if not exists p2_delta int;
+alter table public.matches add column if not exists rematch_code text;  -- a rematch offered after this match
+alter table public.matches add column if not exists rematch_by int;     -- by which player (1 or 2)
+alter table public.matches drop constraint if exists matches_game_check;
+alter table public.matches add constraint matches_game_check
+  check (game in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h', 'any'));  -- 'any' only while waiting
 alter table public.matches enable row level security;
 drop policy if exists "read own matches" on public.matches;
 create policy "read own matches" on public.matches for select to authenticated
   using ((select auth.uid()) in (p1, p2));
 revoke all on public.matches from anon, authenticated;
 grant select on public.matches to authenticated;
+
+-- Ranked duels: each player's Elo rating (everyone starts at 1000). Only the database changes it,
+-- when a ranked match is settled. Players read their own row; the ladder view shows everyone who
+-- has played their 5 placement matches, except private accounts.
+create table if not exists public.ratings (
+  user_id uuid primary key references auth.users on delete cascade,
+  elo int not null default 1000,
+  games int not null default 0,
+  wins int not null default 0,
+  losses int not null default 0,
+  draws int not null default 0,
+  peak int not null default 1000,
+  updated_at timestamptz not null default now()
+);
+alter table public.ratings enable row level security;
+drop policy if exists "read own rating" on public.ratings;
+create policy "read own rating" on public.ratings for select to authenticated using (user_id = (select auth.uid()));
+revoke all on public.ratings from anon, authenticated;
+grant select on public.ratings to authenticated;
+create or replace view public.ladder with (security_invoker = false) as
+  select p.username, r.elo, r.games, r.wins, r.losses, r.draws, r.peak
+  from public.ratings r join public.profiles p on p.id = r.user_id
+  where r.games >= 5 and not p.private;
+revoke all on public.ladder from public;
+grant select on public.ladder to anon, authenticated;
+
+create or replace function public.mm_rating(p_user uuid) returns int
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select elo from public.ratings where user_id = p_user), 1000);
+$$;
 
 -- What the functions hand back: the match, plus the database's clock so both browsers can agree
 -- when the match starts.
@@ -250,7 +294,7 @@ $$;
 -- an earlier finish.
 create or replace function public.mm_settle(m public.matches) returns public.matches
 language plpgsql security definer set search_path = '' as $$
-declare since int; w int;
+declare since int; w int; mid uuid := m.id; r1 int; r2 int; g1 int; g2 int; e1 numeric; s1 numeric; d1 int := 0; d2 int := 0;
 begin
   if m.status <> 'live' then return m; end if;
   since := (extract(epoch from clock_timestamp() - m.starts_at) * 1000)::int;
@@ -265,7 +309,33 @@ begin
     when m.p1_ms < m.p2_ms then 1
     when m.p2_ms < m.p1_ms then 2
     else 0 end;
-  update public.matches set status = 'done', winner = w where id = m.id returning * into m;
+  -- Only one caller settles a match (the other finds it already done), so a rating moves once.
+  update public.matches set status = 'done', winner = w where id = mid and status = 'live' returning * into m;
+  if not found then
+    select * into m from public.matches where id = mid;
+    return m;
+  end if;
+  -- Ranked: Elo. Placement matches (the first 5) move a rating faster. The same two players only
+  -- move each other's ratings in their first 3 ranked matches of a day, so two accounts can't farm.
+  if m.ranked and m.p1 is not null and m.p2 is not null
+     and (select count(*) from public.matches x where x.ranked and x.status = 'done' and x.id <> mid
+          and x.created_at > now() - interval '1 day'
+          and ((x.p1 = m.p1 and x.p2 = m.p2) or (x.p1 = m.p2 and x.p2 = m.p1))) < 3 then
+    insert into public.ratings (user_id) values (m.p1), (m.p2) on conflict (user_id) do nothing;
+    select elo, games into r1, g1 from public.ratings where user_id = m.p1 for update;
+    select elo, games into r2, g2 from public.ratings where user_id = m.p2 for update;
+    e1 := 1 / (1 + power(10, (r2 - r1) / 400.0));
+    s1 := case w when 1 then 1 when 2 then 0 else 0.5 end;
+    d1 := round((case when g1 < 5 then 40 else 24 end) * (s1 - e1));
+    d2 := round((case when g2 < 5 then 40 else 24 end) * ((1 - s1) - (1 - e1)));
+    update public.ratings set elo = elo + d1, games = games + 1, wins = wins + (w = 1)::int, losses = losses + (w = 2)::int,
+      draws = draws + (w = 0)::int, peak = greatest(peak, elo + d1), updated_at = now() where user_id = m.p1;
+    update public.ratings set elo = elo + d2, games = games + 1, wins = wins + (w = 2)::int, losses = losses + (w = 1)::int,
+      draws = draws + (w = 0)::int, peak = greatest(peak, elo + d2), updated_at = now() where user_id = m.p2;
+  end if;
+  if m.ranked then
+    update public.matches set p1_delta = d1, p2_delta = d2 where id = mid returning * into m;
+  end if;
   return m;
 end $$;
 
@@ -287,22 +357,35 @@ begin
   return nm;
 end $$;
 
--- Public queue: joins the oldest open match for the same game whose player is still there, or
--- opens one and waits. Public matches are always a race to 25 with a 2:00 limit.
-create or replace function public.mm_queue(p_game text) returns jsonb
+-- Public queue. Public matches are always a race to 25 with a 2:00 limit.
+--  - Ranked: always arithmetic; pairs you with the waiting player whose rating is closest to yours.
+--  - Unranked: pairs you with someone who picked the same problems, or 'any'. Two 'any' players get
+--    arithmetic; 'any' with a specific choice gets that choice.
+drop function if exists public.mm_queue(text);
+create or replace function public.mm_queue(p_game text, p_ranked boolean default false) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare nm text := public.mm_ready(); m public.matches;
+declare nm text := public.mm_ready(); m public.matches; my int := public.mm_rating(auth.uid()); v_ranked boolean := coalesce(p_ranked, false); g text := p_game;
 begin
-  if p_game not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h') then raise exception 'Unknown game.'; end if;
-  select * into m from public.matches
-    where is_public and status = 'waiting' and game = p_game and p1 <> auth.uid() and seen_at > now() - interval '6 seconds'
-    order by created_at limit 1 for update skip locked;
+  if v_ranked then g := 'standard'; end if;
+  if g not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h', 'any') then raise exception 'Unknown game.'; end if;
+  if v_ranked then
+    select * into m from public.matches
+      where is_public and ranked and status = 'waiting' and p1 <> auth.uid() and seen_at > now() - interval '6 seconds'
+      order by abs(coalesce(p1_elo, 1000) - my), created_at limit 1 for update skip locked;
+  else
+    select * into m from public.matches
+      where is_public and not ranked and status = 'waiting' and p1 <> auth.uid() and seen_at > now() - interval '6 seconds'
+        and (g = 'any' or game in (g, 'any'))
+      order by created_at limit 1 for update skip locked;
+  end if;
   if found then
-    update public.matches set p2 = auth.uid(), p2_name = nm, status = 'live', starts_at = clock_timestamp() + interval '6 seconds'
+    update public.matches set p2 = auth.uid(), p2_name = nm, p2_elo = case when v_ranked then my end, status = 'live',
+      starts_at = clock_timestamp() + interval '6 seconds',
+      game = case when game <> 'any' then game when g <> 'any' then g else 'standard' end
       where id = m.id returning * into m;
   else
-    insert into public.matches (is_public, rule, game, goal, seconds, p1, p1_name)
-      values (true, 'race', p_game, 25, 120, auth.uid(), nm) returning * into m;
+    insert into public.matches (is_public, ranked, rule, game, goal, seconds, p1, p1_name, p1_elo)
+      values (true, v_ranked, 'race', g, 25, 120, auth.uid(), nm, case when v_ranked then my end) returning * into m;
   end if;
   return public.mm_out(m);
 end $$;
@@ -350,6 +433,39 @@ begin
   return public.mm_out(public.mm_settle(m));
 end $$;
 
+-- Rematch: either player, once a match is over. The first to ask opens a private match with the
+-- same problems and rule (always unranked) and offers it on the old match; the other player's
+-- Rematch joins it. Asking again returns your own offer.
+create or replace function public.mm_rematch(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare nm text; old public.matches; m public.matches; c text; seat int;
+begin
+  select * into old from public.matches where id = p_id and auth.uid() in (p1, p2) for update;
+  if not found then raise exception 'Match not found.'; end if;
+  if old.status <> 'done' then raise exception 'The match isn’t over yet.'; end if;
+  if old.p1 is null or old.p2 is null then raise exception 'Your opponent’s account is gone.'; end if;
+  seat := case when old.p1 = auth.uid() then 1 else 2 end;
+  if old.rematch_code is not null then
+    select * into m from public.matches where code = old.rematch_code for update;
+    if found and m.status = 'waiting' and m.seen_at > now() - interval '6 seconds' then
+      if old.rematch_by = seat then return public.mm_out(m); end if;  -- your own offer, still open
+      nm := public.mm_ready();
+      update public.matches set p2 = auth.uid(), p2_name = nm, status = 'live', starts_at = clock_timestamp() + interval '6 seconds'
+        where id = m.id returning * into m;
+      return public.mm_out(m);
+    end if;
+  end if;
+  nm := public.mm_ready();
+  loop
+    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '') into c from generate_series(1, 6);
+    exit when not exists (select 1 from public.matches where code = c);
+  end loop;
+  insert into public.matches (code, is_public, rule, game, goal, seconds, p1, p1_name)
+    values (c, false, old.rule, old.game, old.goal, old.seconds, auth.uid(), nm) returning * into m;
+  update public.matches set rematch_code = c, rematch_by = seat where id = old.id;
+  return public.mm_out(m);
+end $$;
+
 create or replace function public.mm_cancel(p_id uuid) returns void
 language sql security definer set search_path = '' as $$
   update public.matches set status = 'cancelled' where id = p_id and p1 = auth.uid() and status = 'waiting';
@@ -386,9 +502,9 @@ begin
   return public.mm_out(public.mm_settle(m));
 end $$;
 
-revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready() from public, anon, authenticated;
-revoke execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) from public, anon;
-grant execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) to authenticated;
+revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready(), public.mm_rating(uuid) from public, anon, authenticated;
+revoke execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid) from public, anon;
+grant execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid) to authenticated;
 
 -- ---- after a duel: quick chat ---------------------------------------------------------------
 -- The two players can talk once the match is over: short messages (a "gg", an emoji), readable

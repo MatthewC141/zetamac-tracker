@@ -348,6 +348,19 @@
   .bd-list { max-height: 250px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
   .bd-list table { font-size: 14px; }
   .bd-list td { padding: 5px 9px; }
+  .bd-list s.miss { color: var(--red); margin-right: 4px; }
+  /* 80 in 8 in the weak spots: accuracy beside the time, red when it's low. */
+  .tower .gap.acc { color: var(--ink); }
+  .tower .gap.acc.low { color: var(--red); font-weight: 700; }
+  .weak-game { margin-left: auto; }
+  /* 80 in 8 at the foot of the score panel */
+  .o80-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--grid); font-size: 14px; color: var(--muted); }
+  .o80-line[hidden] { display: none; }
+  .o80-line .lbl { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
+  .o80-line .lbl::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--purple); }
+  .o80-line b { color: var(--ink); font: 700 20px/1 var(--figure); margin-right: 4px; }
+  .o80-line a { margin-left: auto; font: 700 12px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .panel-head .weak-game + .seg { margin-left: 8px; }
   .bd-list .slow { color: var(--yellow); font-weight: 700; }
   .bd-list .fast { color: var(--green); font-weight: 700; }
   .bd-sort { border: 0; background: none; color: var(--ink); font: 700 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; padding: 0; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
@@ -359,7 +372,7 @@
   .op-mix { --team: var(--t-mix); background: var(--t-mix); fill: var(--t-mix); }
   .op-dec { --team: #c9a7ff; background: #c9a7ff; fill: #c9a7ff; }
   .op-pct { --team: #ffd21f; background: #ffd21f; fill: #ffd21f; }
-  .tower li.op-add, .tower li.op-sub, .tower li.op-mul, .tower li.op-div { background: none; }
+  .tower li.op-add, .tower li.op-sub, .tower li.op-mul, .tower li.op-div, .tower li.op-dec, .tower li.op-pct, .tower li.op-mix, .tower li.op-sq { background: none; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -475,7 +488,7 @@
     .strip .help-btn + .help-btn { margin-left: 0; }
     .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
   }
-  #welcome { width: min(760px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
+  #welcome { width: min(760px, calc(100vw - 32px)); height: min(740px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
   #welcome[open] { display: flex; flex-direction: column; }
   .w-step { flex: 1 0 auto; }
   #welcome::backdrop { background: rgba(5, 6, 8, .78); }
@@ -500,7 +513,7 @@
   .w-lede b { color: var(--ink); font-weight: 600; }
   .w-grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 24px; align-items: start; }
   .w-rows { list-style: none; margin: 0; padding: 0; }
-  .w-rows li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0 14px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--grid); }
+  .w-rows li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0 14px; align-items: start; padding: 9px 0; border-bottom: 1px solid var(--grid); }
   .w-rows li:first-child { border-top: 1px solid var(--grid); }
   .w-rows .k { font: 700 12px/1.1 var(--label); letter-spacing: .1em; text-transform: uppercase; padding-top: 4px; }
   .w-rows .v { font-size: 15px; line-height: 1.4; color: var(--muted); }
@@ -585,6 +598,10 @@
     <section class="panel" aria-labelledby="weak-title">
       <div class="panel-head">
         <h2 id="weak-title">Weak spots</h2>
+        <div class="seg weak-game" id="weak-game" role="group" aria-label="Which game" hidden>
+          <button data-weak-game="standard" aria-pressed="true">Arithmetic</button>
+          <button data-weak-game="o80" aria-pressed="false">80 in 8</button>
+        </div>
         <div class="seg" role="group" aria-label="Games to include">
           <button data-window="1" aria-pressed="false">Last game</button>
           <button data-window="10" aria-pressed="true">Last 10 games</button>
@@ -598,6 +615,7 @@
       <section class="panel score-panel" aria-labelledby="score-title">
         <div class="panel-head"><h2 id="score-title">2-minute score</h2><span class="sub">Arithmetic</span></div>
         <div id="score"></div>
+        <p class="o80-line" id="o80-line" hidden></p>
       </section>
       <section class="panel heat-panel" aria-labelledby="heat-title">
         <div class="panel-head">
@@ -786,12 +804,14 @@
   </section>
 
   <section class="w-step" data-step="1" aria-labelledby="w-title-1" hidden>
-    <h2 id="w-title-1">Four games. Every question timed.</h2>
+    <h2 id="w-title-1">Six games. Every question timed.</h2>
     <p class="w-lede">Pick a game and a length on its start screen, then press <b>Enter</b>. Every question is timed, so the tracker can see where your time goes.</p>
     <ul class="w-rows">
       <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock and records seconds per problem.</span></li>
       <li class="plain"><span class="k">Squares</span><span class="v">Two-digit or three-digit squares, <b>skipping the easy ones</b>: nothing ending in 5, and no 1–20.</span></li>
       <li class="plain"><span class="k">Combined</span><span class="v">Two steps in one problem, like <b>(5 + 2) × (15 + 9)</b>: work out the brackets, then the rest.</span></li>
+      <li class="plain"><span class="k">80 in 8</span><span class="v">An Optiver-style test: <b>80 questions in 8 minutes</b> with decimals and percentages, marked right minus wrong.</span></li>
+      <li class="plain"><span class="k">Duel</span><span class="v">Race another player on <b>the same questions</b>: find an opponent, or send a friend a code.</span></li>
       <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, like <b>subtraction with borrowing</b>. Untimed by default.</span></li>
       <li class="plain"><span class="k">Guide</span><span class="v">The quickest way to do <b>each operation in your head</b>, step by step, plus a times-table drill. Open <b>Guide</b> from the header.</span></li>
     </ul>
@@ -803,7 +823,7 @@
     <div class="w-grid">
       <ul class="w-rows">
         <li class="plain"><span class="k">Weak spots</span><span class="v">Operations ranked <b>slowest first</b>, and the question types that cost you most.</span></li>
-        <li class="plain"><span class="k">2-min score</span><span class="v">Your best this week against the <b>80 target</b>, plus your last 10 games.</span></li>
+        <li class="plain"><span class="k">2-min score</span><span class="v">Your <b>best this week</b> and your last game, with your last 10 games and their average.</span></li>
         <li class="plain"><span class="k">Chart</span><span class="v">Daily bests over a month, 3 months or a year. 30-second rounds show projected ×4.</span></li>
         <li class="plain"><span class="k">Results</span><span class="v">Every game. <b>Open one</b> to see how long each question took.</span></li>
         <li class="plain"><span class="k">Log a score</span><span class="v">Add rounds you played on the real zetamac site.</span></li>

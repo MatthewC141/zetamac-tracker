@@ -13,6 +13,7 @@
     { key: 'standard|30', name: 'Arithmetic', len: '0:30', team: 't-arith' },
     { key: 'mixed|120', name: 'Combined operations', len: '2:00', team: 't-mix' },
     { key: 'o80|480', name: '80 in 8', len: '8:00', team: 't-o80', play: 'an 80-in-8 test' },
+    { key: 'elo', name: 'Duel rating', len: 'Ranked', team: 't-rank', elo: true, play: 'your 5 placement matches in ranked duels' },
     { key: 'sq99h|120', name: 'Two-digit squares', len: '2:00', team: 't-sq' },
     { key: 'sq999h|120', name: 'Three-digit squares', len: '2:00', team: 't-sq' },
     { key: 'standard|0', name: 'Arithmetic', len: 'Endless', team: 't-end', endless: true },
@@ -27,10 +28,15 @@
   $('#join').hidden = !(window.ZM_WEB && cloud?.ready && !user);
 
   const dateText = s => { const [y, m, d] = s.split('-').map(Number); return `${MONTHS[m - 1]} ${d}${y === new Date().getFullYear() ? '' : `, ${y}`}`; };
-  const figure = (b, r) => b.endless ? `${r.score}<small>in ${clock(r.elapsed)}</small>` : `${r.score}`;
+  const RANK = window.ZM_MATCHES?.rank;
+  // The figure, with what breaks ties on each board: the endless run's time, the 80-in-8 test's
+  // wrong answers and time, and a rating's rank.
+  const figure = (b, r) => b.endless ? `${r.score}<small>in ${clock(r.elapsed)}</small>`
+    : b.elo ? `${r.score}<small>${RANK ? RANK(r.score).name : ''}</small>`
+    : b.key === 'o80|480' && Number.isInteger(r.wrongs) ? `${r.score}<small>${r.wrongs} wrong${r.elapsed ? ` · ${clock(r.elapsed)}` : ''}</small>` : `${r.score}`;
   const behind = (b, r, top) => (r === top ? 'P1' : `−${top.score - r.score}`);
   // Players tied on the same figure share a place.
-  const places = list => list.map((r, i) => (i && list[i - 1].score === r.score && (list[i - 1].elapsed === r.elapsed) ? null : i + 1))
+  const places = list => list.map((r, i) => (i && list[i - 1].score === r.score && list[i - 1].elapsed === r.elapsed && (list[i - 1].wrongs ?? null) === (r.wrongs ?? null) ? null : i + 1))
     .map((p, i, arr) => { let k = i; while (arr[k] === null) k--; return arr[k]; });
 
   function renderBoards() {
@@ -43,7 +49,8 @@
       let line, place;
       if (at >= 0) {
         const r = list[at], ahead = list.slice(0, at).reverse().find(x => x.score > r.score);
-        line = ahead ? `PB <b>${r.score}</b> · ${ahead.score - r.score + 1} to pass ${esc(ahead.username)}` : `PB <b>${r.score}</b> · leading`;
+        const what = b.elo ? `Rating <b>${r.score}</b>${RANK ? ` · ${RANK(r.score).name}` : ''}` : `PB <b>${r.score}</b>`;
+        line = ahead ? `${what} · ${ahead.score - r.score + 1} to pass ${esc(ahead.username)}` : `${what} · leading`;
         place = `<span class="place${pl[at] === 1 ? ' p1' : ''}"><b>P${pl[at]}</b><span>of ${list.length}</span></span>`;
       } else {
         line = list.length ? `Leader ${esc(list[0].username)} · <b>${list[0].score}</b>` : 'No one yet';
@@ -57,7 +64,7 @@
   function renderTower(animate = false) {
     const b = BOARDS.find(x => x.key === chosen), list = byBoard.get(b.key) || [], mine = me();
     $('#b-title').innerHTML = `${b.name}<small>${b.len}</small>`;
-    $('#b-sub').textContent = list.length ? `${list.length} ${list.length === 1 ? 'player' : 'players'} · ${b.endless ? 'questions answered' : 'best score'}` : '';
+    $('#b-sub').textContent = list.length ? `${list.length} ${list.length === 1 ? 'player' : 'players'} · ${b.endless ? 'questions answered' : b.elo ? 'rating · ranked duels' : b.key === 'o80|480' ? 'best score · ties: fewer wrong, then faster' : 'best score'}` : '';
     const tower = $('#tower');
     const pl = places(list);
     tower.innerHTML = list.length ? list.map((r, i) => {
@@ -65,7 +72,7 @@
       const ahead = you && list.slice(0, i).reverse().find(x => x.score > r.score);
       return `<li class="${b.team}${you ? ' me' : ''}"><span class="pos">${pl[i]}</span><span class="stripe"></span>` +
         `<span class="who">${esc(r.username)}${you ? '<span class="you">You</span>' : ''}${ahead ? `<span class="to-pass">${ahead.score - r.score + 1} to pass ${esc(ahead.username)}</span>` : ''}</span>` +
-        `<span class="figure${pl[i] === 1 ? ' p1' : ''}">${figure(b, r)}</span><span class="gap">${behind(b, r, list[0])}</span><span class="date">${dateText(r.date)}</span></li>`;
+        `<span class="figure${pl[i] === 1 ? ' p1' : ''}">${figure(b, r)}</span><span class="gap">${behind(b, r, list[0])}</span><span class="date">${b.elo ? `${r.wins}–${r.losses}` : dateText(r.date)}</span></li>`;
     }).join('') : `<li class="empty-row"><p class="empty">No one on this board yet. Play ${b.play || (b.endless ? 'an endless run' : `a ${b.len} ${b.name.toLowerCase()} game`)} on the site while signed in to set the first mark.</p></li>`;
     if (animate && !reduceMotion.matches) { tower.classList.remove('enter'); void tower.offsetWidth; tower.classList.add('enter'); }
     const row = tower.querySelector('li.me');
@@ -90,13 +97,21 @@
       return;
     }
     try {
-      const rows = await cloud.leaderboard();
+      const [rows, ladder] = await Promise.all([cloud.leaderboard(), cloud.ladder ? cloud.ladder().catch(() => []) : []]);
       byBoard = new Map(BOARDS.map(b => [b.key, []]));
       for (const r of rows) {
         const list = byBoard.get(`${r.mode}|${r.seconds}`);
         if (list && typeof r.username === 'string' && Number.isInteger(r.score)) list.push(r);
       }
-      for (const [k, list] of byBoard) list.sort((a, b) => b.score - a.score || (k.endsWith('|0') ? a.elapsed - b.elapsed : 0) || (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      for (const r of ladder) {
+        if (typeof r.username === 'string' && Number.isInteger(r.elo))
+          byBoard.get('elo').push({ username: r.username, score: r.elo, elapsed: 0, wins: r.wins | 0, losses: r.losses | 0 });
+      }
+      // Ties: endless by the faster run; 80 in 8 by fewer wrong, then faster; then the earlier date.
+      const big = v => (Number.isInteger(v) && v > 0 ? v : Infinity);
+      for (const [k, list] of byBoard) list.sort((a, b) => b.score - a.score || (k.endsWith('|0') ? a.elapsed - b.elapsed : 0)
+        || (k === 'o80|480' ? (a.wrongs ?? Infinity) - (b.wrongs ?? Infinity) || big(a.elapsed) - big(b.elapsed) : 0)
+        || (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       renderBoards();
       renderTower();
     } catch (err) {

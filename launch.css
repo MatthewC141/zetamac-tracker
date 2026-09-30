@@ -211,6 +211,7 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 .mh-score small { display: block; margin-top: 4px; font-size: 12px; color: var(--lt-muted); white-space: nowrap; }
 .mh-when { text-align: right; font-size: 13px; color: var(--lt-muted); white-space: nowrap; }
 .mh-note { margin: 14px 0 0; font-size: 14px; color: var(--lt-muted); }
+.mh-ranked { color: var(--lt-ink); font-weight: 700; }
 .mh-note:empty { display: none; }
 .mh-all { font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none !important; color: var(--lt-muted) !important; border: 1px solid var(--lt-line); border-radius: 3px; padding: 9px 12px; }
 .mh-all:hover { color: var(--lt-ink) !important; border-color: var(--lt-line-hi); }

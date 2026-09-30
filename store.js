@@ -75,11 +75,12 @@
     if (score === null || score > (endless ? 999999 : 500)) throw new Refused('Score is out of range.');
     const seconds = endless ? 0 : parseSeconds(get('seconds'));
     if (!endless && !seconds) throw new Refused('Game length must be 30 or 120 seconds.');
-    const elapsed = endless ? parseInt6(get('elapsed')) : 0;
-    if (elapsed === null) throw new Refused('Endless runs need an elapsed time in seconds.');
     const mode = parseMode(get('mode'));
     if (!mode) throw new Refused('Unknown game mode.');
     if (endless ? mode === 'o80' : !lengthFits(mode, seconds, score)) throw new Refused('That game length doesn’t fit that game.');
+    // How long it took, in seconds: an endless run's length, or the 80-in-8 test's (its tie-break).
+    const elapsed = endless ? parseInt6(get('elapsed')) : mode === 'o80' ? Math.min(480, parseInt6(get('elapsed')) ?? 0) : 0;
+    if (elapsed === null) throw new Refused('Endless runs need an elapsed time in seconds.');
     const e = entry(score, dateKey(new Date()), 'game', seconds, mode);
     e.elapsed = elapsed;
     const d = get('detail');
@@ -174,10 +175,13 @@
   const insertRows = (c, rows) => c.rest('scores?on_conflict=user_id,ts,score,seconds,mode,source', {
     method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
     body: rows.map(({ e, detail }) => {
-      // A log that's unreadable or longer than the database keeps (5,000 answers) is dropped; the score still saves.
+      // A log the database wouldn't keep is dropped and the score still saves: unreadable, over
+      // 5,000 answers, or over its 200 bytes a question (checked with room for the database's own
+      // spacing), since one refused log would otherwise fail the whole batch.
       let log = null;
       try { log = detail ? JSON.parse(detail) : null; } catch {}
-      return { ...e, detail: Array.isArray(log) && log.length <= 5000 ? log : null };
+      const fits = Array.isArray(log) && log.length <= 5000 && new TextEncoder().encode(JSON.stringify(log)).length <= 180 * log.length;
+      return { ...e, detail: fits ? log : null };
     }),
   });
 

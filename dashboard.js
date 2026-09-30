@@ -469,6 +469,12 @@ let weakWindow = '10';
 try { weakWindow = localStorage.getItem('zm-weak') || weakWindow; } catch {}
 if (!['1', '10', 'all'].includes(weakWindow)) weakWindow = '10';
 let weakRun = 0;
+// Which game the weak spots show: arithmetic, or the 80-in-8 test (its question kinds and accuracy).
+let weakGame = 'standard';
+try { weakGame = localStorage.getItem('zm-weak-game') === 'o80' ? 'o80' : 'standard'; } catch {}
+const O80_KINDS = ['add', 'sub', 'mul', 'div', 'dec', 'pct', 'mix'];
+const O80_CODES = { add: 'ADD', sub: 'SUB', mul: 'MUL', div: 'DIV', dec: 'DEC', pct: 'PCT', mix: 'BRK' };
+const O80_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', dec: 'Decimals', pct: 'Percentages', mix: 'Brackets' };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // The kind of question inside an operation, read from its text: "54 + 87" → "+ carry".
@@ -557,7 +563,13 @@ async function renderWeak() {
   const run = ++weakRun;
   const el = $('#weak');
   document.querySelectorAll('[data-window]').forEach(b => b.setAttribute('aria-pressed', b.dataset.window === weakWindow));
-  const timed = allGames.filter(g => (g.mode || 'standard') === 'standard' && g.detail).sort((a, b) => (b.ts > a.ts ? 1 : b.ts < a.ts ? -1 : 0));
+  // The 80-in-8 switch shows once there's a test with its question log.
+  const hasO80 = allGames.some(g => g.mode === 'o80' && g.detail);
+  $('#weak-game').hidden = !hasO80;
+  const game = hasO80 ? weakGame : 'standard';
+  document.querySelectorAll('[data-weak-game]').forEach(b => b.setAttribute('aria-pressed', b.dataset.weakGame === game));
+  const o80 = game === 'o80';
+  const timed = allGames.filter(g => (g.mode || 'standard') === game && g.detail).sort((a, b) => (b.ts > a.ts ? 1 : b.ts < a.ts ? -1 : 0));
   const emptyMsg = '<p class="empty-state">No question timings yet. Play a round on the <a href="play.html">Play</a> page and each operation will be ranked here by its time per question, slowest first.</p>';
   if (!timed.length) { el.innerHTML = emptyMsg; return; }
   // Last game is compared with the 10 games before it; last 10 with the 10 before those.
@@ -567,6 +579,7 @@ async function renderWeak() {
   const load = async list => (await Promise.all(list.map(g => getDetail(g.ts).catch(() => [])))).flat();
   const [qs, prevQs] = await Promise.all([load(cur), load(prev)]);
   if (run !== weakRun) return;  // a newer render started while these loaded
+  if (o80) return renderWeakO80(el, qs, prevQs, cur, prev);
 
   const now = avgBy(qs, q => (has(OP_CODES, q.o) ? q.o : null)), before = avgBy(prevQs, q => (has(OP_CODES, q.o) ? q.o : null));
   const rows = OPS.filter(o => now[o]).map(o => ({ op: o, ...now[o] })).sort((a, b) => b.avg - a.avg);
@@ -600,6 +613,46 @@ async function renderWeak() {
     }
   }
 }
+
+// The 80-in-8 test's weak spots: each kind of question by seconds per answer (skips don't count),
+// with its accuracy beside it (right out of answered; under 85% is marked), then the most missed.
+function renderWeakO80(el, qs, prevQs, cur, prev) {
+  const answered = list => list.filter(q => q.r !== 's');
+  const now = avgBy(answered(qs), q => (has(O80_CODES, q.o) ? q.o : null)), before = avgBy(answered(prevQs), q => (has(O80_CODES, q.o) ? q.o : null));
+  const acc = {};
+  for (const q of answered(qs)) { const a = (acc[q.o] ||= { y: 0, n: 0 }); q.r === 'n' ? a.n++ : a.y++; }
+  const rows = O80_KINDS.filter(o => now[o]).map(o => ({ op: o, ...now[o], acc: acc[o].y / (acc[o].y + acc[o].n) })).sort((a, b) => b.avg - a.avg);
+  if (!rows.length) { el.innerHTML = '<p class="empty-state">No answered questions in these tests yet.</p>'; return; }
+  const fastest = Math.min(...rows.map(r => r.avg)), slowest = rows[0].avg;
+  const sector = r => r.avg === fastest ? 's-purple' : before[r.op] ? (r.avg < before[r.op].avg ? 's-green' : 's-yellow') : '';
+  const pct = v => `${Math.round(v * 100)}%`;
+  const missed = rows.filter(r => r.acc < 1).sort((a, b) => a.acc - b.acc);
+  const wrongs = answered(qs).filter(q => q.r === 'n').length, total = answered(qs).length;
+  el.innerHTML =
+    `<ol class="tower">${rows.map((r, i) => `<li class="op-${r.op} ${sector(r)}" data-op="${r.op}" data-sector="${sector(r)}">` +
+      `<span class="pos">${i + 1}</span><span class="stripe"></span>` +
+      `<span class="code" title="${O80_NAMES[r.op]}">${O80_CODES[r.op]}</span>` +
+      `<span class="track" aria-hidden="true"><i style="width:${(r.avg / slowest * 100).toFixed(1)}%"></i></span>` +
+      `<span class="time">${secs2(r.avg)}<small>s</small></span>` +
+      `<span class="gap acc${r.acc < 0.85 ? ' low' : ''}" title="Right, out of those answered">${pct(r.acc)}</span></li>`).join('')}</ol>` +
+    `<div class="tower-note"><span>Seconds per answer and accuracy · ${plural(total, 'answer')} from ${plural(cur.length, 'test')}${prev.length ? `, compared with the ${prev.length === 1 ? 'test' : plural(prev.length, 'test')} before` : ''} · skips left out</span>` +
+    `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : ''}</span></div>` +
+    `<div class="facts-head"><h3>Most missed</h3></div>` +
+    (missed.length ? `<ol class="tower facts">${missed.map((r, i) => `<li class="op-${r.op}"><span class="pos">${i + 1}</span><span class="stripe"></span>` +
+      `<span class="fact-name">${O80_NAMES[r.op]}</span><span class="track" aria-hidden="true"><i style="width:${((1 - r.acc) * 100).toFixed(1)}%"></i></span>` +
+      `<span class="time">${pct(1 - r.acc)}<small> wrong</small></span><span class="gap">${acc[r.op].n} of ${acc[r.op].y + acc[r.op].n}</span></li>`).join('')}</ol>`
+      : '<p class="facts-note">Nothing missed in these tests.</p>') +
+    `<p class="facts-note">${wrongs ? `${plural(wrongs, 'wrong answer')} in all · each one costs a point on top of the one you didn’t get` : 'Every answer right'}</p>`;
+  renderHeatmap();
+}
+
+$('#weak-game').addEventListener('click', e => {
+  const b = e.target.closest('[data-weak-game]');
+  if (!b) return;
+  weakGame = b.dataset.weakGame;
+  try { localStorage.setItem('zm-weak-game', weakGame); } catch {}
+  renderWeak();
+});
 
 $('#weak').addEventListener('click', e => {
   const b = e.target.closest('[data-facts]');
@@ -654,6 +707,26 @@ function renderScore() {
     `<ol class="laps">${recent.map(r => `<li class="${r.cls}" title="${longDate(parseDate(r.g.date))}">${r.g.score}<small>${esc(shortDate(parseDate(r.g.date)))}</small></li>`).join('')}</ol>`;
 }
 
+// The 80-in-8 test at the foot of the score panel: best and latest, with a link to its chart.
+function renderO80Line() {
+  const tests = allGames.filter(g => g.mode === 'o80' && g.seconds === 480).sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+  const el = $('#o80-line');
+  el.hidden = !tests.length;
+  if (!tests.length) return;
+  const best = Math.max(...tests.map(g => g.score)), last = tests[tests.length - 1];
+  el.innerHTML = `<span class="lbl">80 in 8</span><span><b>${best}</b>best</span>` +
+    `<span><b>${last.score}</b>last · ${esc(shortDate(parseDate(last.date)))}</span>` +
+    `<span>${plural(tests.length, 'test')}</span><a href="#" id="o80-chart">Chart</a>`;
+}
+$('#o80-line').addEventListener('click', e => {
+  if (!e.target.closest('#o80-chart')) return;
+  e.preventDefault();
+  const pick = $('#chart-game');
+  pick.value = 'o80';
+  pick.dispatchEvent(new Event('change'));
+  $('#chart').closest('.panel').scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
+});
+
 // ---------- per-question breakdown (expands under a recent game) ----------
 const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined', dec: 'Decimals', pct: 'Percentages' };
 const detailCache = new Map();
@@ -669,13 +742,17 @@ async function getDetail(ts) {
       q: String(q.q ?? ''), a: String(q.a ?? ''),
       o: /^[a-z]{1,8}$/.test(q.o) ? q.o : 'other',
       c: Math.max(0, Math.floor(Number(q.c) || 0)), t: Math.max(0, Number(q.t) || 0),
+      // The 80-in-8 test marks each question right (y), wrong (n) or skipped (s), with what was typed.
+      r: ['y', 'n', 's'].includes(q.r) ? q.r : 'y', g: String(q.g ?? '').slice(0, 12),
     })));
   }
   return detailCache.get(ts);
 }
 
 function breakdownHTML(qs, sortSlow) {
-  const times = qs.map(q => q.t);
+  // Timings count answered questions; a skip (80 in 8) is listed but isn't a time to answer.
+  const answered = qs.filter(q => q.r !== 's');
+  const times = (answered.length ? answered : qs).map(q => q.t);
   const sorted = [...times].sort((a, b) => a - b);
   const total = times.reduce((a, b) => a + b, 0);
   const mid = sorted.length / 2;
@@ -689,7 +766,7 @@ function breakdownHTML(qs, sortSlow) {
   ];
   // average per operation, slowest first
   const byOp = {};
-  for (const q of qs) (byOp[q.o] ||= []).push(q.t);
+  for (const q of answered) (byOp[q.o] ||= []).push(q.t);
   const ops = Object.entries(byOp).map(([o, t]) => [o, t.reduce((a, b) => a + b, 0) / t.length, t.length]).sort((a, b) => b[1] - a[1]);
 
   // bar chart: one bar per question, in the order they were answered
@@ -702,7 +779,7 @@ function breakdownHTML(qs, sortSlow) {
   for (let v = 0; v <= top; v += step) svg += `<line class="gridline" x1="${m.l}" x2="${W - m.r}" y1="${Y(v * 1000)}" y2="${Y(v * 1000)}"/><text x="${m.l - 4}" y="${Y(v * 1000) + 3}" text-anchor="end">${v}s</text>`;
   qs.forEach((q, i) => {
     const x = m.l + i * bw, y = Y(q.t);
-    const tip = `#${i + 1}  ${q.q} = ${q.a}  ·  ${secs(q.t)} s${q.c ? `  ·  ${plural(q.c, 'correction')}` : ''}`;
+    const tip = `#${i + 1}  ${q.q} = ${q.a}  ·  ${secs(q.t)} s${q.r === 'n' ? `  ·  wrong (typed ${q.g})` : q.r === 's' ? '  ·  skipped' : ''}${q.c ? `  ·  ${plural(q.c, 'correction')}` : ''}`;
     svg += `<rect class="op-${esc(q.o)}" x="${x + Math.min(1, bw * 0.15)}" y="${y}" width="${Math.max(0.6, bw - Math.min(2, bw * 0.3))}" height="${H - m.b - y}"><title>${esc(tip)}</title></rect>`;
   });
   svg += `<text x="${m.l}" y="${H - 3}">#1</text><text x="${W - m.r}" y="${H - 3}" text-anchor="end">#${qs.length}</text>`;
@@ -711,11 +788,14 @@ function breakdownHTML(qs, sortSlow) {
   const rows = qs.map((q, i) => ({ ...q, n: i + 1 }));
   if (sortSlow) rows.sort((a, b) => b.t - a.t);
   const cls = t => t >= median * 2 ? 'slow' : t <= median * 0.6 ? 'fast' : '';
-  const list = rows.map(q => `<tr><td class="src">${q.n}</td><td>${esc(q.q)} = ${esc(q.a)}</td><td class="num ${cls(q.t)}">${secs(q.t)} s</td><td class="num src">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</td></tr>`).join('');
+  const shown = q => q.r === 'n' ? `${esc(q.q)} = <s class="miss" title="Typed">${esc(q.g)}</s> ${esc(q.a)}`
+    : `${esc(q.q)} = ${esc(q.a)}${q.r === 's' ? ' <span class="src">skipped</span>' : ''}`;
+  const list = rows.map(q => `<tr><td class="src">${q.n}</td><td>${shown(q)}</td><td class="num ${cls(q.t)}">${secs(q.t)} s</td><td class="num src">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</td></tr>`).join('');
 
   return `<div class="bd-stats">${stats.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>` +
     `<div class="bd-ops">${ops.map(([o, avg, n]) => `<span><i class="op-${esc(o)}"></i>${(has(OP_NAMES, o) ? OP_NAMES[o] : esc(o))} <b>${secs(avg)} s</b> avg · ${n}</span>`).join('')}` +
-    `<span>${plural(corrections, 'correction')}</span></div>` +
+    `<span>${plural(corrections, 'correction')}</span>` +
+    (qs.some(q => q.r !== 'y') ? `<span>${qs.filter(q => q.r === 'y').length} right · ${qs.filter(q => q.r === 'n').length} wrong · ${qs.filter(q => q.r === 's').length} skipped</span>` : '') + `</div>` +
     `<svg class="bd-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Seconds per question, in order">${svg}</svg>` +
     `<div class="bd-list-head"><span>Every question · red = over 2× your median, green = quick</span><button class="bd-sort" data-slow="${sortSlow ? 1 : 0}">${sortSlow ? 'Show in order' : 'Sort slowest first'}</button></div>` +
     `<div class="bd-list"><table><tbody>${list}</tbody></table></div>`;
@@ -752,7 +832,7 @@ function collapseGame(tr) {
 const toggleGame = tr => tr.classList.contains('open') ? collapseGame(tr) : expandGame(tr);
 
 function render() {
-  renderWeak(); renderScore();
+  renderWeak(); renderScore(); renderO80Line();
   renderStats(); renderChart(); renderPractice(); renderEndless(); renderHeatmap(); renderRecent();
   const t = today();
   $('#session-date').textContent = `${t.toLocaleDateString(undefined, { weekday: 'short' })} ${t.getDate()} ${MONTHS[t.getMonth()]}`;

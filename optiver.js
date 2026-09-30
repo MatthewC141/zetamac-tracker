@@ -126,11 +126,18 @@ input.addEventListener('keydown', e => {
   if (e.key === 'Tab') { e.preventDefault(); answer('s'); return; }
   if (e.key !== 'Enter') return;
   e.preventDefault();
+  submit();
+});
+// The same for the on-screen Enter button and Skip link (phones), keeping the keyboard up.
+function submit() {
   const raw = input.value.trim().replace(',', '.').replace('−', '-');
   if (!raw) return;
   const v = /^-?(\d+\.?\d*|\.\d+)$/.test(raw) ? Number(raw) : NaN;
   answer(Number.isFinite(v) && Math.abs(v - qs[idx].a) < 1e-9 ? 'y' : 'n', raw);
-});
+}
+for (const el of [$('#go'), $('#skip')]) el.addEventListener('mousedown', e => e.preventDefault());
+$('#go').addEventListener('click', () => { if (running) { submit(); input.focus(); } });
+$('#skip').addEventListener('click', e => { e.preventDefault(); if (running) { answer('s'); input.focus(); } });
 input.addEventListener('input', () => {
   if (input.value.length < prevLen) fixes++;
   prevLen = input.value.length;
