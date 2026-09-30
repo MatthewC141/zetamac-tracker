@@ -690,6 +690,8 @@ static void handle_client(int fd) {
       {"/leaderboard", "leaderboard.html"}, {"/leaderboard.html", "leaderboard.html"}, {"/leaderboard.js", "leaderboard.js"},
       {"/account", "account.html"}, {"/account.html", "account.html"},  {"/account.js", "account.js"},
       {"/mixed", "mixed.html"},     {"/mixed.html", "mixed.html"},      {"/mixed.js", "mixed.js"},
+      {"/duel", "duel.html"},       {"/duel.html", "duel.html"},        {"/duel.js", "duel.js"},
+      {"/problems.js", "problems.js"},
       {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);

@@ -184,5 +184,11 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 /* Narrowest phones: the two header buttons tighten so they still share the wordmark's line. */
 @media (max-width: 360px) {
   .lt-progress { padding: 9px 9px; letter-spacing: .06em; }
-  .lt-tabs a { padding-left: 2px; padding-right: 2px; font-size: 11px; letter-spacing: .05em; }
+}
+/* Phones: five game tabs share the row. */
+@media (max-width: 440px) {
+  .lt-tabs a { flex: 1 1 auto; padding-left: 4px; padding-right: 4px; font-size: 11px; letter-spacing: .05em; }
+}
+@media (max-width: 360px) {
+  .lt-tabs a { padding-left: 2px; padding-right: 2px; letter-spacing: 0; }
 }

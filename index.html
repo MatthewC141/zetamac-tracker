@@ -420,7 +420,8 @@
     .brand { order: -3; flex: 1; white-space: nowrap; }
     .session { order: -1; width: 100%; }
     .nav { order: 0; margin-left: 0; width: 100%; }
-    .nav .play-btn { flex: 1 1 0; min-width: 0; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
+    .nav .play-btn { flex: 1 1 auto; min-width: 0; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
+    @media (max-width: 380px) { .nav .play-btn { padding: 10px 3px; letter-spacing: .03em; } }
     .help-btn { order: 1; flex: 1 1 0; text-align: center; padding: 9px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
     .strip .help-btn + .help-btn { margin-left: 0; }
     .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
@@ -517,6 +518,7 @@
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="mixed.html">Combined</a>
       <a class="play-btn" href="practice.html">Practice</a>
+      <a class="play-btn" href="duel.html">1v1</a>
     </nav>
     <a class="help-btn" href="leaderboard.html">Leaderboard</a>
     <a class="help-btn" href="guide.html">Guide</a>

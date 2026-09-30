@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<script src="cloud.js"></script>
+<script src="store.js"></script>
+<link rel="stylesheet" href="launch.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>1v1 Match</title>
+<style>
+  /* The match itself keeps zetamac's white look, like the other games. */
+  :root { --bg: #ffffff; --ink: #000000; --box: #dddddd; --link: #0000ee; --muted: #555555; --good: #1a7f37; --bad: #b3261e; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  a { color: var(--link); }
+  input, select, button { font: inherit; color: var(--ink); }
+
+  /* ---- lobby (dark, the start-screen world) ---- */
+  .team-arith { --team: #f2f3f5; } .team-mix { --team: #2fbf95; }
+  .lt [hidden] { display: none !important; }
+  .d-block + .d-block { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--lt-grid); }
+  .d-rule { color: var(--lt-muted); font-size: 14px; margin: -6px 0 0; }
+  #settings.lt #start .lt-go b { font-size: 46px; }
+  .d-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; color: var(--lt-ink); background: var(--lt-raise); border: 1px solid var(--lt-line-hi); border-radius: 3px; cursor: pointer; text-decoration: none !important; transition: background-color .2s var(--ease), border-color .2s var(--ease); }
+  .d-btn:hover { background: #22232d; border-color: var(--lt-muted); }
+  .d-btn:disabled { opacity: .5; cursor: default; }
+  .d-btn.quiet { background: none; color: var(--lt-muted); border-color: var(--lt-line); }
+  .d-btn.quiet:hover { color: var(--lt-ink); border-color: var(--lt-line-hi); }
+  .d-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .d-row .d-btn.grow { flex: 1; }
+  #rule-seg { grid-template-columns: repeat(2, 1fr); }
+  .d-rule b { color: var(--lt-ink); font-weight: 600; }
+  .d-change { display: none; margin-left: 6px; font: 700 11px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; }
+  /* One column: the problem list sits under the lobby, so the lobby links down to it. */
+  @media (max-width: 860px) { .d-change { display: inline; } }
+  .d-join { display: flex; gap: 8px; margin-top: 12px; }
+  .d-join input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; font: 700 20px/1 var(--lt-figure); letter-spacing: .24em; text-transform: uppercase; color: var(--lt-ink); background: var(--lt-bg); border: 1px solid var(--lt-line); border-radius: 3px; caret-color: var(--lt-purple); }
+  .d-join input::placeholder { color: #5d616e; letter-spacing: .12em; font-size: 15px; font-weight: 600; text-transform: none; }
+  .d-join input:hover { border-color: var(--lt-line-hi); }
+  .d-join input:focus { outline: none; border-color: var(--lt-purple); }
+  .d-msg { margin: 12px 0 0; font-size: 14px; color: var(--lt-muted); min-height: 1.4em; }
+  .d-msg.err { color: var(--lt-red); }
+  .d-record { font: 600 13px/1 var(--lt-figure); color: var(--lt-muted); }
+  .d-record b { color: var(--lt-ink); font-weight: 700; }
+
+  /* waiting and match-found states take over the right panel */
+  .d-state h2 { font: 700 13px/1.2 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; }
+  .d-wait-clock { font: 700 64px/.9 var(--lt-figure); margin: 6px 0 10px; }
+  .d-sub { color: var(--lt-muted); font-size: 15px; margin: 0; max-width: 42ch; }
+  .d-code { display: block; font: 700 58px/1 var(--lt-figure); letter-spacing: .14em; margin: 4px 0 14px; user-select: all; }
+  .d-scan { display: flex; gap: 6px; margin: 18px 0 0; }
+  .d-scan i { flex: 1; height: 3px; border-radius: 1px; background: var(--lt-line); animation: d-scan 1.6s var(--ease) infinite; }
+  .d-scan i:nth-child(2) { animation-delay: .15s; } .d-scan i:nth-child(3) { animation-delay: .3s; } .d-scan i:nth-child(4) { animation-delay: .45s; } .d-scan i:nth-child(5) { animation-delay: .6s; }
+  @keyframes d-scan { 0%, 60%, 100% { background: var(--lt-line); } 20% { background: var(--lt-purple); } }
+  @media (prefers-reduced-motion: reduce) { .d-scan i { animation: none; } }
+  .d-grid-vs { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: 10px 14px; align-items: center; margin: 4px 0 18px; }
+  .d-grid-vs .lt-stripe { height: 30px; }
+  .d-grid-vs b { font: 700 30px/1 var(--lt-figure); overflow-wrap: anywhere; }
+  .d-grid-vs .vs { grid-column: 2; font: 700 11px/1 var(--lt-label); letter-spacing: .14em; text-transform: uppercase; color: var(--lt-muted); }
+  .d-found .lt-lights { margin: 4px 0 14px; }
+  .d-found .lt-lights i.on { background: var(--lt-red); box-shadow: inset 0 0 0 1px var(--lt-red); }
+
+  /* ---- match (white, zetamac) ---- */
+  #game { display: none; }
+  .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
+  /* 30 + 160 + 9 = the band's usual 199px offset, as in guided mode. */
+  #vs { max-width: 620px; height: 160px; margin: 30px auto 0; padding: 0 16px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .vs-row { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 1fr) 70px; gap: 14px; align-items: center; font-size: 17px; }
+  .vs-row .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vs-row.me .who { font-weight: bold; }
+  .vs-track { height: 12px; background: #eeeeee; border-radius: 2px; overflow: hidden; position: relative; }
+  .vs-track i { position: absolute; inset: 0; background: #7a7a7a; transform: scaleX(0); transform-origin: left; transition: transform .35s cubic-bezier(.16, 1, .3, 1); }
+  .vs-row.me .vs-track i { background: #1a66d6; }
+  .vs-row .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .vs-row .n.done { color: var(--good); font-weight: bold; }
+  .band { background: var(--box); margin-top: 9px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
+  #question { white-space: nowrap; }
+  #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
+  #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
+  #held { display: none; font-size: 20px; padding: 0 12px; text-align: center; }
+  #end { display: none; text-align: center; padding: 12px 0; }
+  #end .result { font-size: 37px; }
+  #end .result.win { color: var(--good); font-weight: bold; }
+  #end .result.lose { color: var(--bad); }
+  #end .detail { font-size: 17px; margin-top: 6px; }
+  #end .links { font-size: 18px; margin-top: 8px; }
+  #end .links a { margin: 0 8px; }
+
+  @media (max-width: 600px) {
+    body { font-size: 16px; }
+    #vs { height: 120px; margin: 16px 0 0; gap: 10px; }
+    .vs-row { grid-template-columns: minmax(0, 96px) minmax(0, 1fr) 54px; gap: 10px; font-size: 15px; }
+    .band { font-size: 28px; flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
+    #answer { width: 150px; height: 48px; font-size: 30px; }
+    #end .result { font-size: 32px; }
+    #end .links { font-size: 17px; }
+    .d-code { font-size: 46px; }
+  }
+  .bar { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+  @media (pointer: coarse) {
+    #end .links a { display: inline-block; padding: 12px 8px; }
+    .d-btn { min-height: 46px; }
+  }
+  @media (max-height: 500px) {
+    .bar { padding-top: 8px; }
+    #vs { height: 96px; margin-top: 4px; gap: 6px; }
+    .band { min-height: 60px; }
+    #answer { height: 42px; }
+  }
+</style>
+</head>
+<body class="launch">
+
+<div id="settings" class="lt">
+  <header class="lt-strip">
+    <h1 class="lt-brand">Zetamac<span>1v1</span></h1>
+    <a class="lt-progress lt-guide" href="guide.html">Guide</a>
+    <a class="lt-progress" href="./">View progress</a>
+    <nav class="lt-tabs" aria-label="Games">
+      <a href="play.html">Arithmetic</a>
+      <a href="squares.html">Squares</a>
+      <a href="mixed.html">Combined</a>
+      <a href="practice.html">Practice</a>
+      <a href="duel.html" aria-current="page">1v1</a>
+    </nav>
+  </header>
+
+  <div class="lt-grid">
+    <section class="lt-panel" aria-labelledby="games-title">
+      <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub">both players get the same questions</span></div>
+      <ol class="lt-tower">
+        <li class="lt-row team-arith">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Ari</span>
+          <span class="lt-body"><span class="lt-name">Arithmetic</span><span class="lt-detail">Zetamac’s defaults: + – × ÷</span></span>
+          <input type="radio" class="pick" name="game" value="standard" checked aria-label="Arithmetic">
+        </li>
+        <li class="lt-row team-mix">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Cmb</span>
+          <span class="lt-body"><span class="lt-name">Combined</span><span class="lt-detail">(5 + 2) × (15 + 9)</span></span>
+          <input type="radio" class="pick" name="game" value="mixed" aria-label="Combined">
+        </li>
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2D</span>
+          <span class="lt-body"><span class="lt-name">Two-digit squares</span><span class="lt-detail">1–99</span></span>
+          <input type="radio" class="pick" name="game" value="sq99" aria-label="Two-digit squares">
+        </li>
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2DH</span>
+          <span class="lt-body"><span class="lt-name">Two-digit squares, hard</span><span class="lt-detail">No 1–20, nothing ending in 5</span></span>
+          <input type="radio" class="pick" name="game" value="sq99h" aria-label="Two-digit squares, hard">
+        </li>
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">3D</span>
+          <span class="lt-body"><span class="lt-name">Three-digit squares</span><span class="lt-detail">100–999</span></span>
+          <input type="radio" class="pick" name="game" value="sq999" aria-label="Three-digit squares">
+        </li>
+        <li class="lt-row team-sq">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">3DH</span>
+          <span class="lt-body"><span class="lt-name">Three-digit squares, hard</span><span class="lt-detail">Nothing ending in 5</span></span>
+          <input type="radio" class="pick" name="game" value="sq999h" aria-label="Three-digit squares, hard">
+        </li>
+      </ol>
+    </section>
+
+    <section class="lt-panel" aria-live="polite">
+      <!-- Local tracker: 1v1 needs the website's accounts. -->
+      <div class="d-state" id="st-off" hidden>
+        <h2>1v1 runs on the website</h2>
+        <p class="d-sub">Matches need an account, and accounts live on the <a href="https://matthewc141.github.io/zetamac-tracker/duel.html">website version</a> of the tracker.</p>
+      </div>
+      <!-- Signed out. -->
+      <div class="d-state" id="st-need" hidden>
+        <h2>Sign in to play 1v1</h2>
+        <p class="d-sub">Matches are between two accounts, so each result lands on the right record. It takes a name and a password, no email.</p>
+        <div class="d-row"><a class="d-btn grow" href="account.html">Sign up</a><a class="d-btn quiet grow" href="account.html?mode=login">Log in</a></div>
+      </div>
+
+      <!-- Lobby. -->
+      <div id="st-lobby" hidden>
+        <p class="lt-lede">Same questions, same clock. Whoever’s faster wins.</p>
+        <div class="d-block">
+          <div class="lt-head"><h2>Find an opponent</h2><span class="d-record" id="record"></span></div>
+          <p class="d-rule"><b id="pick-name">Arithmetic</b><a class="d-change" href="#games-title">Change</a><br>A race to 25 questions against whoever else is looking for the same problems, with 2:00 on the clock.</p>
+          <button id="start" type="button"><span class="lt-go"><b>Find match</b><span>Enter</span></span></button>
+        </div>
+        <div class="d-block">
+          <div class="lt-head"><h2>Private match</h2><span class="sub">for a friend</span></div>
+          <div class="lt-seg" id="rule-seg" role="radiogroup" aria-label="How the match is won">
+            <label><input type="radio" name="rule" value="race" checked><b>25</b><small>Race to 25</small></label>
+            <label><input type="radio" name="rule" value="clock"><b>2:00</b><small>Most in 2:00</small></label>
+          </div>
+          <div class="d-row"><button class="d-btn grow" type="button" id="create">Make a code</button></div>
+          <form class="d-join" id="join-form">
+            <label class="sr" for="code">Match code</label>
+            <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Friend’s code">
+            <button class="d-btn" type="submit" id="join">Join</button>
+          </form>
+        </div>
+        <p class="d-msg" id="msg" role="status"></p>
+      </div>
+
+      <!-- Waiting in the public queue. -->
+      <div class="d-state" id="st-queue" hidden>
+        <h2>Looking for an opponent</h2>
+        <div class="d-wait-clock" id="q-clock">0:00</div>
+        <p class="d-sub" id="q-sub"></p>
+        <div class="d-scan" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="d-row"><button class="d-btn quiet grow" type="button" data-cancel>Cancel</button></div>
+      </div>
+
+      <!-- Waiting for a friend with a code. -->
+      <div class="d-state" id="st-code" hidden>
+        <h2>Your code</h2>
+        <span class="d-code" id="my-code"></span>
+        <p class="d-sub" id="code-sub"></p>
+        <div class="d-row"><button class="d-btn grow" type="button" id="copy">Copy link</button><button class="d-btn quiet grow" type="button" data-cancel>Cancel</button></div>
+      </div>
+
+      <!-- Paired: the lights count down to the start. -->
+      <div class="d-state d-found" id="st-found" hidden>
+        <h2>Match found</h2>
+        <div class="d-grid-vs">
+          <span class="lt-stripe" style="--team: var(--lt-purple)"></span><b id="f-me"></b>
+          <span class="vs">versus</span>
+          <span class="lt-stripe"></span><b id="f-them"></b>
+        </div>
+        <p class="d-sub" id="f-sub"></p>
+        <span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <p class="d-sub" id="f-count"></p>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="launch.js"></script>
+
+<div id="game">
+  <div class="bar">
+    <span><span id="clock-label">Seconds left:</span> <span id="secs">120</span></span>
+    <span id="progress"></span>
+  </div>
+  <div id="vs" aria-hidden="true">
+    <div class="vs-row me"><span class="who" id="vs-me">You</span><span class="vs-track"><i id="bar-me"></i></span><span class="n" id="n-me">0</span></div>
+    <div class="vs-row"><span class="who" id="vs-them"></span><span class="vs-track"><i id="bar-them"></i></span><span class="n" id="n-them">0</span></div>
+  </div>
+  <div class="band">
+    <div id="play" style="display:contents">
+      <span id="question"></span><span>=</span>
+      <input id="answer" type="text" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Answer">
+    </div>
+    <div id="held" role="status"></div>
+    <div id="end">
+      <div class="result" id="result"></div>
+      <div class="detail" id="detail"></div>
+      <div class="links"><a href="#" id="again">Find another</a> <a href="#" id="lobby">Back to 1v1</a> <a href="./">View progress</a></div>
+    </div>
+  </div>
+</div>
+
+<script src="problems.js"></script>
+<script src="duel.js"></script>
+</body>
+</html>

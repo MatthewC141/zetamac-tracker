@@ -157,3 +157,193 @@ language sql security definer set search_path = '' as $$
 $$;
 revoke execute on function public.delete_me() from public, anon;
 grant execute on function public.delete_me() to authenticated;
+
+-- ---- 1v1 matches ---------------------------------------------------------------------------
+-- Two signed-in players get the same questions (built in each browser from the match's seed) and
+-- the same clock. "race": first to answer all `goal` questions wins; if time runs out first, more
+-- answered wins. "clock": more answered in `seconds` wins. Either way a tie goes to whoever reached
+-- that score first. Players can only read their own matches; every change goes through the
+-- functions below, which check each update against the clock and decide the winner themselves.
+create table if not exists public.matches (
+  id uuid primary key default gen_random_uuid(),
+  code text unique,                       -- private matches: what the second player types
+  is_public boolean not null,
+  rule text not null check (rule in ('race', 'clock')),
+  game text not null check (game in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h')),
+  goal int not null,                      -- race: questions to answer (clock: 0)
+  seconds int not null,
+  seed int not null default floor(random() * 2147483647)::int,
+  p1 uuid references auth.users on delete set null,
+  p2 uuid references auth.users on delete set null,
+  p1_name text not null,
+  p2_name text,
+  status text not null default 'waiting' check (status in ('waiting', 'live', 'done', 'cancelled')),
+  starts_at timestamptz,
+  p1_score int not null default 0, p2_score int not null default 0,
+  p1_ms int not null default 0, p2_ms int not null default 0,  -- when each reached their score (ms after the start)
+  p1_done boolean not null default false, p2_done boolean not null default false,
+  winner int check (winner in (0, 1, 2)),  -- 1 or 2 = that player, 0 = a draw
+  seen_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+create index if not exists matches_queue on public.matches (game, created_at) where status = 'waiting' and is_public;
+create index if not exists matches_p1 on public.matches (p1, created_at);
+create index if not exists matches_p2 on public.matches (p2, created_at);
+alter table public.matches enable row level security;
+drop policy if exists "read own matches" on public.matches;
+create policy "read own matches" on public.matches for select to authenticated
+  using ((select auth.uid()) in (p1, p2));
+revoke all on public.matches from anon, authenticated;
+grant select on public.matches to authenticated;
+
+-- What the functions hand back: the match, plus the database's clock so both browsers can agree
+-- when the match starts.
+create or replace function public.mm_out(m public.matches) returns jsonb
+language sql stable set search_path = '' as $$
+  select to_jsonb(m) || jsonb_build_object('server_now', clock_timestamp());
+$$;
+
+-- Decides a live match once it can be decided: both players are done, the time plus a few
+-- seconds' grace is up, or (in a race) someone finished and the other had 3 seconds to report
+-- an earlier finish.
+create or replace function public.mm_settle(m public.matches) returns public.matches
+language plpgsql security definer set search_path = '' as $$
+declare since int; w int;
+begin
+  if m.status <> 'live' then return m; end if;
+  since := (extract(epoch from clock_timestamp() - m.starts_at) * 1000)::int;
+  if not ((m.p1_done and m.p2_done) or since > m.seconds * 1000 + 5000
+          or (m.rule = 'race' and ((m.p1_done and since > m.p1_ms + 3000) or (m.p2_done and since > m.p2_ms + 3000)))) then
+    return m;
+  end if;
+  w := case
+    when m.p1_score > m.p2_score then 1
+    when m.p2_score > m.p1_score then 2
+    when m.p1_score = 0 then 0
+    when m.p1_ms < m.p2_ms then 1
+    when m.p2_ms < m.p1_ms then 2
+    else 0 end;
+  update public.matches set status = 'done', winner = w where id = m.id returning * into m;
+  return m;
+end $$;
+
+create or replace function public.mm_name() returns text
+language sql stable security definer set search_path = '' as $$
+  select username from public.profiles where id = auth.uid();
+$$;
+
+-- Leaves any match you're still waiting in, and keeps one account from flooding the table.
+create or replace function public.mm_ready() returns text
+language plpgsql security definer set search_path = '' as $$
+declare nm text := public.mm_name();
+begin
+  if auth.uid() is null or nm is null then raise exception 'Sign in to play 1v1.'; end if;
+  update public.matches set status = 'cancelled' where p1 = auth.uid() and status = 'waiting';
+  if (select count(*) from public.matches where p1 = auth.uid() and created_at > now() - interval '1 hour') >= 120 then
+    raise exception 'Too many matches in the last hour. Try again later.';
+  end if;
+  return nm;
+end $$;
+
+-- Public queue: joins the oldest open match for the same game whose player is still there, or
+-- opens one and waits. Public matches are always a race to 25 with a 2:00 limit.
+create or replace function public.mm_queue(p_game text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare nm text := public.mm_ready(); m public.matches;
+begin
+  if p_game not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h') then raise exception 'Unknown game.'; end if;
+  select * into m from public.matches
+    where is_public and status = 'waiting' and game = p_game and p1 <> auth.uid() and seen_at > now() - interval '6 seconds'
+    order by created_at limit 1 for update skip locked;
+  if found then
+    update public.matches set p2 = auth.uid(), p2_name = nm, status = 'live', starts_at = clock_timestamp() + interval '6 seconds'
+      where id = m.id returning * into m;
+  else
+    insert into public.matches (is_public, rule, game, goal, seconds, p1, p1_name)
+      values (true, 'race', p_game, 25, 120, auth.uid(), nm) returning * into m;
+  end if;
+  return public.mm_out(m);
+end $$;
+
+-- Private match: a six-character code for a friend to type.
+create or replace function public.mm_create(p_game text, p_rule text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare nm text := public.mm_ready(); m public.matches; c text;
+begin
+  if p_game not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h') then raise exception 'Unknown game.'; end if;
+  if p_rule not in ('race', 'clock') then raise exception 'Unknown rule.'; end if;
+  loop
+    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '') into c from generate_series(1, 6);
+    exit when not exists (select 1 from public.matches where code = c);
+  end loop;
+  insert into public.matches (code, is_public, rule, game, goal, seconds, p1, p1_name)
+    values (c, false, p_rule, p_game, case when p_rule = 'race' then 25 else 0 end, 120, auth.uid(), nm) returning * into m;
+  return public.mm_out(m);
+end $$;
+
+create or replace function public.mm_join(p_code text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare nm text := public.mm_ready(); m public.matches;
+begin
+  select * into m from public.matches where code = upper(trim(p_code)) and not is_public for update;
+  if not found then raise exception 'No match has that code. Check it and try again.'; end if;
+  if m.p1 = auth.uid() then raise exception 'That’s your own code. Send it to your opponent.'; end if;
+  if m.status <> 'waiting' or m.seen_at < now() - interval '6 seconds' then raise exception 'That match has already started or closed. Ask for a new code.'; end if;
+  update public.matches set p2 = auth.uid(), p2_name = nm, status = 'live', starts_at = clock_timestamp() + interval '6 seconds'
+    where id = m.id returning * into m;
+  return public.mm_out(m);
+end $$;
+
+-- Polled about once a second by both players: keeps a waiting match open, and settles a match
+-- whose time is up.
+create or replace function public.mm_poll(p_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare m public.matches;
+begin
+  select * into m from public.matches where id = p_id and auth.uid() in (p1, p2);
+  if not found then raise exception 'Match not found.'; end if;
+  if m.status = 'waiting' then
+    update public.matches set seen_at = now() where id = m.id returning * into m;
+  end if;
+  return public.mm_out(public.mm_settle(m));
+end $$;
+
+create or replace function public.mm_cancel(p_id uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.matches set status = 'cancelled' where id = p_id and p1 = auth.uid() and status = 'waiting';
+$$;
+
+-- A player's progress: their score so far and when they reached it (ms after the start). Scores
+-- only go up, never past the race's goal, never faster than 150 ms an answer, and never ahead of
+-- the database's own clock (with 2 seconds' allowance for the network).
+create or replace function public.mm_score(p_id uuid, p_score int, p_ms int, p_done boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare m public.matches; me int; since int;
+begin
+  select * into m from public.matches where id = p_id and auth.uid() in (p1, p2) for update;
+  if not found then raise exception 'Match not found.'; end if;
+  if m.status <> 'live' then return public.mm_out(m); end if;
+  me := case when m.p1 = auth.uid() then 1 else 2 end;
+  since := (extract(epoch from clock_timestamp() - m.starts_at) * 1000)::int;
+  if since < 0 or since > m.seconds * 1000 + 5000 then return public.mm_out(public.mm_settle(m)); end if;
+  if (me = 1 and m.p1_done) or (me = 2 and m.p2_done) then return public.mm_out(public.mm_settle(m)); end if;
+  if p_score < (case me when 1 then m.p1_score else m.p2_score end)
+     or p_ms < (case me when 1 then m.p1_ms else m.p2_ms end)
+     or p_ms > since + 2000 or p_ms > m.seconds * 1000
+     or p_score * 150 > p_ms + 150
+     or (m.rule = 'race' and p_score > m.goal)
+     or (p_done and m.rule = 'race' and p_score < m.goal and since < m.seconds * 1000 - 2000)
+     or (p_done and m.rule = 'clock' and since < m.seconds * 1000 - 2000) then
+    raise exception 'That update doesn''t fit the match clock.';
+  end if;
+  if me = 1 then
+    update public.matches set p1_score = p_score, p1_ms = p_ms, p1_done = p_done where id = m.id returning * into m;
+  else
+    update public.matches set p2_score = p_score, p2_ms = p_ms, p2_done = p_done where id = m.id returning * into m;
+  end if;
+  return public.mm_out(public.mm_settle(m));
+end $$;
+
+revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready() from public, anon, authenticated;
+revoke execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) from public, anon;
+grant execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) to authenticated;
