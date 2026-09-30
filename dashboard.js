@@ -8,15 +8,16 @@ const RANGE_NAMES = { '1m': 'past month', '3m': 'past 3 months', '1y': 'past yea
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 let allGames = [], games = [], sprints = [], endless = [];  // everything / chosen game at 120 s / chosen game at 30 s / endless runs
-const SQ_MODES = { sq99: 'Two-digit', sq99h: 'Two-digit hard', sq999: 'Three-digit', sq999h: 'Three-digit hard' };
+// sq99h and sq999h are the squares games; sq99 and sq999 are older games from when every number could come up.
+const SQ_MODES = { sq99h: 'Two-digit squares', sq999h: 'Three-digit squares', sq99: 'Two-digit squares, all numbers', sq999: 'Three-digit squares, all numbers' };
 const PRACTICE_MODES = { 'sub-borrow': 'Subtraction with borrowing', 'sub-easy': 'Subtraction without borrowing' };
 const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borrow practice' };
 // Games that are saved but not shown anywhere on the dashboard (yet).
 const HIDDEN_MODES = new Set(['guided']);
 // Table lookups by own key only, so a stray name like "toString" never matches a mode.
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
-const modeName = m => has(SQ_MODES, m) ? `${SQ_MODES[m]} squares` : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : 'Arithmetic';
-// The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99').
+const modeName = m => has(SQ_MODES, m) ? SQ_MODES[m] : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : 'Arithmetic';
+// The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99h').
 let chartGame = 'standard';
 try { chartGame = localStorage.getItem('zm-chart-game') || chartGame; } catch {}
 let range = '3m';
@@ -283,7 +284,7 @@ const pace = g => g.elapsed && g.score ? `${(g.elapsed / g.score).toFixed(2)} s`
 
 function renderEndless() {
   const longest = list => list.reduce((b, g) => (!b || g.score > b.score ? g : b), null);
-  const record = (label, g) => g && `<div><span>${label}</span><b>${g.score}</b><em>in ${clock(g.elapsed || 0)} · ${shortDate(parseDate(g.date))}${has(SQ_MODES, g.mode) ? ` · ${SQ_MODES[g.mode]}` : ''}</em></div>`;
+  const record = (label, g) => g && `<div><span>${label}</span><b>${g.score}</b><em>in ${clock(g.elapsed || 0)} · ${shortDate(parseDate(g.date))}${has(SQ_MODES, g.mode) ? ` · ${SQ_MODES[g.mode].replace(' squares', '')}` : ''}</em></div>`;
   const total = endless.reduce((n, g) => n + g.score, 0);
   $('#endless-stats').innerHTML = endless.length ? [
     record('Longest run · Arithmetic', longest(endless.filter(g => (g.mode || 'standard') === 'standard'))),
@@ -423,7 +424,7 @@ function renderRecent() {
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]} squares</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -838,7 +839,7 @@ $('#add').addEventListener('submit', async e => {
     const seconds = $('#f-len').value, mode = $('#f-mode').value;
     setGames(await api('api/scores', { date: $('#f-date').value, score: $('#f-score').value, seconds, mode }));
     msg.className = 'msg ok';
-    const kind = `${has(SQ_MODES, mode) ? `${SQ_MODES[mode].toLowerCase()} squares, ` : ''}${seconds === '30' ? '30 seconds' : '2 minutes'}`;
+    const kind = `${has(SQ_MODES, mode) ? `${SQ_MODES[mode].toLowerCase()}, ` : ''}${seconds === '30' ? '30 seconds' : '2 minutes'}`;
     msg.textContent = `Logged ${$('#f-score').value} (${kind}) for ${shortDate(parseDate($('#f-date').value))}.`;
     $('#f-score').value = '';
     $('#f-score').focus();

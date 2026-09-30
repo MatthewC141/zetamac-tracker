@@ -1,17 +1,18 @@
 // The squares game (squares.html). Kept out of the page so the page's security policy can refuse inline scripts.
 const $ = s => document.querySelector(s);
-const MODE_NAMES = { sq99: 'Two-digit squares', sq99h: 'Two-digit squares, hard', sq999: 'Three-digit squares', sq999h: 'Three-digit squares, hard' };
+// The game uses the harder number sets (saved as sq99h and sq999h); sq99 and sq999 are older
+// games from before, when every number could come up.
+const MODE_NAMES = { sq99h: 'Two-digit squares', sq999h: 'Three-digit squares' };
 const input = $('#answer');
 let log = [], current = null, prevLen = 0, startAt = 0, cfg, pool = [], last = 0, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
 
-// Numbers that can come up. Hard mode drops numbers ending in 5 (x5² is a trick) and, for
-// two-digit squares, 1–20, which most people already know by heart.
-function buildPool(range, hard) {
-  const [lo, hi] = range === '99' ? [1, 99] : [100, 999];
+// Numbers that can come up: none ending in 5 (x5² is a trick) and, for two-digit squares,
+// nothing from 1 to 20, which most people already know by heart.
+function buildPool(range) {
+  const [lo, hi] = range === '99' ? [21, 99] : [100, 999];
   const out = [];
   for (let n = lo; n <= hi; n++) {
-    if (hard && n % 10 === 5) continue;
-    if (hard && range === '99' && n <= 20) continue;
+    if (n % 10 === 5) continue;
     out.push(n);
   }
   return out;
@@ -19,17 +20,12 @@ function buildPool(range, hard) {
 
 function readSettings() {
   const range = document.querySelector('input[name=range]:checked').value;
-  const hard = $('#hard').checked;
   const duration = parseInt($('#duration').value, 10);
-  const mode = `sq${range}${hard ? 'h' : ''}`;
-  return { range, hard, duration, mode, tracked: [120, 30, 0].includes(duration) };
+  return { range, duration, mode: `sq${range}h`, tracked: [120, 30, 0].includes(duration) };
 }
 
 function updateNote() {
   const s = readSettings();
-  $('#hard-detail').textContent = s.range === '99'
-    ? 'Skips numbers ending in 5, and 1\u2060–\u206020.'
-    : 'Skips numbers ending in 5.';
   $('#custom-note').textContent = !s.tracked ? 'Only 120-second, 30-second and endless games save to your tracker.'
     : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : '';
 }
@@ -60,7 +56,7 @@ function tick() {
 
 function start() {
   cfg = readSettings();
-  pool = buildPool(cfg.range, cfg.hard);
+  pool = buildPool(cfg.range);
   score = 0;
   log = [];
   $('#score').textContent = 0;

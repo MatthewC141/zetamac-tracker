@@ -47,22 +47,22 @@
   }
 
   // ---- lobby ----
+  // Your record, and your last five matches (All matches shows the rest, duel.html#history).
   async function loadRecord() {
     try {
-      const rows = await cloud.rest('matches?select=p1,p2,winner&status=eq.done&order=created_at.desc&limit=1000');
-      const id = cloud.user()?.id;
-      let w = 0, l = 0, d = 0;
-      for (const r of rows) {
-        const seat = r.p1 === id ? 1 : r.p2 === id ? 2 : 0;
-        if (!seat) continue;
-        if (r.winner === 0) d++; else if (r.winner === seat) w++; else l++;
-      }
-      $('#record').innerHTML = w + l + d ? `Record <b>${w}</b> W · <b>${l}</b> L${d ? ` · <b>${d}</b> D` : ''}` : '';
+      const list = await window.ZM_MATCHES.load();
+      const { won, lost, draw } = window.ZM_MATCHES.record(list);
+      $('#record').innerHTML = list.length ? `Record <b>${won}</b> W · <b>${lost}</b> L${draw ? ` · <b>${draw}</b> D` : ''}` : '';
+      $('#mh-list').innerHTML = list.slice(0, 5).map(window.ZM_MATCHES.row).join('');
+      $('#mh-note').textContent = list.length ? '' : 'No matches yet. Find one above, or send a friend a code.';
+      $('#mh-all').textContent = list.length > 5 ? `All ${list.length} matches` : 'All matches';
+      $('#mh-all').hidden = !list.length;
+      $('#mh-panel').hidden = false;
     } catch { $('#record').textContent = ''; }
   }
 
   async function queue() {
-    if ($('#st-lobby').hidden) return;
+    if ($('#st-lobby').hidden || $('#lobby-view').hidden) return;  // not in the lobby (or looking at the history)
     try { enter(await call('mm_queue', { p_game: game() })); } catch (err) { fail(err); }
   }
   $('#start').addEventListener('click', queue);

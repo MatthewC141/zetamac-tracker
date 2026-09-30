@@ -12,10 +12,8 @@
     { key: 'standard|120', name: 'Arithmetic', len: '2:00', team: 't-arith' },
     { key: 'standard|30', name: 'Arithmetic', len: '0:30', team: 't-arith' },
     { key: 'mixed|120', name: 'Combined operations', len: '2:00', team: 't-mix' },
-    { key: 'sq99|120', name: 'Two-digit squares', len: '2:00', team: 't-sq' },
-    { key: 'sq99h|120', name: 'Two-digit squares, hard', len: '2:00', team: 't-sq' },
-    { key: 'sq999|120', name: 'Three-digit squares', len: '2:00', team: 't-sq' },
-    { key: 'sq999h|120', name: 'Three-digit squares, hard', len: '2:00', team: 't-sq' },
+    { key: 'sq99h|120', name: 'Two-digit squares', len: '2:00', team: 't-sq' },
+    { key: 'sq999h|120', name: 'Three-digit squares', len: '2:00', team: 't-sq' },
     { key: 'standard|0', name: 'Arithmetic', len: 'Endless', team: 't-end', endless: true },
   ];
   let chosen = BOARDS[0].key;

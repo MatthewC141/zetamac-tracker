@@ -44,6 +44,33 @@
   .d-msg { margin: 12px 0 0; font-size: 14px; color: var(--lt-muted); min-height: 1.4em; }
   .d-msg.err { color: var(--lt-red); }
   .d-record { font: 600 13px/1 var(--lt-figure); color: var(--lt-muted); }
+  .mh-panel { margin-top: 14px; }
+  .mh-back { display: flex; margin-bottom: 14px; }
+  .mh-panel[hidden] { display: none; }
+  /* The full match history: a second view of this page (duel.html#history). */
+  .lt-grid.mh-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); }
+  .mh-filter { display: flex; flex-wrap: wrap; gap: 2px; border: 1px solid var(--lt-line); border-radius: 3px; padding: 2px; background: var(--lt-bg); margin-bottom: 14px; }
+  .mh-filter button { flex: 1 1 auto; font: 700 12px/1 var(--lt-label); letter-spacing: .1em; text-transform: uppercase; color: var(--lt-muted); background: none; border: 0; border-radius: 2px; padding: 11px 10px; cursor: pointer; white-space: nowrap; }
+  .mh-filter button:hover { color: var(--lt-ink); }
+  .mh-filter button[aria-pressed="true"] { background: var(--lt-raise); color: var(--lt-ink); box-shadow: inset 0 -2px 0 var(--lt-purple); }
+  .mh-more { display: block; width: 100%; margin-top: 14px; min-height: 42px; font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; color: var(--lt-ink); background: var(--lt-raise); border: 1px solid var(--lt-line-hi); border-radius: 3px; cursor: pointer; }
+  .mh-more:hover { background: #22232d; }
+  /* the record: wins, losses and draws as figures */
+  .rec { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--lt-grid); border-bottom: 1px solid var(--lt-grid); }
+  .rec div { padding: 14px 0 12px; }
+  .rec div + div { border-left: 1px solid var(--lt-grid); padding-left: 16px; }
+  .rec b { display: block; font: 700 44px/.9 var(--lt-figure); }
+  .rec span { display: flex; align-items: center; gap: 7px; margin-top: 8px; font: 700 11px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; color: var(--lt-muted); }
+  .rec span::before { content: ""; width: 4px; height: 12px; border-radius: 1px; background: var(--team); }
+  .rec .w { --team: var(--lt-green); } .rec .l { --team: var(--lt-red); } .rec .d { --team: var(--lt-muted); }
+  .rate { margin: 12px 0 20px; font-size: 14px; color: var(--lt-muted); }
+  .rate b { color: var(--lt-ink); font: 700 17px/1 var(--lt-figure); }
+  .by { list-style: none; margin: 0; padding: 0; }
+  .by li { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--lt-grid); font-size: 15px; }
+  .by li:first-child { border-top: 1px solid var(--lt-grid); }
+  .by b { font: 700 17px/1 var(--lt-figure); font-variant-numeric: tabular-nums; }
+  .by small { color: var(--lt-muted); font-size: 13px; margin-left: 8px; }
+  @media (max-width: 860px) { .lt-grid.mh-grid { grid-template-columns: 1fr; } .mh-side { order: -1; } }
   .d-record b { color: var(--lt-ink); font-weight: 700; }
 
   /* waiting and match-found states take over the right panel */
@@ -160,6 +187,7 @@
     </nav>
   </header>
 
+  <div id="lobby-view">
   <div class="lt-grid">
     <section class="lt-panel" aria-labelledby="games-title">
       <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub">both players get the same questions</span></div>
@@ -250,6 +278,35 @@
       </div>
     </section>
   </div>
+
+  <!-- Your recent matches; All matches opens the full list (#history). -->
+  <section class="lt-panel mh-panel" id="mh-panel" aria-labelledby="mh-title" hidden>
+    <div class="lt-head"><h2 id="mh-title">Match history</h2><a class="mh-all" href="#history" id="mh-all">All matches</a></div>
+    <ol class="mh-list" id="mh-list"></ol>
+    <p class="mh-note" id="mh-note"></p>
+  </section>
+  </div>
+
+  <!-- Every match: record, how you do on each kind of problem, and the full list. -->
+  <div id="history-view" hidden>
+    <div class="mh-back"><a class="mh-all" href="#" id="history-back">Back to Duel</a></div>
+    <div class="lt-grid mh-grid">
+    <section class="lt-panel" aria-labelledby="list-title">
+      <div class="lt-head"><h2 id="list-title">Every match</h2><span class="sub" id="list-sub"></span></div>
+      <div class="mh-filter" id="filter" role="group" aria-label="Show matches for"></div>
+      <ol class="mh-list" id="list"></ol>
+      <p class="mh-note" id="note"></p>
+      <button class="mh-more" type="button" id="more" hidden>Show more</button>
+    </section>
+    <section class="lt-panel mh-side" aria-labelledby="rec-title">
+      <div class="lt-head"><h2 id="rec-title">Record</h2></div>
+      <div class="rec"><div class="w"><b id="rec-w">0</b><span>Won</span></div><div class="l"><b id="rec-l">0</b><span>Lost</span></div><div class="d"><b id="rec-d">0</b><span>Drawn</span></div></div>
+      <p class="rate" id="rate"></p>
+      <div class="lt-head"><h2>By problems</h2><span class="sub">won – lost</span></div>
+      <ul class="by" id="by"></ul>
+    </section>
+  </div>
+  </div>
 </div>
 <script src="launch.js"></script>
 
@@ -286,6 +343,8 @@
 </div>
 
 <script src="problems.js"></script>
+<script src="matches.js"></script>
+<script src="duel-history.js"></script>
 <script src="duel.js"></script>
 </body>
 </html>
