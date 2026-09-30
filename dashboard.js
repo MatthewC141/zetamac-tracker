@@ -15,7 +15,7 @@ const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borr
 const HIDDEN_MODES = new Set(['guided']);
 // Table lookups by own key only, so a stray name like "toString" never matches a mode.
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
-const modeName = m => has(SQ_MODES, m) ? `${SQ_MODES[m]} squares` : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : 'Arithmetic';
+const modeName = m => has(SQ_MODES, m) ? `${SQ_MODES[m]} squares` : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : 'Arithmetic';
 // The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99').
 let chartGame = 'standard';
 try { chartGame = localStorage.getItem('zm-chart-game') || chartGame; } catch {}
@@ -288,6 +288,7 @@ function renderEndless() {
   $('#endless-stats').innerHTML = endless.length ? [
     record('Longest run · Arithmetic', longest(endless.filter(g => (g.mode || 'standard') === 'standard'))),
     record('Longest run · Squares', longest(endless.filter(g => has(SQ_MODES, g.mode)))),
+    record('Longest run · Combined', longest(endless.filter(g => g.mode === 'mixed'))),
     record('Longest run · Practice', longest(endless.filter(g => has(PRACTICE_MODES, g.mode)))),
     `<div><span>Questions answered</span><b>${total}</b><em>across ${plural(endless.length, 'run')}</em></div>`,
   ].filter(Boolean).join('') : '';
@@ -375,7 +376,7 @@ function renderRecent() {
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]} squares</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]} squares</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -532,7 +533,10 @@ async function renderWeak() {
     if (!old) continue;
     const dy = old.top - li.getBoundingClientRect().top;
     if (dy) li.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 650, easing: 'cubic-bezier(.16, 1, .3, 1)' });
-    if (old.sector !== li.dataset.sector) li.classList.add('flash');
+    if (old.sector !== li.dataset.sector) {  // a new color: a brief glow, then the class comes off
+      li.classList.add('lit');
+      li.addEventListener('animationend', () => li.classList.remove('lit'), { once: true });
+    }
   }
 }
 
@@ -591,7 +595,7 @@ function renderScore() {
 }
 
 // ---------- per-question breakdown (expands under a recent game) ----------
-const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares' };
+const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined' };
 const detailCache = new Map();
 const openGames = new Set();
 const secs = ms => (ms / 1000).toFixed(ms < 10000 ? 2 : 1);

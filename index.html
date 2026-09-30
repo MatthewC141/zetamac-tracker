@@ -38,6 +38,7 @@
     --t-mul: #6d8bff;
     --t-div: #ff62b8;
     --t-sq: #ffa53d;
+    --t-mix: #2fbf95;
     --accent: var(--ink);
     --proj: #b9bfcc;
     --sprint: var(--t-add);
@@ -118,8 +119,8 @@
   .tower { list-style: none; margin: 0; padding: 0; }
   .tower li { display: grid; grid-template-columns: 26px 4px 52px minmax(0, 1fr) 70px 64px; align-items: center; gap: 0 12px; height: 46px; padding: 0 10px 0 6px; border-bottom: 1px solid var(--grid); position: relative; }
   .tower li:first-child { border-top: 1px solid var(--grid); }
-  .tower li.flash { animation: flash 1.1s cubic-bezier(.16, 1, .3, 1); }
-  @keyframes flash { from { background: rgba(255, 255, 255, .09); } to { background: transparent; } }
+  .tower li.lit { animation: lit 1.1s cubic-bezier(.16, 1, .3, 1); }
+  @keyframes lit { from { background: rgba(255, 255, 255, .09); } to { background: transparent; } }
   .pos { font: 700 17px/1 var(--figure); color: var(--muted); text-align: right; }
   .stripe { width: 4px; height: 26px; border-radius: 1px; background: var(--team); }
   .code { font: 700 17px/1 var(--label); letter-spacing: .06em; }
@@ -228,6 +229,7 @@
   /* ---- archive: practice, endless, calendar ---- */
   .len { font: 700 11px/1 var(--label); letter-spacing: .08em; text-transform: uppercase; color: var(--t-add); margin-right: 8px; white-space: nowrap; display: inline-block; }
   .len.sq { color: var(--t-sq); }
+  .len.mx { color: var(--t-mix); }
   .len.end { color: var(--proj); }
   .len.pr { color: var(--t-sub); }
   .practice td, .practice th, .runs td, .runs th { white-space: nowrap; }
@@ -340,6 +342,7 @@
   .op-mul { --team: var(--t-mul); background: var(--t-mul); fill: var(--t-mul); }
   .op-div { --team: var(--t-div); background: var(--t-div); fill: var(--t-div); }
   .op-sq { --team: var(--t-sq); background: var(--t-sq); fill: var(--t-sq); }
+  .op-mix { --team: var(--t-mix); background: var(--t-mix); fill: var(--t-mix); }
   .tower li.op-add, .tower li.op-sub, .tower li.op-mul, .tower li.op-div { background: none; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -411,13 +414,13 @@
   .acct-btn { color: var(--ink); }
   .strip .help-btn + .help-btn { margin-left: -16px; }
   @media (max-width: 640px) {
-    /* Phones: wordmark with the account at its right, the date line, the three games, then
+    /* Phones: wordmark with the account at its right, the date line, the four games, then
        Leaderboard / Guide / How it works as three equal buttons. */
     .strip { gap: 10px 6px; }
     .brand { order: -3; flex: 1; white-space: nowrap; }
     .session { order: -1; width: 100%; }
     .nav { order: 0; margin-left: 0; width: 100%; }
-    .nav .play-btn { flex: 1; text-align: center; }
+    .nav .play-btn { flex: 1 1 0; min-width: 0; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
     .help-btn { order: 1; flex: 1 1 0; text-align: center; padding: 9px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
     .strip .help-btn + .help-btn { margin-left: 0; }
     .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
@@ -512,6 +515,7 @@
     <nav class="nav" aria-label="Games">
       <a class="play-btn go" href="play.html">Play</a>
       <a class="play-btn" href="squares.html">Squares</a>
+      <a class="play-btn" href="mixed.html">Combined</a>
       <a class="play-btn" href="practice.html">Practice</a>
     </nav>
     <a class="help-btn" href="leaderboard.html">Leaderboard</a>
@@ -559,6 +563,7 @@
           <label for="chart-game">Stats and chart for</label>
           <select id="chart-game">
             <option value="standard">Arithmetic (zetamac)</option>
+            <option value="mixed">Combined operations</option>
             <optgroup label="Squares">
               <option value="sq99">Two-digit squares</option>
               <option value="sq99h">Two-digit squares, hard</option>
@@ -663,6 +668,7 @@
             <option value="sq99h">Two-digit squares, hard</option>
             <option value="sq999">Three-digit squares</option>
             <option value="sq999h">Three-digit squares, hard</option>
+            <option value="mixed">Combined operations</option>
             <option value="sub-borrow">Borrowing practice</option>
             <option value="sub-easy">No-borrow practice</option>
           </select>
@@ -727,11 +733,12 @@
   </section>
 
   <section class="w-step" data-step="1" aria-labelledby="w-title-1" hidden>
-    <h2 id="w-title-1">Three games. Every question timed.</h2>
+    <h2 id="w-title-1">Four games. Every question timed.</h2>
     <p class="w-lede">Pick a game and a length on its start screen, then press <b>Enter</b>. Every question is timed, so the tracker can see where your time goes.</p>
     <ul class="w-rows">
       <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock and records seconds per problem.</span></li>
       <li class="plain"><span class="k">Squares</span><span class="v">Two-digit or three-digit squares, with a <b>hard mode</b> that skips the easy ones.</span></li>
+      <li class="plain"><span class="k">Combined</span><span class="v">Two steps in one problem, like <b>(5 + 2) × (15 + 9)</b>: work out the brackets, then the rest.</span></li>
       <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, like <b>subtraction with borrowing</b>. Untimed by default.</span></li>
       <li class="plain"><span class="k">Guide</span><span class="v">The quickest way to do <b>each operation in your head</b>, step by step, plus a times-table drill. Open <b>Guide</b> from the header.</span></li>
     </ul>

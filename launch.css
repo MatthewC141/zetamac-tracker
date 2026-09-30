@@ -133,7 +133,12 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
   #settings.lt { padding: 0 16px 28px; }
   .lt-strip { padding-top: 14px; }
   .lt-tabs { order: 4; width: 100%; }
+  /* The tab row right below names the game, so the wordmark drops it and Guide and Progress
+     stay on the top line instead of wrapping out past the gutter. */
+  .lt-strip { column-gap: 12px; }
+  .lt-brand span { display: none; }
   .lt-progress { padding: 9px 12px; }
+  .lt-guide + .lt-progress { margin-left: -6px; }
   .lt-tabs a { flex: 1; text-align: center; padding: 11px 6px; }
   .lt-row { grid-template-columns: 16px 4px 38px minmax(0, 1fr) auto; gap: 0 9px; }
   .lt-pos { font-size: 15px; }
@@ -175,4 +180,9 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lt-row, .lt-stripe, .lt input.switch, .lt input.switch::after { transition: none; }
+}
+/* Narrowest phones: the two header buttons tighten so they still share the wordmark's line. */
+@media (max-width: 360px) {
+  .lt-progress { padding: 9px 9px; letter-spacing: .06em; }
+  .lt-tabs a { padding-left: 2px; padding-right: 2px; font-size: 11px; letter-spacing: .05em; }
 }

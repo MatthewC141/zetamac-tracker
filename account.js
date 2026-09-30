@@ -128,6 +128,7 @@
   // Where you stand on each board you're on.
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
+    ['mixed|120', 'Combined operations', '2:00', 't-mix'],
     ['sq99|120', 'Two-digit squares', '2:00', 't-sq'], ['sq99h|120', 'Two-digit squares, hard', '2:00', 't-sq'],
     ['sq999|120', 'Three-digit squares', '2:00', 't-sq'], ['sq999h|120', 'Three-digit squares, hard', '2:00', 't-sq'],
     ['standard|0', 'Arithmetic', 'Endless', 't-end'],

@@ -54,7 +54,9 @@
   };
   settings.addEventListener('input', () => setTimeout(showBest));
   settings.addEventListener('change', () => setTimeout(showBest));
-  fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) { games = d; showBest(); } }).catch(() => {});
+  // The game's own script (with readSettings) loads after this one, so wait for the page too.
+  const parsed = new Promise(r => (document.readyState === 'loading' ? addEventListener('DOMContentLoaded', r, { once: true }) : r()));
+  fetch('api/scores').then(r => r.json()).then(async d => { await parsed; if (Array.isArray(d)) { games = d; showBest(); } }).catch(() => {});
 
   // A range moved off zetamac's default is marked, since custom ranges don't save.
   const markRanges = () => settings.querySelectorAll('input.num').forEach(i => i.classList.toggle('changed', i.value !== i.defaultValue));

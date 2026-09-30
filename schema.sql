@@ -64,7 +64,7 @@ create table if not exists public.scores (
   score int not null check (score between 0 and 999999),
   seconds int not null check (seconds in (0, 30, 120)),
   source text not null check (source in ('game', 'manual')),
-  mode text not null check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided')),
+  mode text not null check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed')),
   elapsed int not null default 0 check (elapsed between 0 and 999999),
   detail jsonb check (detail is null or (jsonb_typeof(detail) = 'array' and pg_column_size(detail) < 2000000)),
   has_detail boolean generated always as (detail is not null) stored,
@@ -77,6 +77,9 @@ alter table public.scores drop constraint if exists scores_ts_date;
 alter table public.scores add constraint scores_ts_date check (left(ts, 10) = date::text);
 alter table public.scores drop constraint if exists scores_timed_max;
 alter table public.scores add constraint scores_timed_max check (seconds = 0 or score <= 500);
+alter table public.scores drop constraint if exists scores_mode_check;
+alter table public.scores add constraint scores_mode_check
+  check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed'));
 alter table public.scores drop constraint if exists scores_detail_len;
 alter table public.scores add constraint scores_detail_len check (detail is null or jsonb_array_length(detail) <= 5000);
 create index if not exists scores_user_ts on public.scores (user_id, ts);

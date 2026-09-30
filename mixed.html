@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="launch.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Squares Game</title>
+<title>Combined Game</title>
 <style>
   /* Same look as play.html (the zetamac clone). */
   :root {
@@ -31,6 +31,7 @@
   .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
   .band { background: var(--box); margin-top: 199px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
   #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
+  #question { white-space: nowrap; }
   #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
   #end { display: none; text-align: center; padding: 12px 0; }
   #end .score { font-size: 37px; }
@@ -43,7 +44,8 @@
 
   @media (max-width: 600px) {
     body { font-size: 16px; }
-    .band { margin-top: 90px; font-size: 30px; }
+    /* A long bracketed problem gets its own line above the answer box. */
+    .band { margin-top: 90px; font-size: 28px; flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
     #answer { width: 150px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
     #end .links { font-size: 17px; }
@@ -67,41 +69,46 @@
 
 <div id="settings" class="lt">
   <header class="lt-strip">
-    <h1 class="lt-brand">Zetamac<span>Squares</span></h1>
+    <h1 class="lt-brand">Zetamac<span>Combined</span></h1>
     <a class="lt-progress lt-guide" href="guide.html">Guide</a>
     <a class="lt-progress" href="./">View progress</a>
     <nav class="lt-tabs" aria-label="Games">
       <a href="play.html">Arithmetic</a>
-      <a href="squares.html" aria-current="page">Squares</a>
-      <a href="mixed.html">Combined</a>
+      <a href="squares.html">Squares</a>
+      <a href="mixed.html" aria-current="page">Combined</a>
       <a href="practice.html">Practice</a>
     </nav>
   </header>
 
   <div class="lt-grid">
     <section class="lt-panel" aria-labelledby="ops-title">
-      <div class="lt-head"><h2 id="ops-title">Squares</h2><span class="sub">each mode keeps its own chart</span></div>
+      <div class="lt-head"><h2 id="ops-title">Problems</h2><span class="sub">all four save to your tracker</span></div>
       <ol class="lt-tower">
-        <li class="lt-row team-sq">
-          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2D</span>
-          <span class="lt-body"><span class="lt-name">Two-digit squares</span><span class="lt-detail">1–99</span></span>
-          <input type="radio" class="pick" name="range" value="99" checked aria-label="Two-digit squares">
+        <li class="lt-row team-mul">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2Br</span>
+          <span class="lt-body"><span class="lt-name">Two brackets, times</span><span class="lt-detail">(5 + 2) × (15 + 9)</span></span>
+          <input type="checkbox" class="switch" id="both-on" checked aria-label="Include two brackets, times">
         </li>
-        <li class="lt-row team-sq">
-          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">3D</span>
-          <span class="lt-body"><span class="lt-name">Three-digit squares</span><span class="lt-detail">100–999</span></span>
-          <input type="radio" class="pick" name="range" value="999" aria-label="Three-digit squares">
+        <li class="lt-row team-mul">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">1Br</span>
+          <span class="lt-body"><span class="lt-name">One bracket, times</span><span class="lt-detail">(13 – 4) × 23</span></span>
+          <input type="checkbox" class="switch" id="one-on" checked aria-label="Include one bracket, times">
         </li>
-        <li class="lt-row team-sq mod">
-          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Hrd</span>
-          <span class="lt-body"><span class="lt-name">Hard mode</span><span class="lt-detail" id="hard-detail"></span></span>
-          <input type="checkbox" class="switch" id="hard" aria-label="Hard mode">
+        <li class="lt-row team-add">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Prd</span>
+          <span class="lt-body"><span class="lt-name">Two products, added or taken away</span><span class="lt-detail">(7 × 8) + (6 × 14)</span></span>
+          <input type="checkbox" class="switch" id="prod-on" checked aria-label="Include two products, added or taken away">
+        </li>
+        <li class="lt-row team-div">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Div</span>
+          <span class="lt-body"><span class="lt-name">A bracket, divided</span><span class="lt-detail">(84 + 12) ÷ 8</span></span>
+          <input type="checkbox" class="switch" id="div-on" checked aria-label="Include a bracket, divided">
         </li>
       </ol>
     </section>
 
     <section class="lt-panel" aria-labelledby="len-title">
-      <p class="lt-lede">Square as many numbers as you can before time runs out.</p>
+      <p class="lt-lede">Work out the brackets, then the rest. A correct answer is taken the moment you type it, with no Enter.</p>
       <div class="lt-head"><h2 id="len-title">Length</h2><span class="sub lt-best" id="lt-best"></span></div>
       <div class="lt-seg" role="radiogroup" aria-labelledby="len-title">
         <label><input type="radio" name="len" value="30"><b>0:30</b><small>30 seconds</small></label>
@@ -109,7 +116,7 @@
         <label><input type="radio" name="len" value="0"><b>∞</b><small>Endless</small></label>
       </div>
       <input type="hidden" id="duration" value="120">
-      <p class="lt-save"><span class="custom-note" id="custom-note" data-default="Saves to your squares tracker."></span></p>
+      <p class="lt-save"><span class="custom-note" id="custom-note" data-default="Saves to your combined tracker."></span></p>
       <button id="start"><span class="lt-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="lt-go"><b>Start</b><span>Enter</span></span></button>
     </section>
   </div>
@@ -136,6 +143,6 @@
   </div>
 </div>
 
-<script src="squares.js"></script>
+<script src="mixed.js"></script>
 </body>
 </html>

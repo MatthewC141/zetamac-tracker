@@ -132,9 +132,10 @@ struct Entry {
 
 // Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 5,
 // and no 1–20 in the 1–99 range). Practice drills: subtraction with / without borrowing, and
-// "guided" (the arithmetic game with guided mode on, kept apart from real scores).
-static const std::set<std::string> kModes = {"standard", "sq99",       "sq99h",    "sq999",
-                                             "sq999h",   "sub-borrow", "sub-easy", "guided"};
+// "guided" (the arithmetic game with guided mode on, kept apart from real scores), and "mixed"
+// (combined operations, like (5 + 2) × (15 + 9)).
+static const std::set<std::string> kModes = {"standard", "sq99",     "sq99h",  "sq999", "sq999h",
+                                             "sub-borrow", "sub-easy", "guided", "mixed"};
 
 static const char* kHeader = "timestamp,date,score,seconds,source,mode,elapsed";
 
@@ -688,6 +689,7 @@ static void handle_client(int fd) {
       {"/guide", "guide.html"},     {"/guide.html", "guide.html"},      {"/guide.js", "guide.js"},
       {"/leaderboard", "leaderboard.html"}, {"/leaderboard.html", "leaderboard.html"}, {"/leaderboard.js", "leaderboard.js"},
       {"/account", "account.html"}, {"/account.html", "account.html"},  {"/account.js", "account.js"},
+      {"/mixed", "mixed.html"},     {"/mixed.html", "mixed.html"},      {"/mixed.js", "mixed.js"},
       {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);

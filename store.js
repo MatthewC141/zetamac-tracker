@@ -17,7 +17,7 @@
 
   const SCORES = 'zm-web-scores';
   const DETAIL = 'zm-web-detail:';  // + timestamp → that game's question log (JSON text)
-  const MODES = new Set(['standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided']);
+  const MODES = new Set(['standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed']);
 
   const pad = n => String(n).padStart(2, '0');
   const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

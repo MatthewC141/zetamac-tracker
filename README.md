@@ -8,6 +8,7 @@ A clone of [zetamac](https://arithmetic.zetamac.com) that saves every game, plus
 
 - Same game and default settings as zetamac (2 min, +/−/×/÷), plus 30-second and endless modes
 - Squares mode (two- and three-digit) and a subtraction-with-borrowing drill
+- Combined mode: two-step problems like (5 + 2) × (15 + 9)
 - Per-question timing, so you can see which kinds of problems slow you down
 - Dashboard with score history, daily bests, a calendar heatmap, and slowest question types
 - A guide page with mental math shortcuts for each operation
