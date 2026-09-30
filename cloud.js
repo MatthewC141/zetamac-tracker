@@ -36,8 +36,9 @@
     return data;
   }
 
+  // The name shown is always the account's fixed username, never the account's editable metadata.
   const keep = (data, name) => {
-    const s = { access: data.access_token, refresh: data.refresh_token, expires: Date.now() + (data.expires_in - 60) * 1000, id: data.user?.id, name: name || data.user?.user_metadata?.username };
+    const s = { access: data.access_token, refresh: data.refresh_token, expires: Date.now() + (data.expires_in - 60) * 1000, id: data.user?.id, name };
     write(s);
     return s;
   };
@@ -75,7 +76,15 @@
     },
     async logIn(name, password) {
       if (!nameOk(name)) throw new Error('That name and password don’t match.');
-      return keep(await call('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: emailFor(name), password } }));
+      const data = await call('/auth/v1/token?grant_type=password', { method: 'POST', body: { email: emailFor(name), password } });
+      // The username as it was signed up (its capitals), from the profile the leaderboard uses. The
+      // sign-in address can't change, so the typed name is the same name if that lookup fails.
+      let real = name;
+      try {
+        const rows = await call(`/rest/v1/profiles?select=username&id=eq.${encodeURIComponent(data.user?.id || '')}`, { token: data.access_token });
+        if (rows?.[0]?.username && rows[0].username.toLowerCase() === name.toLowerCase()) real = rows[0].username;
+      } catch {}
+      return keep(data, real);
     },
     async logOut() {
       const s = read();

@@ -101,6 +101,7 @@
     $('#in').hidden = false;
     $('#me-name').textContent = name;
     showPlaces(name);
+    loadPrivate();
     const im = $('#in-msg');
     im.className = note ? `msg ${isError ? 'err' : 'ok'}` : 'msg'; im.textContent = note;
     const n = localCount();
@@ -125,6 +126,38 @@
     $('#msg').textContent = 'Your sign-in ran out. Log in again.';
   }
 
+  // Private account: every score off the leaderboard (the database's set_private does the switching).
+  let isPrivate = false;
+  const showPrivate = () => {
+    $('#private').checked = isPrivate;
+    $('#private-text').textContent = isPrivate
+      ? 'Your scores are hidden from the leaderboard. Switch this off to put them back.'
+      : 'Keep all of your scores off the leaderboard. Your tracker and duels work the same.';
+  };
+  async function loadPrivate() {
+    try {
+      const rows = await cloud.rest(`profiles?select=private&id=eq.${encodeURIComponent(cloud.user().id)}`);
+      isPrivate = !!rows?.[0]?.private;
+      showPrivate();
+      if (isPrivate) showPlaces(cloud.user().name);
+      $('#private').disabled = false;
+    } catch {}
+  }
+  $('#private').addEventListener('change', async () => {
+    const want = $('#private').checked, im = $('#in-msg');
+    $('#private').disabled = true;
+    try {
+      isPrivate = !!(await cloud.rest('rpc/set_private', { method: 'POST', body: { p_private: want } }));
+      im.className = 'msg ok';
+      im.textContent = isPrivate ? 'Your account is private: your scores are off the leaderboard.' : 'Your scores are back on the leaderboard.';
+      showPlaces(cloud.user().name);
+    } catch (err) {
+      im.className = 'msg err'; im.textContent = err.message || 'Couldn’t change that. Try again.';
+    }
+    showPrivate();
+    $('#private').disabled = false;
+  });
+
   // Where you stand on each board you're on.
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
@@ -145,7 +178,8 @@
         return `<li class="${team}"><span class="pos">P${place}</span><span class="stripe"></span><span class="who board-name">${name}<small>${len}</small></span><span class="figure${place === 1 ? ' p1' : ''}">${list[at].score}<small>of ${list.length}</small></span></li>`;
       }).filter(Boolean);
       $('#places').innerHTML = mine.join('');
-      $('#places-note').textContent = mine.length ? 'Your best game on each board. Only games played on the site count.'
+      $('#places-note').textContent = isPrivate ? 'Your account is private, so none of your scores are on the leaderboard.'
+        : mine.length ? 'Your best game on each board. Only games played on the site count.'
         : 'Not on any board yet. Play a game on the site while signed in and your best score posts itself.';
     } catch (err) {
       $('#places-note').textContent = `Couldn’t load the leaderboard: ${err.message}`;

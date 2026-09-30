@@ -67,32 +67,64 @@
   #game { display: none; }
   .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
   /* 30 + 160 + 9 = the band's usual 199px offset, as in guided mode. */
-  #vs { max-width: 620px; height: 160px; margin: 30px auto 0; padding: 0 16px; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
-  .vs-row { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 1fr) 70px; gap: 14px; align-items: center; font-size: 17px; }
-  .vs-row .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The two players: name and count over a slim bar, in the game's own plain style. */
+  #vs { max-width: 560px; height: 160px; margin: 30px auto 0; padding: 0 16px; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  .vs-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who n" "track track"; gap: 7px 12px; align-items: baseline; font-size: 15px; color: var(--muted); }
+  .vs-row .who { grid-area: who; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vs-row .n { grid-area: n; font-variant-numeric: tabular-nums; }
+  .vs-row.me { color: var(--ink); }
   .vs-row.me .who { font-weight: bold; }
-  .vs-track { height: 12px; background: #eeeeee; border-radius: 2px; overflow: hidden; position: relative; }
-  .vs-track i { position: absolute; inset: 0; background: #7a7a7a; transform: scaleX(0); transform-origin: left; transition: transform .35s cubic-bezier(.16, 1, .3, 1); }
+  .vs-row .lead { margin-left: 8px; font-size: 13px; color: var(--good); font-weight: bold; }
+  .vs-row .lead:empty { display: none; }
+  #n-them.done { color: var(--good); font-weight: bold; }
+  .vs-track { grid-area: track; height: 6px; background: #e8e8e8; border-radius: 3px; overflow: hidden; position: relative; }
+  .vs-track i { position: absolute; inset: 0; background: #9a9a9a; border-radius: 3px; transform: scaleX(0); transform-origin: left; transition: transform .35s cubic-bezier(.16, 1, .3, 1); }
   .vs-row.me .vs-track i { background: #1a66d6; }
-  .vs-row .n { text-align: right; font-variant-numeric: tabular-nums; }
-  .vs-row .n.done { color: var(--good); font-weight: bold; }
   .band { background: var(--box); margin-top: 9px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
   #question { white-space: nowrap; }
   #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
   #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
   #held { display: none; font-size: 20px; padding: 0 12px; text-align: center; }
-  #end { display: none; text-align: center; padding: 12px 0; }
-  #end .result { font-size: 37px; }
+  /* End of the match: the result, both players side by side, then the links. */
+  #end { display: none; text-align: center; padding: 16px 0 14px; }
+  #end .result { font-size: 37px; line-height: 1.1; }
   #end .result.win { color: var(--good); font-weight: bold; }
   #end .result.lose { color: var(--bad); }
-  #end .detail { font-size: 17px; margin-top: 6px; }
-  #end .links { font-size: 18px; margin-top: 8px; }
+  #end .res-sub { font-size: 15px; color: var(--muted); margin-top: 4px; }
+  .standings { margin: 12px auto 0; border-collapse: collapse; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .standings th { font-size: 12px; font-weight: normal; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 0 12px 4px; text-align: right; }
+  .standings th:first-child, .standings td:first-child { text-align: left; }
+  .standings td { padding: 5px 12px; text-align: right; border-top: 1px solid #c8c8c8; }
+  .standings tr.me td { font-weight: bold; }
+  .standings td.win::after { content: "✓"; color: var(--good); margin-left: 6px; font-weight: bold; }
+  .standings .dim { color: var(--muted); font-weight: normal; }
+  #end .links { font-size: 18px; margin-top: 12px; }
   #end .links a { margin: 0 8px; }
+
+  /* After the match: a little chat under the band. */
+  #chat { max-width: 560px; margin: 18px auto 0; padding: 0 16px; }
+  #chat[hidden] { display: none; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .quick button { font-size: 15px; padding: 6px 12px; background: #fff; border: 1px solid #bbb; border-radius: 16px; cursor: pointer; }
+  .quick button:hover { border-color: #777; }
+  .quick button:disabled { opacity: .5; cursor: default; }
+  .msgs { list-style: none; margin: 12px 0 0; padding: 0; max-height: 180px; overflow-y: auto; font-size: 16px; line-height: 1.35; }
+  .msgs:empty { display: none; }
+  .msgs li { padding: 3px 0; overflow-wrap: anywhere; }
+  .msgs .from { font-weight: bold; margin-right: 6px; }
+  .msgs li.mine .from { color: #1a66d6; }
+  .say { display: flex; gap: 6px; margin-top: 10px; }
+  .say input { flex: 1; min-width: 0; height: 36px; padding: 0 10px; font-size: 16px; border: 1px solid #aaa; border-radius: 3px; }
+  .say input:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
+  .say button { height: 36px; padding: 0 14px; font-size: 15px; background: #fff; border: 1px solid #aaa; border-radius: 3px; cursor: pointer; }
+  .chat-msg { min-height: 1.2em; margin: 6px 0 0; font-size: 14px; color: var(--bad); }
 
   @media (max-width: 600px) {
     body { font-size: 16px; }
-    #vs { height: 120px; margin: 16px 0 0; gap: 10px; }
-    .vs-row { grid-template-columns: minmax(0, 96px) minmax(0, 1fr) 54px; gap: 10px; font-size: 15px; }
+    #vs { height: 120px; margin: 16px 0 0; gap: 12px; }
+    .vs-row { font-size: 14px; }
+    .standings { font-size: 15px; }
+    .standings th, .standings td { padding-left: 7px; padding-right: 7px; }
     .band { font-size: 28px; flex-wrap: wrap; padding: 10px 12px; row-gap: 8px; }
     #answer { width: 150px; height: 48px; font-size: 30px; }
     #end .result { font-size: 32px; }
@@ -106,7 +138,7 @@
   }
   @media (max-height: 500px) {
     .bar { padding-top: 8px; }
-    #vs { height: 96px; margin-top: 4px; gap: 6px; }
+    #vs { height: 96px; margin-top: 4px; gap: 8px; }
     .band { min-height: 60px; }
     #answer { height: 42px; }
   }
@@ -132,20 +164,20 @@
     <section class="lt-panel" aria-labelledby="games-title">
       <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub">both players get the same questions</span></div>
       <ol class="lt-tower">
+        <li class="lt-row team-arith">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Ari</span>
+          <span class="lt-body"><span class="lt-name">Arithmetic</span><span class="lt-detail">Zetamac’s defaults: + – × ÷</span></span>
+          <input type="radio" class="pick" name="game" value="standard" checked aria-label="Arithmetic">
+        </li>
         <li class="lt-row team-sq">
           <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">2D</span>
           <span class="lt-body"><span class="lt-name">Two-digit squares</span><span class="lt-detail">21–99, nothing ending in 5</span></span>
-          <input type="radio" class="pick" name="game" value="sq99h" checked aria-label="Two-digit squares">
+          <input type="radio" class="pick" name="game" value="sq99h" aria-label="Two-digit squares">
         </li>
         <li class="lt-row team-sq">
           <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">3D</span>
           <span class="lt-body"><span class="lt-name">Three-digit squares</span><span class="lt-detail">100–999, nothing ending in 5</span></span>
           <input type="radio" class="pick" name="game" value="sq999h" aria-label="Three-digit squares">
-        </li>
-        <li class="lt-row team-arith">
-          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Ari</span>
-          <span class="lt-body"><span class="lt-name">Arithmetic</span><span class="lt-detail">Zetamac’s defaults: + – × ÷</span></span>
-          <input type="radio" class="pick" name="game" value="standard" aria-label="Arithmetic">
         </li>
       </ol>
     </section>
@@ -168,7 +200,7 @@
         <p class="lt-lede">Same questions, same clock. Whoever’s faster wins.</p>
         <div class="d-block">
           <div class="lt-head"><h2>Find an opponent</h2><span class="d-record" id="record"></span></div>
-          <p class="d-rule"><b id="pick-name">Two-digit squares</b><a class="d-change" href="#games-title">Change</a><br>A race to 25 questions against whoever else is looking for the same problems, with 2:00 on the clock.</p>
+          <p class="d-rule"><b id="pick-name">Arithmetic</b><a class="d-change" href="#games-title">Change</a><br>A race to 25 questions against whoever else is looking for the same problems, with 2:00 on the clock.</p>
           <button id="start" type="button"><span class="lt-go"><b>Find match</b><span>Enter</span></span></button>
         </div>
         <div class="d-block">
@@ -227,8 +259,8 @@
     <span id="progress"></span>
   </div>
   <div id="vs" aria-hidden="true">
-    <div class="vs-row me"><span class="who" id="vs-me">You</span><span class="vs-track"><i id="bar-me"></i></span><span class="n" id="n-me">0</span></div>
-    <div class="vs-row"><span class="who" id="vs-them"></span><span class="vs-track"><i id="bar-them"></i></span><span class="n" id="n-them">0</span></div>
+    <div class="vs-row me"><span class="who" id="vs-me">You</span><span class="n"><span id="n-me">0</span><span class="lead" id="lead-me"></span></span><span class="vs-track"><i id="bar-me"></i></span></div>
+    <div class="vs-row"><span class="who" id="vs-them"></span><span class="n"><span id="n-them">0</span><span class="lead" id="lead-them"></span></span><span class="vs-track"><i id="bar-them"></i></span></div>
   </div>
   <div class="band">
     <div id="play" style="display:contents">
@@ -238,10 +270,19 @@
     <div id="held" role="status"></div>
     <div id="end">
       <div class="result" id="result"></div>
-      <div class="detail" id="detail"></div>
+      <div class="res-sub" id="res-sub"></div>
+      <table class="standings" id="standings"></table>
       <div class="links"><a href="#" id="again">Find another</a> <a href="#" id="lobby">Back to Duel</a> <a href="./">View progress</a></div>
     </div>
   </div>
+  <section id="chat" aria-label="Chat with your opponent" hidden>
+    <div class="quick" id="quick">
+      <button type="button">gg</button><button type="button">gg wp</button><button type="button">👏</button><button type="button">🔥</button><button type="button">😂</button><button type="button">😤</button><button type="button">rematch?</button>
+    </div>
+    <ol class="msgs" id="msgs" aria-live="polite"></ol>
+    <form class="say" id="say-form"><input id="say" maxlength="120" autocomplete="off" placeholder="Say something" aria-label="Message"><button type="submit">Send</button></form>
+    <p class="chat-msg" id="chat-msg" role="status"></p>
+  </section>
 </div>
 
 <script src="problems.js"></script>

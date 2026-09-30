@@ -17,6 +17,8 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 create unique index if not exists profiles_username_lower on public.profiles (lower(username));
+-- A private account keeps every score off the leaderboard (set with set_private below).
+alter table public.profiles add column if not exists private boolean not null default false;
 alter table public.profiles enable row level security;
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles for select to authenticated using (id = (select auth.uid()));
@@ -82,6 +84,12 @@ alter table public.scores add constraint scores_mode_check
   check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed'));
 alter table public.scores drop constraint if exists scores_detail_len;
 alter table public.scores add constraint scores_detail_len check (detail is null or jsonb_array_length(detail) <= 5000);
+-- A question takes about 75 bytes in the log; 200 each leaves plenty of room. Measured before
+-- compression, so a log can't hide one giant entry by making it repetitive. (Not checked against
+-- rows saved before this rule.)
+alter table public.scores drop constraint if exists scores_detail_size;
+alter table public.scores add constraint scores_detail_size
+  check (detail is null or octet_length(detail::text) <= 200 * jsonb_array_length(detail) + 2) not valid;
 create index if not exists scores_user_ts on public.scores (user_id, ts);
 create index if not exists scores_user_created on public.scores (user_id, created_at);
 create index if not exists scores_board on public.scores (mode, seconds, score desc) where verified;
@@ -103,7 +111,8 @@ grant insert (ts, date, score, seconds, source, mode, elapsed, detail) on public
 grant select on public.profiles to authenticated;
 
 -- Each save is checked here. First, limits that keep one account from filling the database: 20,000
--- games in all and 1,000 saves an hour (plenty for importing years of history). Then whether the
+-- games and 50 MB of question logs in all, and 1,000 saves or 25 MB of logs an hour (plenty for
+-- importing years of history). Then whether the
 -- game counts for the leaderboard: it was played in the browser game, scored at least a point, and
 -- its question log holds up, with one entry per point scored, every answer timed at 150 ms or more,
 -- and the times adding up to no more than the game's length (the run's length for endless).
@@ -117,6 +126,14 @@ begin
   end if;
   if (select count(*) from public.scores where user_id = new.user_id and created_at > now() - interval '1 hour') >= 1000 then
     raise exception 'Too many saves in the last hour. Try again later.';
+  end if;
+  if new.detail is not null then
+    if (select coalesce(sum(pg_column_size(detail)), 0) from public.scores where user_id = new.user_id) + pg_column_size(new.detail) > 50000000 then
+      raise exception 'This account has reached its limit of 50 MB of question timings.';
+    end if;
+    if (select coalesce(sum(pg_column_size(detail)), 0) from public.scores where user_id = new.user_id and created_at > now() - interval '1 hour') > 25000000 then
+      raise exception 'Too many question timings saved in the last hour. Try again later.';
+    end if;
   end if;
   new.verified := false;
   if new.source <> 'game' or new.mode = 'guided' or new.detail is null
@@ -144,7 +161,7 @@ create or replace view public.leaderboard with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
     p.username, s.mode, s.seconds, s.score, s.elapsed, s.date
   from public.scores s join public.profiles p on p.id = s.user_id
-  where s.verified
+  where s.verified and not p.private
   order by s.user_id, s.mode, s.seconds, s.score desc, s.elapsed asc, s.ts asc;
 revoke all on public.leaderboard from public;
 grant select on public.leaderboard to anon, authenticated;
@@ -157,6 +174,15 @@ language sql security definer set search_path = '' as $$
 $$;
 revoke execute on function public.delete_me() from public, anon;
 grant execute on function public.delete_me() to authenticated;
+
+-- ---- private accounts ----------------------------------------------------------------------
+-- Players can't edit their profile directly (the name is fixed); this switches only the privacy flag.
+create or replace function public.set_private(p_private boolean) returns boolean
+language sql security definer set search_path = '' as $$
+  update public.profiles set private = coalesce(p_private, false) where id = auth.uid() returning private;
+$$;
+revoke execute on function public.set_private(boolean) from public, anon;
+grant execute on function public.set_private(boolean) to authenticated;
 
 -- ---- 1v1 matches ---------------------------------------------------------------------------
 -- Two signed-in players get the same questions (built in each browser from the match's seed) and
@@ -347,3 +373,43 @@ end $$;
 revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready() from public, anon, authenticated;
 revoke execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) from public, anon;
 grant execute on function public.mm_queue(text), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean) to authenticated;
+
+-- ---- after a duel: quick chat ---------------------------------------------------------------
+-- The two players can talk once the match is over: short messages (a "gg", an emoji), readable
+-- only by the players of that match, added only through mm_say.
+create table if not exists public.match_messages (
+  id bigint generated always as identity primary key,
+  match_id uuid not null references public.matches on delete cascade,
+  seat int not null check (seat in (1, 2)),
+  body text not null check (char_length(body) between 1 and 120),
+  created_at timestamptz not null default now()
+);
+create index if not exists match_messages_match on public.match_messages (match_id, id);
+alter table public.match_messages enable row level security;
+drop policy if exists "read own match messages" on public.match_messages;
+create policy "read own match messages" on public.match_messages for select to authenticated
+  using (exists (select 1 from public.matches m where m.id = match_id and (select auth.uid()) in (m.p1, m.p2)));
+revoke all on public.match_messages from anon, authenticated;
+grant select on public.match_messages to authenticated;
+
+create or replace function public.mm_say(p_id uuid, p_text text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare m public.matches; v_seat int; v_body text := btrim(regexp_replace(coalesce(p_text, ''), '[[:cntrl:]]', ' ', 'g')); msg public.match_messages;
+begin
+  select * into m from public.matches where id = p_id and auth.uid() in (p1, p2);
+  if not found then raise exception 'Match not found.'; end if;
+  if m.status <> 'done' then raise exception 'Chat opens when the match is over.'; end if;
+  if char_length(v_body) = 0 then raise exception 'Say something first.'; end if;
+  if char_length(v_body) > 120 then raise exception 'Keep it under 120 characters.'; end if;
+  v_seat := case when m.p1 = auth.uid() then 1 else 2 end;
+  if (select count(*) from public.match_messages where match_id = m.id and match_messages.seat = v_seat and created_at > now() - interval '30 seconds') >= 8 then
+    raise exception 'Slow down a little.';
+  end if;
+  if (select count(*) from public.match_messages where match_id = m.id and match_messages.seat = v_seat) >= 60 then
+    raise exception 'That’s the most messages for one match.';
+  end if;
+  insert into public.match_messages (match_id, seat, body) values (m.id, v_seat, v_body) returning * into msg;
+  return to_jsonb(msg);
+end $$;
+revoke execute on function public.mm_say(uuid, text) from public, anon;
+grant execute on function public.mm_say(uuid, text) to authenticated;

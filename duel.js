@@ -195,6 +195,7 @@
     $('#progress').textContent = goal ? `Question ${Math.min(score + 1, goal)} of ${goal}` : `Score: ${score}`;
     $('#n-me').textContent = goal ? `${score}/${goal}` : score;
     $('#bar-me').style.transform = `scaleX(${bar(score) / 100})`;
+    showLead();
   }
   // Race bars fill toward the goal; clock bars are scaled to whoever's ahead.
   function bar(n) {
@@ -208,6 +209,13 @@
     $('#n-them').classList.toggle('done', !!done && m.rule === 'race' && n >= m.goal);
     $('#bar-them').style.transform = `scaleX(${bar(n) / 100})`;
     if (m.rule === 'clock') $('#bar-me').style.transform = `scaleX(${bar(score) / 100})`;
+    showLead();
+  }
+  // "+3" beside whoever's ahead.
+  function showLead() {
+    const d = score - (theirs(match, 'score') || 0);
+    $('#lead-me').textContent = d > 0 ? `+${d}` : '';
+    $('#lead-them').textContent = d < 0 ? `+${-d}` : '';
   }
 
   input.addEventListener('input', () => {
@@ -266,13 +274,91 @@
     const r = $('#result');
     r.className = `result ${draw ? '' : won ? 'win' : 'lose'}`;
     r.textContent = draw ? 'Draw' : won ? 'You win' : `${them(m)} wins`;
-    const line = (name, s, ms, done) => m.rule === 'race' && s >= m.goal && done ? `${name} ${s} in ${secs(ms)} s` : `${name} ${s}`;
-    $('#detail').textContent = `${line('You', mine(m, 'score'), mine(m, 'ms'), mine(m, 'done'))} · ${line(them(m), theirs(m, 'score'), theirs(m, 'ms'), theirs(m, 'done'))}`;
+    $('#res-sub').textContent = ruleText(m);
+    standings(m);
+    openChat(m);
     setTimeout(() => $('#again').focus(), 700);
   }
 
+  // Both players side by side. A race also shows the finish time and the pace each player was on,
+  // projected to a 2-minute game (25 in 40 s is a pace of 75).
+  function standings(m) {
+    const race = m.rule === 'race';
+    const pace = (n, ms) => (n > 0 && ms > 0 ? Math.round(n / ms * 120000) : null);
+    const cell = (text, cls = '') => { const td = document.createElement('td'); td.textContent = text; if (cls) td.className = cls; return td; };
+    const table = $('#standings');
+    table.replaceChildren();
+    const head = document.createElement('tr');
+    for (const h of ['', race ? 'Answered' : 'Score', ...(race ? ['Time', '2:00 pace'] : [])]) { const th = document.createElement('th'); th.textContent = h; head.append(th); }
+    table.append(head);
+    for (const seat of [me, 3 - me]) {
+      const n = m[`p${seat}_score`], ms = m[`p${seat}_ms`], finishedRace = race && n >= m.goal && m[`p${seat}_done`];
+      const tr = document.createElement('tr');
+      if (seat === me) tr.className = 'me';
+      tr.append(cell(seat === me ? cloud.user().name : them(m), m.winner === seat ? 'win' : ''));
+      tr.append(cell(race ? `${n}/${m.goal}` : String(n)));
+      if (race) {
+        tr.append(cell(finishedRace ? `${secs(ms)} s` : '—', finishedRace ? '' : 'dim'));
+        const p = pace(n, ms);
+        tr.append(cell(p == null ? '—' : String(p), p == null ? 'dim' : ''));
+      }
+      table.append(tr);
+    }
+  }
+
+  // ---- chat after the match ----
+  let chatTimer = 0, chatId = null, seen = 0;
+  function openChat(m) {
+    if (chatId === m.id) return;
+    closeChat();
+    chatId = m.id; seen = 0;
+    $('#msgs').replaceChildren();
+    $('#chat-msg').textContent = '';
+    $('#say').placeholder = `Say something to ${them(m)}`;
+    $('#chat').hidden = false;
+    loadChat();
+    chatTimer = setInterval(loadChat, 2000);
+  }
+  function closeChat() { clearInterval(chatTimer); chatTimer = 0; chatId = null; $('#chat').hidden = true; }
+  async function loadChat() {
+    if (!chatId) return;
+    const id = chatId;
+    try {
+      const rows = await cloud.rest(`match_messages?select=id,seat,body&match_id=eq.${encodeURIComponent(id)}&order=id.asc`);
+      if (id !== chatId) return;
+      for (const r of rows) if (r.id > seen) { addLine(r); seen = r.id; }
+    } catch {}
+  }
+  function addLine(r) {
+    const list = $('#msgs'), li = document.createElement('li'), who = document.createElement('span');
+    const mineMsg = r.seat === me;
+    li.className = mineMsg ? 'mine' : '';
+    who.className = 'from';
+    who.textContent = mineMsg ? 'You' : them(match);
+    li.append(who, document.createTextNode(' ' + r.body));
+    list.append(li);
+    list.scrollTop = list.scrollHeight;
+  }
+  async function say(text) {
+    const body = text.trim();
+    if (!body || !chatId) return;
+    const note = $('#chat-msg');
+    note.textContent = '';
+    try {
+      await cloud.rest('rpc/mm_say', { method: 'POST', body: { p_id: chatId, p_text: body } });
+      await loadChat();
+      return true;
+    } catch (err) { note.textContent = err.message || 'Couldn’t send that.'; return false; }
+  }
+  $('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (b) say(b.textContent); });
+  $('#say-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (await say($('#say').value)) $('#say').value = '';
+  });
+
   function backToLobby() {
     finished = false; playing = false;
+    closeChat();
     $('#game').style.display = 'none';
     $('#settings').style.display = 'block';
     lobby();
