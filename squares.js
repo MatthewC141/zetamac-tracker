@@ -6,13 +6,13 @@ const MODE_NAMES = { sq99h: 'Two-digit squares', sq999h: 'Three-digit squares' }
 const input = $('#answer');
 let log = [], current = null, prevLen = 0, startAt = 0, cfg, pool = [], last = 0, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
 
-// Numbers that can come up: none ending in 5 (x5² is a trick) and, for two-digit squares,
+// Numbers that can come up: none ending in 0 or 5 (both are tricks) and, for two-digit squares,
 // nothing from 1 to 20, which most people already know by heart.
 function buildPool(range) {
   const [lo, hi] = range === '99' ? [21, 99] : [100, 999];
   const out = [];
   for (let n = lo; n <= hi; n++) {
-    if (n % 10 === 5) continue;
+    if (n % 5 === 0) continue;
     out.push(n);
   }
   return out;

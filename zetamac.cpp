@@ -132,7 +132,7 @@ struct Entry {
   int elapsed = 0;  // endless runs (seconds == 0): how long the run lasted, in seconds
 };
 
-// Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 5,
+// Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 0 or 5,
 // and no 1–20 in the 1–99 range). Practice drills: subtraction with / without borrowing, and
 // "guided" (the arithmetic game with guided mode on, kept apart from real scores), and "mixed"
 // (combined operations, like (5 + 2) × (15 + 9)), the quant tests ("o80", the Optiver 80-in-8

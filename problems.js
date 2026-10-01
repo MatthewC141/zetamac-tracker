@@ -149,7 +149,7 @@ window.ZM_PROBLEMS = (() => {
     const m = /^sq(99|999)(h?)$/.exec(game);
     if (m) {
       const [lo, hi] = m[1] === '99' ? [1, 99] : [100, 999], hard = !!m[2], pool = [];
-      for (let n = lo; n <= hi; n++) if (!(hard && (n % 10 === 5 || (m[1] === '99' && n <= 20)))) pool.push(n);
+      for (let n = lo; n <= hi; n++) if (!(hard && (n % 5 === 0 || (m[1] === '99' && n <= 20)))) pool.push(n);
       return () => { const n = pool[rand(0, pool.length - 1)]; return { q: `${n}²`, a: n * n, o: 'sq' }; };
     }
     throw new Error('Unknown game.');
