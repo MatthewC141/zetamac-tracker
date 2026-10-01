@@ -7,6 +7,9 @@
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Zetamac Live Timing</title>
 <style>
@@ -240,6 +243,7 @@
   .len.sq { color: var(--t-sq); }
   .len.mx { color: var(--t-mix); }
   .len.o8 { color: var(--purple); }
+  .len.dy { color: var(--ink); }
   .len.end { color: var(--proj); }
   .len.pr { color: var(--t-sub); }
   .practice td, .practice th, .runs td, .runs th { white-space: nowrap; }
@@ -321,7 +325,7 @@
   .dd-opt[aria-selected="true"] { font-weight: 700; }
   .dd-opt[aria-selected="true"]::before { background: var(--purple); }
   .dd-opt.active { background: #2a2c38; }
-  .dd-group { padding: 10px 10px 4px 21px; font: 700 10px/1 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .dd-group { padding: 10px 10px 4px 21px; font: 700 11px/1 var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
   .game-pick .dd-btn { font-weight: 700; padding: 8px 11px; min-width: 210px; }
   .recent-controls .dd-btn { font-size: 14px; padding: 8px 10px; }
 
@@ -353,13 +357,22 @@
   .tower .gap.acc { color: var(--ink); }
   .tower .gap.acc.low { color: var(--red); font-weight: 700; }
   .weak-game { margin-left: auto; }
+  .drill-cta { display: flex; align-items: center; gap: 14px; margin: 14px 0 0; padding: 11px 14px 11px 12px; border: 1px solid var(--line); border-radius: 3px; text-decoration: none; color: var(--muted); font-size: 13px; transition: border-color .15s, background-color .15s; }
+  .drill-cta::before { content: ""; flex: none; width: 4px; align-self: stretch; border-radius: 1px; background: var(--purple); }
+  .drill-cta::after { content: ""; flex: none; margin-left: auto; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-top: 2px solid var(--muted); transform: rotate(45deg); }
+  .drill-cta b { display: block; margin-bottom: 2px; font: 700 12px/1.2 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+  .drill-cta:hover { border-color: #3d4050; background: var(--raise); }
+  .drill-cta:hover::after { border-color: var(--ink); }
   /* 80 in 8 at the foot of the score panel */
-  .o80-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--grid); font-size: 14px; color: var(--muted); }
+  .o80-line { display: grid; gap: 10px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--grid); font-size: 14px; color: var(--muted); }
   .o80-line[hidden] { display: none; }
-  .o80-line .lbl { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
-  .o80-line .lbl::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--purple); }
+  .t-line { display: grid; grid-template-columns: minmax(110px, auto) auto auto 1fr auto; align-items: baseline; gap: 4px 16px; }
+  .o80-line .lbl { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .o80-line .lbl::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--team, var(--purple)); }
+  .t-o80 { --team: var(--purple); } .t-seq { --team: #2fd0f5; } .t-frac { --team: #8fb3ff; } .t-est { --team: #ff62b8; }
   .o80-line b { color: var(--ink); font: 700 20px/1 var(--figure); margin-right: 4px; }
-  .o80-line a { margin-left: auto; font: 700 12px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .o80-line a { font: 700 12px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  @media (max-width: 640px) { .t-line { grid-template-columns: 1fr auto; } .t-line > span:nth-child(4) { display: none; } .t-line > span:nth-child(3) { grid-column: 1; } }
   .panel-head .weak-game + .seg { margin-left: 8px; }
   .bd-list .slow { color: var(--yellow); font-weight: 700; }
   .bd-list .fast { color: var(--green); font-weight: 700; }
@@ -372,6 +385,9 @@
   .op-mix { --team: var(--t-mix); background: var(--t-mix); fill: var(--t-mix); }
   .op-dec { --team: #c9a7ff; background: #c9a7ff; fill: #c9a7ff; }
   .op-pct { --team: #ffd21f; background: #ffd21f; fill: #ffd21f; }
+  .op-seq { --team: #2fd0f5; background: #2fd0f5; fill: #2fd0f5; }
+  .op-frac { --team: #8fb3ff; background: #8fb3ff; fill: #8fb3ff; }
+  .op-est { --team: #ff62b8; background: #ff62b8; fill: #ff62b8; }
   .tower li.op-add, .tower li.op-sub, .tower li.op-mul, .tower li.op-div, .tower li.op-dec, .tower li.op-pct, .tower li.op-mix, .tower li.op-sq { background: none; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -379,9 +395,6 @@
   }
   @media (max-width: 1000px) {
     .top { grid-template-columns: 1fr; }
-    .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .stat:nth-child(4) { border-left: 0; }
-    .stat:nth-child(n+4) { border-top: 1px solid var(--line); }
     form { grid-template-columns: 1fr 1fr; }
     form .primary, form label:nth-of-type(2) { grid-column: 1 / -1; }
   }
@@ -398,7 +411,7 @@
     .stack td.lead { grid-column: 1 / -1; font-weight: 700; font-size: 16px; }
     .tower.facts li { grid-template-columns: 20px 4px 104px minmax(0, 1fr) 56px 44px; }
     #recent td:first-child, #recent td:nth-child(2) { white-space: nowrap; }
-    #recent td.num .len { display: block; margin: 0 0 4px auto; width: max-content; }
+    #recent td.num .len { display: block; margin: 0 0 4px auto; width: auto; max-width: 15ch; white-space: normal; text-align: right; line-height: 1.25; }
     .tower li { grid-template-columns: 20px 4px 44px minmax(0, 1fr) 62px 50px; gap: 0 8px; padding: 0 4px 0 0; }
     .sb-fig.main > b { font-size: 84px; }
     .sb-fig.last > b { font-size: 44px; }
@@ -488,6 +501,36 @@
     .strip .help-btn + .help-btn { margin-left: 0; }
     .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
   }
+  /* ---- replay ---- */
+  #replay { width: min(860px, calc(100vw - 32px)); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); }
+  #replay::backdrop { background: rgba(5, 6, 8, .78); }
+  .rp-top { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .rp-top h2 { margin: 0; }
+  .rp-sub { color: var(--muted); font-size: 14px; margin-right: auto; }
+  /* the game itself, in zetamac's white */
+  .rp-stage { margin: 18px; background: #fff; color: #000; border-radius: 3px; padding: 14px 0 12px; font: 16px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  .rp-bar { display: flex; justify-content: space-between; padding: 0 16px; font-size: 17px; }
+  .rp-bar b { font-weight: normal; font-variant-numeric: tabular-nums; }
+  #rp-qn { color: #555; }
+  .rp-band { display: flex; align-items: center; justify-content: center; gap: 11px; margin-top: 46px; min-height: 70px; background: #ddd; font-size: 34px; white-space: nowrap; }
+  .rp-typed { display: inline-block; min-width: 4.5ch; height: 44px; line-height: 44px; padding: 0 6px; background: #fff; border: 1px solid #767676; border-radius: 2px; text-align: left; font-variant-numeric: tabular-nums; }
+  .rp-typed s { color: #b3261e; margin-right: 8px; }
+  .rp-note { min-height: 1.3em; margin: 12px 16px 0; text-align: center; font-size: 15px; color: #555; }
+  .rp-note b { color: #b3261e; }
+  .rp-line { display: block; width: calc(100% - 36px); height: 90px; margin: 0 18px; cursor: pointer; }
+  .rp-line .gridline { stroke: var(--grid); }
+  .rp-line .head { stroke: var(--purple); stroke-width: 2; }
+  .rp-line rect.past { opacity: .4; }
+  .rp-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 18px 18px; }
+  .rp-btn { min-width: 40px; height: 36px; padding: 0 12px; font: 700 15px/1 var(--label); color: var(--ink); background: var(--raise); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+  .rp-btn:hover { border-color: #3d4050; }
+  .rp-play { min-width: 92px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .rp-play:hover { background: #fff; }
+  .rp-keys { margin-left: auto; font-size: 13px; color: var(--muted); }
+  .bd-replay { border: 1px solid var(--line); background: none; color: var(--ink); font: 700 11px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; padding: 7px 10px; border-radius: 3px; }
+  .bd-replay:hover { border-color: #3d4050; background: var(--panel); }
+  @media (max-width: 640px) { .rp-band { font-size: 26px; gap: 8px; } .rp-typed { height: 38px; line-height: 38px; } .rp-keys { display: none; } .rp-stage { margin: 12px; } .rp-line { width: calc(100% - 24px); margin: 0 12px; } }
+  @media (pointer: coarse) { .rp-btn { min-height: 44px; } }
   #welcome { width: min(760px, calc(100vw - 32px)); height: min(740px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); overflow: auto; }
   #welcome[open] { display: flex; flex-direction: column; }
   .w-step { flex: 1 0 auto; }
@@ -578,11 +621,11 @@
       <div class="session"><span class="live" id="session-date">Session</span></div>
     </div>
     <nav class="nav" aria-label="Games">
-      <a class="play-btn go" href="play.html">Play</a>
+      <a class="play-btn go" href="play.html">Arithmetic</a>
       <a class="play-btn" href="squares.html">Squares</a>
       <a class="play-btn" href="mixed.html">Combined</a>
       <a class="play-btn" href="practice.html">Practice</a>
-      <a class="play-btn" href="optiver.html">80 in 8</a>
+      <a class="play-btn" href="optiver.html">Tests</a>
       <a class="play-btn" href="duel.html">Duel</a>
     </nav>
     <a class="help-btn" href="leaderboard.html">Leaderboard</a>
@@ -637,7 +680,12 @@
           <select id="chart-game">
             <option value="standard">Arithmetic (zetamac)</option>
             <option value="mixed">Combined operations</option>
-            <option value="o80">80 in 8</option>
+            <optgroup label="Quant tests">
+              <option value="o80">80 in 8</option>
+              <option value="seq">Sequences</option>
+              <option value="frac">Fractions</option>
+              <option value="est">Estimation</option>
+            </optgroup>
             <optgroup label="Squares">
               <option value="sq99h">Two-digit squares</option>
               <option value="sq999h">Three-digit squares</option>
@@ -740,8 +788,12 @@
             <option value="sq999">Three-digit squares, all numbers (older)</option>
             <option value="mixed">Combined operations</option>
             <option value="o80">80 in 8</option>
+            <option value="seq">Sequences test</option>
+            <option value="frac">Fractions test</option>
+            <option value="est">Estimation test</option>
             <option value="sub-borrow">Borrowing practice</option>
             <option value="sub-easy">No-borrow practice</option>
+            <option value="drill">Weak-spot drill</option>
           </select>
         </label>
         <label>Length
@@ -771,6 +823,27 @@
     </section>
 </main>
 
+
+<!-- Replay: a saved game played back question by question (opened from a game's breakdown). -->
+<dialog id="replay" aria-labelledby="rp-title">
+  <div class="rp-top">
+    <h2 id="rp-title">Replay</h2><span class="rp-sub" id="rp-sub"></span>
+    <button class="w-x" type="button" id="rp-close" aria-label="Close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg></button>
+  </div>
+  <div class="rp-stage">
+    <div class="rp-bar"><span>Time: <b id="rp-clock">0:00</b></span><span id="rp-qn"></span><span>Score: <b id="rp-score">0</b></span></div>
+    <div class="rp-band"><span id="rp-q"></span><span>=</span><span class="rp-typed" id="rp-typed"></span></div>
+    <p class="rp-note" id="rp-note" aria-live="polite"></p>
+  </div>
+  <svg class="rp-line" id="rp-line" preserveAspectRatio="none" aria-label="Every question’s time; click to jump"></svg>
+  <div class="rp-controls">
+    <button type="button" class="rp-btn" id="rp-prev" aria-label="Previous question">‹</button>
+    <button type="button" class="rp-btn rp-play" id="rp-play">Play</button>
+    <button type="button" class="rp-btn" id="rp-next" aria-label="Next question">›</button>
+    <div class="seg" role="group" aria-label="Speed" id="rp-speed"><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2" aria-pressed="false">2×</button><button type="button" data-speed="4" aria-pressed="false">4×</button></div>
+    <span class="rp-keys">Space plays · ← → step</span>
+  </div>
+</dialog>
 
 <dialog id="welcome" aria-labelledby="w-title-0">
   <div class="w-top">
@@ -807,12 +880,12 @@
     <h2 id="w-title-1">Six games. Every question timed.</h2>
     <p class="w-lede">Pick a game and a length on its start screen, then press <b>Enter</b>. Every question is timed, so the tracker can see where your time goes.</p>
     <ul class="w-rows">
-      <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock and records seconds per problem.</span></li>
+      <li class="plain"><span class="k">Arithmetic</span><span class="v">Zetamac’s default settings. <b>2:00 is your score</b>; a 0:30 round counts ×4; Endless has no clock. Plus a <b>daily challenge</b>: the same questions for everyone, one try a day.</span></li>
       <li class="plain"><span class="k">Squares</span><span class="v">Two-digit or three-digit squares, <b>skipping the easy ones</b>: nothing ending in 5, and no 1–20.</span></li>
       <li class="plain"><span class="k">Combined</span><span class="v">Two steps in one problem, like <b>(5 + 2) × (15 + 9)</b>: work out the brackets, then the rest.</span></li>
-      <li class="plain"><span class="k">80 in 8</span><span class="v">An Optiver-style test: <b>80 questions in 8 minutes</b> with decimals and percentages, marked right minus wrong.</span></li>
-      <li class="plain"><span class="k">Duel</span><span class="v">Race another player on <b>the same questions</b>: find an opponent, or send a friend a code.</span></li>
-      <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, like <b>subtraction with borrowing</b>. Untimed by default.</span></li>
+      <li class="plain"><span class="k">Tests</span><span class="v">Trading-firm tests marked right minus wrong: <b>80 in 8</b> (Optiver-style), number sequences, fractions and estimation.</span></li>
+      <li class="plain"><span class="k">Duel</span><span class="v">Race another player on <b>the same questions</b>, ranked or for fun: find an opponent, challenge a friend by name, or race a ghost.</span></li>
+      <li class="plain"><span class="k">Practice</span><span class="v">Drills for one kind of problem, including one <b>built from your own weak spots</b>. Untimed by default.</span></li>
       <li class="plain"><span class="k">Guide</span><span class="v">The quickest way to do <b>each operation in your head</b>, step by step, plus a times-table drill. Open <b>Guide</b> from the header.</span></li>
     </ul>
   </section>
@@ -849,6 +922,7 @@
     <a class="w-go" href="play.html" id="w-play" hidden>Play a 2-minute round</a>
   </div>
 </dialog>
+<script src="problems.js"></script>
 <script src="dashboard.js"></script>
 </body>
 </html>

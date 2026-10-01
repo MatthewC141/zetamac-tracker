@@ -22,7 +22,7 @@
   const rule = () => document.querySelector('input[name=rule]:checked').value;
   const them = m => (me === 1 ? m.p2_name : m.p1_name) || 'Opponent';
   const mine = (m, k) => m[`p${me}_${k}`], theirs = (m, k) => m[`p${3 - me}_${k}`];
-  const ruleText = m => `${m.ranked ? 'Ranked · ' : ''}${P.NAMES[m.game]} · ${m.rule === 'race' ? `race to ${m.goal}, 2:00 limit` : `most answered in ${clock(m.seconds)}`}`;
+  const ruleText = m => `${m.ghost ? 'Ghost race · ' : m.ranked ? 'Ranked · ' : ''}${P.NAMES[m.game]} · ${m.rule === 'race' ? `race to ${m.goal}, 2:00 limit` : `most answered in ${clock(m.seconds)}`}`;
   const M = window.ZM_MATCHES;
   const ranked = () => document.querySelector('input[name=queue]:checked').value === 'ranked';
 
@@ -34,6 +34,8 @@
     $('#msg').className = `d-msg${isError ? ' err' : ''}`;
     loadRecord();
     loadRank();
+    loadInvites();
+    $('#ghost-msg').textContent = '';
   }
 
   // Your rank card: placement games first, then your rank, rating and the next rank's rating.
@@ -43,8 +45,10 @@
       const placing = r.games < M.PLACEMENT, k = M.rank(r.elo);
       card.className = `d-rank rk-${placing ? 'none' : k.tier}`;
       $('#rank-name').textContent = placing ? 'Unranked' : k.name;
+      const record = `${r.wins}–${r.losses}${r.draws ? `–${r.draws}` : ''} this season`;
       $('#rank-note').textContent = placing ? `Placement: ${r.games} of ${M.PLACEMENT} matches played`
-        : k.next ? `${k.next - r.elo} to ${M.rank(k.next).name} · ${r.wins}–${r.losses}${r.draws ? `–${r.draws}` : ''}` : `The top rank · ${r.wins}–${r.losses}${r.draws ? `–${r.draws}` : ''}`;
+        : `${k.next ? `${k.next - r.elo} to ${M.rank(k.next).name}` : 'The top rank'} · ${record}`;
+      $('#rank-card').title = `Season ${M.seasonName(r.season)} · ratings move halfway back to 1000 when a new season starts each quarter`;
       $('#rank-elo').textContent = r.elo;
       card.hidden = false;
     } catch {}
@@ -127,13 +131,98 @@
     setTimeout(() => { $('#copy').textContent = 'Copy link'; }, 1600);
   });
 
+  // ---- challenges by name ----
+  // Sent: a private match for that player, waiting like a code match. Received: listed at the top
+  // of the lobby (checked every few seconds while it shows), to accept or decline.
+  $('#challenge-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('#rival').value.trim();
+    if (!cloud.nameOk(name)) { $('#msg').className = 'd-msg err'; $('#msg').textContent = 'Names are 3 to 20 letters, digits or underscores.'; return $('#rival').focus(); }
+    try { enter(await call('mm_challenge', { p_name: name, p_game: game() === 'any' ? 'standard' : game(), p_rule: rule() })); } catch (err) { fail(err); $('#rival').focus(); }
+  });
+  $('#rival').addEventListener('keydown', e => { if (e.key === 'Enter') e.stopPropagation(); });
+  async function loadInvites() {
+    const box = $('#invites');
+    if ($('#st-lobby').hidden || $('#lobby-view').hidden) return;
+    let list = [];
+    try { list = await rpc('mm_invites', {}); } catch { return; }
+    if ($('#st-lobby').hidden) return;
+    box.replaceChildren(...(Array.isArray(list) ? list : []).map(inv => {
+      const li = document.createElement('li'), body = document.createElement('span'), who = document.createElement('b'), what = document.createElement('small');
+      who.textContent = `${inv.from} challenged you`;
+      what.textContent = `${P.NAMES[inv.game] || 'Duel'} · ${inv.rule === 'race' ? `race to ${inv.goal}` : `most in ${clock(inv.seconds)}`}`;
+      body.append(who, what);
+      const acts = document.createElement('span'), yes = document.createElement('button'), no = document.createElement('button');
+      acts.className = 'acts';
+      yes.className = 'd-btn'; yes.type = 'button'; yes.textContent = 'Accept';
+      no.className = 'd-btn quiet'; no.type = 'button'; no.textContent = 'Decline';
+      yes.addEventListener('click', async () => { try { enter(await call('mm_join', { p_code: inv.code })); } catch (err) { fail(err); } });
+      no.addEventListener('click', async () => { li.remove(); box.hidden = !box.children.length; try { await rpc('mm_decline', { p_id: inv.id }); } catch {} });
+      acts.append(yes, no);
+      const stripe = document.createElement('span');
+      stripe.className = 'lt-stripe';
+      li.append(stripe, body, acts);
+      return li;
+    }));
+    box.hidden = !box.children.length;
+  }
+  setInterval(loadInvites, 3000);
+
+  // ---- ghosts: a saved game to race while nobody's searching ----
+  // After 20 seconds in the queue, a ghost race is offered: your own best 2-minute game, or one by
+  // the player nearest your rating, replayed answer by answer on its own questions. Nothing is
+  // saved and the database plays no part once the game is fetched.
+  const GHOST_AFTER = 20000;
+  let ghostLog = null, ghostTimes = [];
+  document.querySelectorAll('[data-ghost]').forEach(b => b.addEventListener('click', async () => {
+    const msg = $('#ghost-msg');
+    msg.textContent = '';
+    let g;
+    try { g = await rpc('mm_ghost', { p_mine: b.dataset.ghost === 'mine' }); } catch (err) { msg.textContent = err.message; return; }
+    // The log is checked before use: 25 questions, each with text, a numeric answer and a time.
+    const log = Array.isArray(g?.log) ? g.log.filter(q => typeof q?.q === 'string' && q.q.length <= 40 && Number.isFinite(Number(q.a)) && Number.isFinite(Number(q.t)) && q.t >= 0) : [];
+    if (log.length < 25) {
+      msg.textContent = b.dataset.ghost === 'mine' ? 'You need a 2-minute arithmetic game of 25 or more, played on the site, to race your best.' : 'No other player’s game to race yet.';
+      return;
+    }
+    const waiting = match;
+    if (waiting) { stopPolling(); rpc('mm_cancel', { p_id: waiting.id }).catch(() => {}); }
+    raceGhost({ name: g.mine ? 'Your best' : String(g.name || 'Ghost'), score: g.score, rating: g.rating, log: log.slice(0, 25).map(q => ({ q: q.q, a: Number(q.a), t: Number(q.t) })) });
+  }));
+  function raceGhost(g) {
+    ghostLog = g;
+    let sum = 0;
+    ghostTimes = g.log.map(q => (sum += q.t));
+    const startsAt = new Date(Date.now() + offset + 5000).toISOString();
+    enter({ id: `ghost-${Date.now()}`, ghost: true, status: 'live', is_public: false, ranked: false, rule: 'race', game: 'standard', goal: 25, seconds: 120,
+            p1: cloud.user().id, p2: null, p1_name: cloud.user().name, p2_name: g.name, starts_at: startsAt,
+            p1_score: 0, p2_score: 0, p1_ms: 0, p2_ms: 0, p1_done: false, p2_done: false, winner: null });
+  }
+  // The ghost's progress at this moment, and the result once either side has finished (or time's up).
+  function ghostTick() {
+    if (!match?.ghost || !playing && !finished) return;
+    const t = elapsed(), n = ghostTimes.filter(x => x <= t).length;
+    if (n !== match.p2_score) {
+      match.p2_score = n; match.p2_ms = ghostTimes[n - 1] || 0;
+      if (n >= match.goal) match.p2_done = true;
+      showOpponent(match);
+    }
+    if (match.status !== 'live') return;
+    const meDone = match.p1_done, timeUp = t > match.seconds * 1000;
+    if (match.p2_done || meDone || timeUp) {
+      const w = match.p1_score > match.p2_score ? 1 : match.p2_score > match.p1_score ? 2
+        : match.p1_score === 0 ? 0 : match.p1_ms < match.p2_ms ? 1 : match.p2_ms < match.p1_ms ? 2 : 0;
+      update({ ...match, status: 'done', winner: w });
+    }
+  }
+
   // ---- following a match ----
   function stopPolling() { clearInterval(poller); poller = 0; }
   function enter(m) {
     match = m;
     me = m.p1 === cloud.user().id ? 1 : 2;
     stopPolling();
-    poller = setInterval(poll, 1000);
+    poller = m.ghost ? setInterval(ghostTick, 50) : setInterval(poll, 1000);
     update(m);
   }
   async function poll() {
@@ -143,7 +232,7 @@
   function update(m) {
     if (!m || m.id !== match?.id) return;
     match = m;
-    if (m.status === 'cancelled') return lobby('That match was closed.');
+    if (m.status === 'cancelled') return lobby(m.invitee && me === 1 ? `${m.p2_name} declined the challenge.` : 'That match was closed.');
     if (m.status === 'waiting') return showWaiting(m);
     if (m.status === 'live' && !playing && !finished) return countdown(m);
     if (playing || finished) showOpponent(m);
@@ -158,11 +247,14 @@
     if (m.is_public) {
       show('st-queue');
       $('#q-clock').textContent = clock(Math.floor((Date.now() - waitStart) / 1000));
-      $('#q-sub').textContent = `${P.NAMES[m.game]}. The match starts as soon as someone else looks for the same problems.`;
+      $('#q-sub').textContent = `${m.ranked ? 'Ranked · ' : ''}${P.NAMES[m.game]}. The match starts as soon as someone else looks for the same problems.`;
+      $('#ghost-offer').hidden = Date.now() - waitStart < GHOST_AFTER;
     } else {
       show('st-code');
       $('#my-code').textContent = m.code;
-      $('#code-sub').textContent = `${ruleText(m)}. Send the code or the link to your opponent; the match starts when they join.`;
+      $('#code-sub').textContent = m.invitee
+        ? `${ruleText(m)}. ${m.p2_name} sees your challenge on their Duel page; the match starts when they accept.`
+        : `${ruleText(m)}. Send the code or the link to your opponent; the match starts when they join.`;
     }
   }
 
@@ -181,8 +273,8 @@
       el.textContent = k ? `${k.name} · ${elo}` : '';
       el.className = `f-rank${k ? ` rk-${k.tier}` : ''}`;
     }
-    $('#f-sub').textContent = ruleText(m) + '.';
-    qs = P.list(m.game, m.seed, m.rule === 'race' ? m.goal : 600);
+    $('#f-sub').textContent = ruleText(m) + (m.ghost && Number.isInteger(ghostLog?.score) ? `. Their game scored ${ghostLog.score} in 2:00.` : '.');
+    qs = m.ghost ? ghostLog.log.map(q => ({ q: q.q, a: q.a })) : P.list(m.game, m.seed, m.rule === 'race' ? m.goal : 600);
     const startsAt = Date.parse(m.starts_at) - offset;  // this browser's clock
     startPerf = performance.now() + (startsAt - Date.now());
     const lights = [...document.querySelectorAll('.d-found .lt-lights i')];
@@ -208,7 +300,7 @@
     $('#clock-label').textContent = 'Seconds left:';
     $('#vs-me').textContent = cloud.user().name;
     $('#vs-them').textContent = them(match);
-    $('#again').textContent = match.is_public ? 'Find another' : 'New code';
+    $('#again').textContent = match.ghost ? 'Find a player' : match.is_public ? 'Find another' : 'New code';
     showOpponent(match);
     drawMine();
     input.disabled = false;
@@ -270,6 +362,10 @@
   // Reports the latest score; one request at a time, and the newest score goes next.
   // A failed final report is retried until the match is decided.
   async function send(done) {
+    if (match?.ghost) {  // a ghost race keeps its own score
+      Object.assign(match, { p1_score: score, p1_ms: lastMs, p1_done: done && score >= match.goal });
+      return;
+    }
     if (sending) { queued = true; return; }
     sending = true;
     const id = match.id;
@@ -317,7 +413,7 @@
     standings(m);
     rematchOffer = null;
     showRematch(m);
-    openChat(m);
+    if (!m.ghost) openChat(m);
     setTimeout(() => $('#again').focus(), 700);
   }
 
@@ -382,6 +478,11 @@
     const note = $('#rematch-note'), link = $('#rematch');
     note.replaceChildren();
     const theirs = old.rematch_code && old.rematch_by && old.rematch_by !== me && !rematchOffer;
+    if (old.ghost) {
+      link.textContent = 'Race again';
+      link.hidden = false;
+      return;
+    }
     if (rematchOffer) {
       link.textContent = 'Cancel rematch';
       note.append(`Rematch offered. Waiting for ${them(old)}…`);
@@ -408,6 +509,7 @@
     e.preventDefault();
     const old = match;
     if (!old) return;
+    if (old.ghost) { finished = false; playing = false; $('#game').style.display = 'none'; $('#settings').style.display = 'block'; return raceGhost(ghostLog); }
     const note = $('#rematch-note');
     try {
       if (rematchOffer) {
@@ -502,7 +604,8 @@
     e.preventDefault();
     const m = match;
     backToLobby();
-    if (m?.is_public) {  // the same kind of search again
+    if (m?.ghost) queue();
+    else if (m?.is_public) {  // the same kind of search again
       document.querySelector(`input[name=queue][value="${m.ranked ? 'ranked' : 'unranked'}"]`)?.click();
       if (!m.ranked) document.querySelector(`input[name=game][value="${m.game}"]`)?.click();
       queue();

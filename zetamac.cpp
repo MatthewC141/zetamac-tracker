@@ -45,6 +45,7 @@ using Clock = std::chrono::steady_clock;
 // Duration:        120 seconds; a correct answer is accepted as soon as it's typed.
 constexpr int kDuration = 120;
 constexpr int kO80Seconds = 480;  // the 80-in-8 test: 80 questions in 8 minutes
+constexpr int kTestSeconds = 240;  // the other quant tests: sequences, fractions, estimation
 constexpr int kAddLo = 2, kAddHi = 100;
 constexpr int kMulLeftLo = 2, kMulLeftHi = 12;
 constexpr int kMulRightLo = 2, kMulRightHi = 100;
@@ -134,9 +135,21 @@ struct Entry {
 // Game modes the tracker accepts. Squares: 1–99 or 100–999, "h" = hard (no numbers ending in 5,
 // and no 1–20 in the 1–99 range). Practice drills: subtraction with / without borrowing, and
 // "guided" (the arithmetic game with guided mode on, kept apart from real scores), and "mixed"
-// (combined operations, like (5 + 2) × (15 + 9)), and "o80" (the Optiver 80-in-8 test).
-static const std::set<std::string> kModes = {"standard", "sq99",     "sq99h",  "sq999", "sq999h",
-                                             "sub-borrow", "sub-easy", "guided", "mixed", "o80"};
+// (combined operations, like (5 + 2) × (15 + 9)), the quant tests ("o80", the Optiver 80-in-8
+// test, and "seq", "frac" and "est"), "daily" (the daily challenge: arithmetic, everyone's same
+// questions for the day) and "drill" (practice on your weak spots).
+static const std::set<std::string> kModes = {"standard", "daily", "sq99", "sq99h", "sq999", "sq999h", "sub-borrow",
+                                             "sub-easy", "drill", "guided", "mixed", "o80", "seq", "frac", "est"};
+
+// A quant test's fixed length and question count (its highest score); {0, 0} for other games.
+struct TestLength { int seconds, count; };
+static TestLength test_length(const std::string& mode) {
+  if (mode == "o80") return {kO80Seconds, 80};
+  if (mode == "seq") return {kTestSeconds, 30};
+  if (mode == "frac") return {kTestSeconds, 60};
+  if (mode == "est") return {kTestSeconds, 40};
+  return {0, 0};
+}
 
 static const char* kHeader = "timestamp,date,score,seconds,source,mode,elapsed";
 
@@ -175,7 +188,7 @@ static std::vector<Entry> load_scores() {
     // Hand-edited rows outside what the tracker ever writes are skipped (huge values would
     // overflow the stats maths).
     if (e.score < 0 || e.score > 999999 || e.elapsed < 0 || e.elapsed > 999999 ||
-        (e.seconds != 0 && e.seconds != 30 && e.seconds != kDuration && e.seconds != kO80Seconds))
+        (e.seconds != 0 && e.seconds != 30 && e.seconds != kDuration && e.seconds != kO80Seconds && e.seconds != kTestSeconds))
       continue;
     if (e.source.empty()) e.source = "manual";
     if (e.mode.empty()) e.mode = "standard";  // rows from before modes existed
@@ -614,18 +627,23 @@ static void respond_error(int fd, const std::string& status, const std::string& 
   respond(fd, status, "application/json", "{\"error\":\"" + json_escape(msg) + "\"}");
 }
 
-// Game length for a posted score: 120 (the default) or 30 seconds, or 480 for the 80-in-8 test.
+// Game length for a posted score: 120 (the default) or 30 seconds, or a quant test's length.
 // Returns 0 if invalid (see length_fits for which lengths go with which game).
 static int parse_seconds(const std::map<std::string, std::string>& form) {
   auto it = form.find("seconds");
   if (it == form.end() || it->second.empty() || it->second == "120") return 120;
   if (it->second == "480") return kO80Seconds;
+  if (it->second == "240") return kTestSeconds;
   return it->second == "30" ? 30 : 0;
 }
 
-// The 80-in-8 test is always 8 minutes (and scores at most 80); nothing else is.
+// Each quant test has its own length and highest score, and no other game uses those lengths.
+// The daily challenge is always 2 minutes.
 static bool length_fits(const std::string& mode, int seconds, int score) {
-  return mode == "o80" ? seconds == kO80Seconds && score <= 80 : seconds != kO80Seconds;
+  TestLength t = test_length(mode);
+  if (t.seconds) return seconds == t.seconds && score <= t.count;
+  if (mode == "daily") return seconds == kDuration;
+  return seconds != kO80Seconds && seconds != kTestSeconds;
 }
 
 // Game mode for a posted score: "standard" unless a known squares mode is given. Empty if invalid.
@@ -701,15 +719,20 @@ static void handle_client(int fd) {
       {"/duel", "duel.html"},       {"/duel.html", "duel.html"},        {"/duel.js", "duel.js"},
       {"/problems.js", "problems.js"}, {"/matches.js", "matches.js"}, {"/duel-history.js", "duel-history.js"},
       {"/optiver", "optiver.html"}, {"/optiver.html", "optiver.html"}, {"/optiver.js", "optiver.js"},
+      {"/profile", "profile.html"}, {"/profile.html", "profile.html"}, {"/profile.js", "profile.js"},
+      {"/sw.js", "sw.js"},          {"/manifest.webmanifest", "manifest.webmanifest"},
+      {"/icons/icon-192.png", "icons/icon-192.png"}, {"/icons/icon-512.png", "icons/icon-512.png"},
+      {"/icons/icon-maskable-512.png", "icons/icon-maskable-512.png"}, {"/icons/apple-touch-icon.png", "icons/apple-touch-icon.png"},
       {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);
-    std::ifstream f(g_home / page);
+    std::ifstream f(g_home / page, std::ios::binary);
     if (!f) return respond_error(fd, "500 Internal Server Error", page + " not found next to zetamac");
     std::stringstream ss;
     ss << f.rdbuf();
     const std::string ext = page.substr(page.rfind('.'));
-    const char* type = ext == ".js" ? "text/javascript; charset=utf-8" : ext == ".css" ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
+    const char* type = ext == ".js" ? "text/javascript; charset=utf-8" : ext == ".css" ? "text/css; charset=utf-8"
+                     : ext == ".png" ? "image/png" : ext == ".webmanifest" ? "application/manifest+json" : "text/html; charset=utf-8";
     return respond(fd, "200 OK", type, ss.str());
   }
   if (method == "GET" && path.rfind("/fonts/", 0) == 0) {  // self-hosted webfonts for the dashboard
@@ -769,9 +792,15 @@ static void handle_client(int fd) {
       std::string mode = parse_mode(form);
       if (mode.empty()) return respond_error(fd, "400 Bad Request", "Unknown game mode.");
       if (!endless && !length_fits(mode, seconds, score)) return respond_error(fd, "400 Bad Request", "That game length doesn't fit that game.");
-      if (endless && mode == "o80") return respond_error(fd, "400 Bad Request", "The 80-in-8 test has no endless version.");
-      // The 80-in-8 test keeps how long it took too (its leaderboard tie-break), up to its 8 minutes.
-      if (mode == "o80" && (!parse_int(form["elapsed"], elapsed) || elapsed > kO80Seconds)) elapsed = 0;
+      if (endless && (test_length(mode).seconds || mode == "daily"))
+        return respond_error(fd, "400 Bad Request", "That game has no endless version.");
+      // A quant test keeps how long it took too (its leaderboard tie-break), up to its length.
+      if (test_length(mode).seconds && (!parse_int(form["elapsed"], elapsed) || elapsed > seconds)) elapsed = 0;
+      // The daily challenge is played once a day.
+      if (mode == "daily")
+        for (const Entry& x : load_scores())
+          if (x.mode == "daily" && x.date == today())
+            return respond_error(fd, "400 Bad Request", "You’ve already played today’s challenge.");
       Entry e = make_entry(score, today(), "game", seconds, mode);
       e.elapsed = elapsed;
       if (!append_score(e))

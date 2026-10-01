@@ -152,6 +152,16 @@ function renderGuide() {
 }
 
 function nextProblem() {
+  if (cfg.daily) {  // the day's list, the same for everyone
+    const p = cfg.daily[cfg.at++];
+    $('#question').textContent = p.q;
+    answer = String(p.a);
+    input.value = '';
+    prevLen = 0;
+    current = { q: p.q, a: p.a, o: p.o, c: 0, shownAt: performance.now() };
+    problem = null;
+    return;
+  }
   const { r, ops } = cfg;
   const op = ops[Math.floor(Math.random() * ops.length)];
   let q;
@@ -185,8 +195,7 @@ function tick() {
   if (left === 0) finish();
 }
 
-function start() {
-  const s = readSettings();
+function start(s = readSettings()) {
   if (s.error) { updateNote(); return; }
   cfg = s;
   score = 0;
@@ -205,6 +214,7 @@ function start() {
   endAt = startAt + cfg.duration * 1000;
   $('#clock-label').textContent = cfg.duration === 0 ? 'Time:' : 'Seconds left:';
   $('#stop').hidden = cfg.duration !== 0;
+  $('#again').hidden = !!cfg.daily;  // the daily challenge is one try
   tick();
   timer = setInterval(tick, 50);
 }
@@ -243,6 +253,12 @@ async function save(final, elapsed) {
     if (Array.isArray(data)) history = data;
     const mine = history[history.length - 1];  // the server appends, so the newest row is this game
     if (hidden) { saved.textContent = 'Saved · guided games are hidden from your tracker for now'; return; }
+    if (cfg.daily) {
+      saved.innerHTML = `Today’s challenge saved · ${daily.streak(history)}-day streak · <a href="leaderboard.html#daily">See today’s board</a>`;
+      if (mine?.detail && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
+      daily.render();
+      return;
+    }
     const label = cfg.duration === 30 ? '30-second ' : cfg.duration === 0 ? 'endless ' : '';
     const proj = cfg.duration === 30 ? ` · projects to ${final * 4} in 2 minutes` : '';
     if (cfg.duration === 0 && final > prevBest) {
@@ -254,7 +270,7 @@ async function save(final, elapsed) {
     } else {
       saved.textContent = `Saved · ${label}personal best ${Math.max(prevBest, final)}${proj}`;
     }
-    if (mine && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
+    if (mine?.detail && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
   } catch {
     saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
     $('#retry').onclick = e => { e.preventDefault(); save(final, elapsed); };
@@ -278,7 +294,7 @@ function finish() {
   setTimeout(() => $('#again').focus(), 700);
 }
 
-$('#start').addEventListener('click', start);
+$('#start').addEventListener('click', () => start());
 $('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && running && cfg.duration === 0) finish();
@@ -291,5 +307,56 @@ $('#change').addEventListener('click', e => {
   $('#start').focus();
 });
 
-fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; }).catch(() => {});
+// ---- the daily challenge ----
+// Everyone gets the same 2 minutes of zetamac arithmetic each calendar day (problems.js builds it
+// from the date), and only the first try counts. The card on the start screen offers it, or says
+// how it went: the score, the place on today's board (signed in), and the streak of days played.
+const daily = (() => {
+  const pad = n => String(n).padStart(2, '0');
+  const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const today = () => dayKey(new Date());
+  const mineToday = list => list.find(g => g.mode === 'daily' && g.date === today());
+  // Days in a row with a daily challenge, up to today (or yesterday, if today's is still to play).
+  function streak(list) {
+    const days = new Set(list.filter(g => g.mode === 'daily').map(g => g.date));
+    const d = new Date();
+    if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    let n = 0;
+    while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  const card = $('#daily'), text = $('#daily-text'), acts = $('#daily-acts');
+  const ordinal = n => { const v = n % 100; return n + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); };
+  async function render() {
+    if (!window.ZM_PROBLEMS) return;
+    card.hidden = false;
+    const done = mineToday(history), n = streak(history);
+    $('#daily-streak').textContent = n ? `${n}-day streak` : '';
+    if (!done) {
+      text.textContent = 'Today’s 2 minutes of arithmetic: the same questions for everyone, one try.';
+      acts.innerHTML = '<button type="button" id="daily-go">Play today’s</button><a class="btn" href="leaderboard.html#daily">Today’s board</a>';
+      $('#daily-go').addEventListener('click', play);
+      return;
+    }
+    text.innerHTML = `Today: <b>${done.score}</b> · back tomorrow for a new set`;
+    acts.innerHTML = '<a class="btn" href="leaderboard.html#daily">Today’s board</a>';
+    const cloud = window.ZM_CLOUD;
+    if (!window.ZM_WEB || !cloud?.ready || !cloud.user()) return;
+    try {
+      const board = await cloud.daily(today()), me = cloud.user().name.toLowerCase();
+      const at = board.findIndex(r => r.username.toLowerCase() === me);
+      // Tied scores share a place.
+      if (at >= 0) text.innerHTML = `Today: <b>${done.score}</b> · ${ordinal(board.findIndex(r => r.score === board[at].score) + 1)} of ${board.length} · back tomorrow for a new set`;
+    } catch {}
+  }
+  function play() {
+    if (mineToday(history)) return render();
+    const date = today();
+    start({ ops: ['add', 'sub', 'mul', 'div'], r: { ...DEFAULTS }, duration: 120, tracked: true, guided: false, mode: 'daily',
+            daily: window.ZM_PROBLEMS.list('daily', window.ZM_PROBLEMS.daySeed(date), 500), at: 0 });
+  }
+  return { render, streak };
+})();
+
+fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; daily.render(); }).catch(() => daily.render());
 $('#start').focus();

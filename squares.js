@@ -117,7 +117,7 @@ async function save(final, elapsed) {
     } else {
       saved.textContent = `Saved · personal best ${Math.max(prevBest, final)} · ${label}`;
     }
-    if (mine && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
+    if (mine?.detail && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
   } catch {
     saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
     $('#retry').onclick = e => { e.preventDefault(); save(final, elapsed); };

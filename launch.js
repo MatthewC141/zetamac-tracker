@@ -21,7 +21,8 @@
       const out = !!input && !input.checked;
       row.classList.toggle('off', out);
       const cell = row.querySelector('.lt-pos');
-      if (cell) cell.textContent = out || row.classList.contains('mod') ? '' : ++pos;  // modifiers aren't in the order
+      // Switch rows (operations) are numbered as a running order; a pick list is one choice, so no numbers.
+      if (cell) cell.textContent = out || row.classList.contains('mod') || input?.type === 'radio' ? '' : ++pos;
     });
   };
   rows.forEach(row => row.addEventListener('click', e => {
@@ -94,6 +95,58 @@
     }, 90 * lights.length + 160);
   }, true);
 })();
+
+// Pace ghost (off unless switched on, under the length): during a 2:00 or 0:30 game, the score your
+// best game of the same kind and length had at the same second, beside the clock. It follows the
+// game from outside: a game starts when its answer row shows, and stops when its end screen does.
+// (This file loads above the game screen and the game's own script, so this waits for the page.)
+document.addEventListener('DOMContentLoaded', () => {
+  const seg = document.querySelector('#settings .lt-seg:has(input[name=len])');
+  const play = document.querySelector('#play'), game = document.querySelector('#game');
+  if (!seg || !play || !game || typeof window.readSettings !== 'function') return;
+  let on = false;
+  try { on = localStorage.getItem('zm-pace') === '1'; } catch {}
+  seg.insertAdjacentHTML('afterend', '<label class="lt-opt"><input type="checkbox" class="switch" id="pace-on"><span><b>Pace ghost</b><small>Your best game’s score at the same second, beside the clock</small></span></label>');
+  const box = document.querySelector('#pace-on');
+  box.checked = on;
+  box.addEventListener('change', () => { on = box.checked; try { localStorage.setItem('zm-pace', on ? '1' : '0'); } catch {} });
+
+  let curve = null, startedAt = 0, timer = 0;
+  const label = document.createElement('span');
+  label.id = 'pace-ghost';
+  label.style.cssText = 'color:#555;font-variant-numeric:tabular-nums';
+  label.hidden = true;
+  document.querySelector('#game .bar > span')?.after(label);
+  // The best game's answer times as running totals (ms): the ghost's score at t is how many are ≤ t.
+  async function load() {
+    curve = null;
+    const cfg = window.readSettings?.();
+    if (!cfg || cfg.error || !cfg.tracked || ![120, 30].includes(cfg.duration)) return;
+    const games = await (await fetch('api/scores')).json();
+    const best = games.filter(g => g.mode === cfg.mode && g.seconds === cfg.duration && g.detail).sort((a, b) => b.score - a.score)[0];
+    if (!best) return;
+    const qs = (await (await fetch(`api/detail?ts=${encodeURIComponent(best.ts)}`)).json()).questions || [];
+    let sum = 0;
+    curve = qs.map(q => (sum += Number(q.t) || 0));
+  }
+  const show = () => {
+    const ms = performance.now() - startedAt;
+    label.textContent = `Best pace ${curve.filter(t => t <= ms).length}`;
+  };
+  // Playing: the game screen shows with its answer row (the end screen hides the row).
+  new MutationObserver(async () => {
+    const playing = game.style.display === 'block' && play.style.display !== 'none';
+    if (playing && !timer && on) {
+      startedAt = performance.now();
+      timer = setInterval(() => curve && show(), 100);
+      label.hidden = true;
+      await load().catch(() => {});
+      if (curve && timer) { label.hidden = false; show(); }
+    } else if (!playing && timer) {
+      clearInterval(timer); timer = 0;
+    }
+  }).observe(game, { attributes: true, attributeFilter: ['style'], subtree: true });
+});
 
 // Fullscreen keeps the game where it was on the screen. Two things move the page's top edge:
 // hiding the tabs and toolbar in fullscreen (the page gets taller at the top by their height),

@@ -5,7 +5,7 @@ window.ZM_MATCHES = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const GAMES = { standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
-  const COLS = 'id,created_at,is_public,ranked,rule,game,goal,seconds,p1,p2,p1_name,p2_name,winner,p1_score,p2_score,p1_ms,p2_ms,p1_done,p2_done,p1_delta,p2_delta';
+  const COLS = 'id,created_at,is_public,ranked,rule,game,goal,seconds,p1,p2,p1_name,p2_name,winner,p1_score,p2_score,p1_ms,p2_ms,p1_done,p2_done,p1_elo,p2_elo,p1_delta,p2_delta';
 
   // Every finished match, newest first, from your side: { won, lost, draw, you, them, ... }.
   async function load() {
@@ -19,6 +19,7 @@ window.ZM_MATCHES = (() => {
         out.push({
           id: m.id, at: new Date(m.created_at), game: m.game, rule: m.rule, goal: m.goal, isPublic: m.is_public,
           ranked: !!m.ranked, delta: Number.isInteger(m[`p${seat}_delta`]) ? m[`p${seat}_delta`] : null,
+          elo: Number.isInteger(m[`p${seat}_elo`]) ? m[`p${seat}_elo`] : null,  // ranked: your rating going in
           them: m[`p${o}_name`] || 'Deleted player',
           result: m.winner === 0 ? 'draw' : m.winner === seat ? 'won' : 'lost',
           you: m[`p${seat}_score`], theirs: m[`p${o}_score`],
@@ -65,11 +66,14 @@ window.ZM_MATCHES = (() => {
     const i = RANKS.findIndex(([min]) => elo >= min);
     return { name: RANKS[i][1], tier: RANKS[i][2], next: i > 0 ? RANKS[i - 1][0] : null };
   }
-  // Your own rating (the database only lets you read your own); a new player is 1000 with no games.
+  // Your own rating this season (the database only lets you read your own, and rolls it into a new
+  // season first), with your past seasons: { elo, games, wins, …, season, seasons: [{ season, peak }] }.
+  // A new player is 1000 with no games.
   async function mine() {
-    const rows = await cloud.rest(`ratings?select=elo,games,wins,losses,draws,peak&user_id=eq.${encodeURIComponent(cloud.user()?.id || '')}`);
-    return rows[0] || { elo: 1000, games: 0, wins: 0, losses: 0, draws: 0, peak: 1000 };
+    const r = await cloud.rest('rpc/mm_me', { method: 'POST', body: {} });
+    return { elo: 1000, games: 0, wins: 0, losses: 0, draws: 0, peak: 1000, ...(r?.rating || {}), season: r?.season || '', seasons: r?.seasons || [] };
   }
+  const seasonName = s => String(s || '').replace('-', ' ');  // "2026-Q4" → "2026 Q4"
 
-  return { load, record, row, GAMES, rank, mine, PLACEMENT };
+  return { load, record, row, GAMES, rank, mine, PLACEMENT, RANKS, seasonName };
 })();

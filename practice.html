@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="launch.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Practice</title>
 <style>
   /* Same look as play.html (the zetamac clone). Untimed by default. */
@@ -68,22 +71,28 @@
 <div id="settings" class="lt">
   <header class="lt-strip">
     <h1 class="lt-brand"><a class="home" href="./" title="Your progress">Zetamac<span>Practice</span></a></h1>
+    <a class="lt-progress lt-board" href="leaderboard.html">Leaderboard</a>
     <a class="lt-progress lt-guide" href="guide.html">Guide</a>
-    <a class="lt-progress" href="./">View progress</a>
+    <a class="lt-progress" href="./">Progress</a>
     <nav class="lt-tabs" aria-label="Games">
       <a href="play.html">Arithmetic</a>
       <a href="squares.html">Squares</a>
       <a href="mixed.html">Combined</a>
       <a href="practice.html" aria-current="page">Practice</a>
-      <a href="optiver.html">80 in 8</a>
+      <a href="optiver.html">Tests</a>
       <a href="duel.html">Duel</a>
     </nav>
   </header>
 
   <div class="lt-grid">
     <section class="lt-panel" aria-labelledby="ops-title">
-      <div class="lt-head"><h2 id="ops-title">Drill</h2><span class="sub">zetamac’s subtraction range</span></div>
+      <div class="lt-head"><h2 id="ops-title">Drill</h2><span class="sub">one kind of problem at a time</span></div>
       <ol class="lt-tower">
+        <li class="lt-row team-guide" id="drill-row">
+          <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">You</span>
+          <span class="lt-body"><span class="lt-name">Your weak spots</span><span class="lt-detail" id="drill-detail">Reading your games…</span></span>
+          <input type="radio" class="pick" name="drill" value="drill" aria-label="Your weak spots">
+        </li>
         <li class="lt-row team-sub">
           <span class="lt-pos"></span><span class="lt-stripe"></span><span class="lt-code">Brw</span>
           <span class="lt-body"><span class="lt-name">Subtraction with borrowing</span><span class="lt-detail">The ones digit being subtracted is bigger, like 62&#8288;&nbsp;–&nbsp;&#8288;17.</span></span>
@@ -98,7 +107,7 @@
     </section>
 
     <section class="lt-panel" aria-labelledby="len-title">
-      <p class="lt-lede">Drill one kind of problem at a time. Problems come from zetamac’s subtraction range (addition problems in reverse), filtered to the drill you pick. Every run saves to your tracker.</p>
+      <p class="lt-lede" id="lede">Drill one kind of problem at a time. Every run saves to your tracker.</p>
       <div class="lt-head"><h2 id="len-title">Length</h2><span class="sub lt-best" id="lt-best"></span></div>
       <div class="lt-seg" role="radiogroup" aria-labelledby="len-title">
         <label><input type="radio" name="len" value="30"><b>0:30</b><small>30 seconds</small></label>
@@ -133,6 +142,7 @@
   </div>
 </div>
 
+<script src="problems.js"></script>
 <script src="practice.js"></script>
 </body>
 </html>

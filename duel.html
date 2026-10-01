@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="launch.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Duel</title>
 <style>
   /* The match itself keeps zetamac's white look, like the other games. */
@@ -87,6 +90,30 @@
   .by small { color: var(--lt-muted); font-size: 13px; margin-left: 8px; }
   @media (max-width: 860px) { .lt-grid.mh-grid { grid-template-columns: 1fr; } .mh-side { order: -1; } }
   .d-record b { color: var(--lt-ink); font-weight: 700; }
+  /* challenges you've been sent, at the top of the lobby */
+  .d-invites { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+  .d-invites li { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px; background: var(--lt-bg); border: 1px solid var(--lt-purple); border-radius: 3px; --team: var(--lt-purple); }
+  .d-invites .lt-stripe { height: 34px; }
+  .d-invites b { display: block; font: 700 17px/1.2 var(--lt-figure); }
+  .d-invites small { display: block; color: var(--lt-muted); font-size: 13px; margin-top: 2px; }
+  .d-invites .acts { display: flex; gap: 6px; }
+  .d-challenge input { letter-spacing: 0; text-transform: none; font: 600 16px/1 var(--lt-figure); }
+  .d-challenge input::placeholder { letter-spacing: 0; }
+  /* racing a ghost while the queue is empty */
+  .d-ghost { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--lt-grid); }
+  .d-ghost h3 { margin: 0 0 6px; font: 700 13px/1.2 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; }
+  /* the rating graph and past seasons (match history) */
+  .mh-rating { margin-bottom: 22px; }
+  .d-graph { display: block; width: 100%; height: 170px; }
+  .d-graph text { fill: var(--lt-muted); font: 500 11px var(--lt-figure); }
+  .d-graph .band { stroke: var(--lt-grid); }
+  .d-graph .line { fill: none; stroke: var(--lt-ink); stroke-width: 2; stroke-linejoin: round; }
+  .d-graph .pt { fill: var(--lt-ink); }
+  .d-graph .peak { fill: var(--lt-purple); }
+  .d-seasons { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .d-seasons li { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 8px; border: 1px solid var(--lt-line); border-radius: 3px; font-size: 13px; color: var(--lt-muted); }
+  .d-seasons li::before { content: ""; width: 3px; height: 14px; border-radius: 1px; background: var(--team); }
+  .d-seasons b { color: var(--lt-ink); font-weight: 600; }
 
   /* waiting and match-found states take over the right panel */
   .d-state h2 { font: 700 13px/1.2 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; }
@@ -198,14 +225,15 @@
 <div id="settings" class="lt">
   <header class="lt-strip">
     <h1 class="lt-brand"><a class="home" href="./" title="Your progress">Zetamac<span>Duel</span></a></h1>
+    <a class="lt-progress lt-board" href="leaderboard.html">Leaderboard</a>
     <a class="lt-progress lt-guide" href="guide.html">Guide</a>
-    <a class="lt-progress" href="./">View progress</a>
+    <a class="lt-progress" href="./">Progress</a>
     <nav class="lt-tabs" aria-label="Games">
       <a href="play.html">Arithmetic</a>
       <a href="squares.html">Squares</a>
       <a href="mixed.html">Combined</a>
       <a href="practice.html">Practice</a>
-      <a href="optiver.html">80 in 8</a>
+      <a href="optiver.html">Tests</a>
       <a href="duel.html" aria-current="page">Duel</a>
     </nav>
   </header>
@@ -253,6 +281,8 @@
 
       <!-- Lobby. -->
       <div id="st-lobby" hidden>
+        <!-- Challenges sent to you by name. -->
+        <ol class="d-invites" id="invites" aria-live="polite" hidden></ol>
         <p class="lt-lede">Same questions, same clock. Whoever’s faster wins.</p>
         <div class="d-block">
           <div class="lt-head"><h2>Find an opponent</h2><span class="d-record" id="record"></span></div>
@@ -280,6 +310,11 @@
             <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Friend’s code">
             <button class="d-btn" type="submit" id="join">Join</button>
           </form>
+          <form class="d-join d-challenge" id="challenge-form">
+            <label class="sr" for="rival">Player’s name</label>
+            <input id="rival" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Challenge by name">
+            <button class="d-btn" type="submit" id="challenge">Challenge</button>
+          </form>
         </div>
         <p class="d-msg" id="msg" role="status"></p>
       </div>
@@ -291,6 +326,13 @@
         <p class="d-sub" id="q-sub"></p>
         <div class="d-scan" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
         <div class="d-row"><button class="d-btn quiet grow" type="button" data-cancel>Cancel</button></div>
+        <!-- After a while with nobody: race a ghost (a real saved game) instead. -->
+        <div class="d-ghost" id="ghost-offer" hidden>
+          <h3>Nobody yet. Race a ghost?</h3>
+          <p class="d-sub">A real saved game replayed answer by answer: same questions, same race to 25. It doesn’t count for your record.</p>
+          <div class="d-row"><button class="d-btn grow" type="button" data-ghost="mine">Your best game</button><button class="d-btn grow" type="button" data-ghost="other">Near your rating</button></div>
+          <p class="d-msg" id="ghost-msg" role="status"></p>
+        </div>
       </div>
 
       <!-- Waiting for a friend with a code. -->
@@ -336,6 +378,11 @@
       <button class="mh-more" type="button" id="more" hidden>Show more</button>
     </section>
     <section class="lt-panel mh-side" aria-labelledby="rec-title">
+      <div class="mh-rating" id="rating-box" hidden>
+        <div class="lt-head"><h2 id="rating-title">Rating</h2><span class="sub" id="rating-sub"></span></div>
+        <svg class="d-graph" id="rating-graph" role="img"></svg>
+        <ul class="d-seasons" id="seasons" aria-label="Past seasons"></ul>
+      </div>
       <div class="lt-head"><h2 id="rec-title">Record</h2></div>
       <div class="rec"><div class="w"><b id="rec-w">0</b><span>Won</span></div><div class="l"><b id="rec-l">0</b><span>Lost</span></div><div class="d"><b id="rec-d">0</b><span>Drawn</span></div></div>
       <p class="rate" id="rate"></p>

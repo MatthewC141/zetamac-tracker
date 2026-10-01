@@ -10,16 +10,19 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 let allGames = [], games = [], sprints = [], endless = [];  // everything / chosen game at 120 s / chosen game at 30 s / endless runs
 // sq99h and sq999h are the squares games; sq99 and sq999 are older games from when every number could come up.
 const SQ_MODES = { sq99h: 'Two-digit squares', sq999h: 'Three-digit squares', sq99: 'Two-digit squares, all numbers', sq999: 'Three-digit squares, all numbers' };
-const PRACTICE_MODES = { 'sub-borrow': 'Subtraction with borrowing', 'sub-easy': 'Subtraction without borrowing' };
-const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borrow practice' };
+const PRACTICE_MODES = { 'sub-borrow': 'Subtraction with borrowing', 'sub-easy': 'Subtraction without borrowing', drill: 'Weak-spot drill' };
+const PRACTICE_TAGS = { 'sub-borrow': 'Borrowing practice', 'sub-easy': 'No-borrow practice', drill: 'Weak-spot drill' };
+// The quant tests: each a fixed length, marked right minus wrong.
+const TESTS = { o80: ['80 in 8', 480], seq: ['Sequences', 240], frac: ['Fractions', 240], est: ['Estimation', 240] };
+const isTest = m => has(TESTS, m);
 // Games that are saved but not shown anywhere on the dashboard (yet).
 const HIDDEN_MODES = new Set(['guided']);
 // Table lookups by own key only, so a stray name like "toString" never matches a mode.
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
-const modeName = m => has(SQ_MODES, m) ? SQ_MODES[m] : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : m === 'o80' ? '80 in 8' : 'Arithmetic';
-// The length that counts as a full game: 8 minutes for the 80-in-8 test, 2 minutes for everything else.
-const mainSeconds = m => (m === 'o80' ? 480 : 120);
-const mainLabel = m => (m === 'o80' ? '80-in-8 test' : '2-minute game');
+const modeName = m => has(SQ_MODES, m) ? SQ_MODES[m] : has(PRACTICE_MODES, m) ? PRACTICE_MODES[m] : m === 'mixed' ? 'Combined operations' : isTest(m) ? TESTS[m][0] : 'Arithmetic';
+// The length that counts as a full game: a quant test's own length, 2 minutes for everything else.
+const mainSeconds = m => (isTest(m) ? TESTS[m][1] : 120);
+const mainLabel = m => (isTest(m) ? `${TESTS[m][0]} test` : '2-minute game');
 // The game the stat tiles and score chart show (a mode key, e.g. 'standard' or 'sq99h').
 let chartGame = 'standard';
 try { chartGame = localStorage.getItem('zm-chart-game') || chartGame; } catch {}
@@ -220,11 +223,11 @@ const TARGET = 80;
 
 function renderChart() {
   $('#legend [data-series="target"]').hidden = chartGame !== 'standard';
-  // The 80-in-8 test has one length (8 minutes), so its legend names that and drops the 30-second line.
-  const o80 = chartGame === 'o80';
-  $('#legend [data-series="best"]').textContent = o80 ? '80-in-8 daily best' : '2-minute daily best';
-  $('#legend [data-series="games"]').textContent = o80 ? 'Individual 80-in-8 tests' : 'Individual 2-minute games';
-  $('#legend [data-series="proj"]').hidden = o80;
+  // A quant test has one length, so its legend names the test and drops the 30-second line.
+  const test = isTest(chartGame) ? TESTS[chartGame][0] : null;
+  $('#legend [data-series="best"]').textContent = test ? `${test} daily best` : '2-minute daily best';
+  $('#legend [data-series="games"]').textContent = test ? `Individual ${test} tests` : 'Individual 2-minute games';
+  $('#legend [data-series="proj"]').hidden = !!test;
   document.querySelectorAll('.tabs button[data-range]').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === range));
   $('#chart-title').innerHTML = `${esc(modeName(chartGame))} <span class="h-note">${RANGE_NAMES[range]}</span>`;
   const from = startOf();
@@ -334,7 +337,7 @@ function renderHeatmap() {
   const cuts = yearBests.length ? [q(0.25), q(0.5), q(0.75)] : [];
   const level = v => 1 + cuts.filter(c => v > c).length;
   // What was played each day, for the hover card: games by kind, and the day's arithmetic best.
-  const kind = g => g.seconds === 0 ? 'endless' : g.mode === 'o80' ? '80 in 8' : (g.mode || 'standard') === 'standard' ? 'arithmetic'
+  const kind = g => g.seconds === 0 ? 'endless' : isTest(g.mode) ? TESTS[g.mode][0].toLowerCase() : (g.mode || 'standard') === 'standard' ? 'arithmetic'
     : has(SQ_MODES, g.mode) ? 'squares' : has(PRACTICE_MODES, g.mode) ? 'practice' : g.mode === 'mixed' ? 'combined' : null;
   const perDay = new Map();
   for (const g of allGames) {
@@ -386,7 +389,7 @@ function renderHeatmap() {
   const show = rect => {
     const cell = heatDays[Number(rect.dataset.i)];
     if (!cell || !rect.isConnected) return hide();
-    const day = cell.day, order = ['arithmetic', 'squares', 'combined', 'practice', '80 in 8', 'endless'];
+    const day = cell.day, order = ['arithmetic', 'squares', 'combined', 'practice', '80 in 8', 'sequences', 'fractions', 'estimation', 'endless'];
     // Arithmetic shows its real best: the 2-minute one, or the 0:30 one if that's all there was.
     const best = day.best[120] != null ? `, best ${day.best[120]}` : day.best[30] != null ? `, best ${day.best[30]} in 0:30` : '';
     const lines = order.filter(k => day.kinds.has(k)).map(k => `<span>${day.kinds.get(k)} ${k}${k === 'arithmetic' ? best : ''}</span>`).join('');
@@ -416,7 +419,7 @@ function renderRecent() {
   const best = {};
   [...sorted].reverse().forEach(g => {
     const k = `${g.mode || 'standard'}/${g.seconds}`;
-    if (g.score > (best[k] ?? -1)) { best[k] = g.score; pbs.add(g.i); }
+    if (g.score > (best[k] ?? 0)) { best[k] = g.score; pbs.add(g.i); }  // a 0 is never a personal best
   });
   const f = recentFilter;
   const shown = sorted
@@ -432,7 +435,7 @@ function renderRecent() {
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${g.mode === 'o80' ? '<span class="len o8">80 in 8</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${isTest(g.mode) ? `<span class="len o8">${TESTS[g.mode][0]}</span>` : ''}${g.daily ? '<span class="len dy">Daily</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -477,17 +480,8 @@ const O80_CODES = { add: 'ADD', sub: 'SUB', mul: 'MUL', div: 'DIV', dec: 'DEC', 
 const O80_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', dec: 'Decimals', pct: 'Percentages', mix: 'Brackets' };
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-// The kind of question inside an operation, read from its text: "54 + 87" → "+ carry".
-function factOf(q) {
-  const m = /^(\d+) (\+|–|×|÷) (\d+)$/.exec(q.q || '');
-  if (!m) return null;
-  const a = Number(m[1]), b = Number(m[3]);
-  if (q.o === 'add') return a % 10 + b % 10 >= 10 ? '+ carry' : '+ no carry';
-  if (q.o === 'sub') return b % 10 > a % 10 ? '– borrow' : '– no borrow';
-  if (q.o === 'mul') return `× ${a <= 12 ? a : b}`;
-  if (q.o === 'div') return `÷ ${b}`;
-  return null;
-}
+// The kind of question inside an operation, read from its text: "54 + 87" → "+ carry" (problems.js).
+const factOf = window.ZM_PROBLEMS.factOf;
 
 const avgBy = (list, keyOf) => {
   const m = {};
@@ -598,7 +592,7 @@ async function renderWeak() {
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    factsHTML(qs);
+    DRILL + factsHTML(qs);
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;
@@ -613,6 +607,9 @@ async function renderWeak() {
     }
   }
 }
+
+// A practice run made of these: Practice's "Your weak spots" drill.
+const DRILL = '<a class="drill-cta" href="practice.html#weak"><span><b>Drill these</b>Your slowest kinds of question, and the exact ones you were slow on or missed, until they’re quick</span></a>';
 
 // The 80-in-8 test's weak spots: each kind of question by seconds per answer (skips don't count),
 // with its accuracy beside it (right out of answered; under 85% is marked), then the most missed.
@@ -637,7 +634,7 @@ function renderWeakO80(el, qs, prevQs, cur, prev) {
       `<span class="gap acc${r.acc < 0.85 ? ' low' : ''}" title="Right, out of those answered">${pct(r.acc)}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per answer and accuracy · ${plural(total, 'answer')} from ${plural(cur.length, 'test')}${prev.length ? `, compared with the ${prev.length === 1 ? 'test' : plural(prev.length, 'test')} before` : ''} · skips left out</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : ''}</span></div>` +
-    `<div class="facts-head"><h3>Most missed</h3></div>` +
+    DRILL + `<div class="facts-head"><h3>Most missed</h3></div>` +
     (missed.length ? `<ol class="tower facts">${missed.map((r, i) => `<li class="op-${r.op}"><span class="pos">${i + 1}</span><span class="stripe"></span>` +
       `<span class="fact-name">${O80_NAMES[r.op]}</span><span class="track" aria-hidden="true"><i style="width:${((1 - r.acc) * 100).toFixed(1)}%"></i></span>` +
       `<span class="time">${pct(1 - r.acc)}<small> wrong</small></span><span class="gap">${acc[r.op].n} of ${acc[r.op].y + acc[r.op].n}</span></li>`).join('')}</ol>`
@@ -707,28 +704,33 @@ function renderScore() {
     `<ol class="laps">${recent.map(r => `<li class="${r.cls}" title="${longDate(parseDate(r.g.date))}">${r.g.score}<small>${esc(shortDate(parseDate(r.g.date)))}</small></li>`).join('')}</ol>`;
 }
 
-// The 80-in-8 test at the foot of the score panel: best and latest, with a link to its chart.
+// The quant tests at the foot of the score panel, one line each: best and latest, with a link to
+// the test's chart.
 function renderO80Line() {
-  const tests = allGames.filter(g => g.mode === 'o80' && g.seconds === 480).sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
   const el = $('#o80-line');
-  el.hidden = !tests.length;
-  if (!tests.length) return;
-  const best = Math.max(...tests.map(g => g.score)), last = tests[tests.length - 1];
-  el.innerHTML = `<span class="lbl">80 in 8</span><span><b>${best}</b>best</span>` +
-    `<span><b>${last.score}</b>last · ${esc(shortDate(parseDate(last.date)))}</span>` +
-    `<span>${plural(tests.length, 'test')}</span><a href="#" id="o80-chart">Chart</a>`;
+  const lines = Object.entries(TESTS).map(([mode, [name, secs]]) => {
+    const tests = allGames.filter(g => g.mode === mode && g.seconds === secs).sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+    if (!tests.length) return '';
+    const best = Math.max(...tests.map(g => g.score)), last = tests[tests.length - 1];
+    return `<span class="t-line"><span class="lbl t-${mode}">${name}</span><span><b>${best}</b>best</span>` +
+      `<span><b>${last.score}</b>last · ${esc(shortDate(parseDate(last.date)))}</span>` +
+      `<span>${plural(tests.length, 'test')}</span><a href="#" data-chart="${mode}">Chart</a></span>`;
+  }).join('');
+  el.hidden = !lines;
+  el.innerHTML = lines;
 }
 $('#o80-line').addEventListener('click', e => {
-  if (!e.target.closest('#o80-chart')) return;
+  const link = e.target.closest('[data-chart]');
+  if (!link) return;
   e.preventDefault();
   const pick = $('#chart-game');
-  pick.value = 'o80';
+  pick.value = link.dataset.chart;
   pick.dispatchEvent(new Event('change'));
   $('#chart').closest('.panel').scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
 });
 
 // ---------- per-question breakdown (expands under a recent game) ----------
-const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined', dec: 'Decimals', pct: 'Percentages' };
+const OP_NAMES = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division', sq: 'Squares', mix: 'Combined', dec: 'Decimals', pct: 'Percentages', seq: 'Sequences', frac: 'Fractions', est: 'Estimation' };
 const detailCache = new Map();
 const openGames = new Set();
 const secs = ms => (ms / 1000).toFixed(ms < 10000 ? 2 : 1);
@@ -797,7 +799,7 @@ function breakdownHTML(qs, sortSlow) {
     `<span>${plural(corrections, 'correction')}</span>` +
     (qs.some(q => q.r !== 'y') ? `<span>${qs.filter(q => q.r === 'y').length} right · ${qs.filter(q => q.r === 'n').length} wrong · ${qs.filter(q => q.r === 's').length} skipped</span>` : '') + `</div>` +
     `<svg class="bd-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Seconds per question, in order">${svg}</svg>` +
-    `<div class="bd-list-head"><span>Every question · red = over 2× your median, green = quick</span><button class="bd-sort" data-slow="${sortSlow ? 1 : 0}">${sortSlow ? 'Show in order' : 'Sort slowest first'}</button></div>` +
+    `<div class="bd-list-head"><span>Every question · red = over 2× your median, green = quick</span><span><button class="bd-replay" type="button">Replay</button> <button class="bd-sort" data-slow="${sortSlow ? 1 : 0}">${sortSlow ? 'Show in order' : 'Sort slowest first'}</button></span></div>` +
     `<div class="bd-list"><table><tbody>${list}</tbody></table></div>`;
 }
 
@@ -847,6 +849,8 @@ function setGames(list) {
   list = list.filter(g => g && whole(g.i) && whole(g.score) && whole(g.seconds) && whole(g.elapsed ?? 0) &&
     typeof g.ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(g.date) && typeof (g.mode ?? '') === 'string' && typeof (g.source ?? '') === 'string');
   list = list.filter(g => !HIDDEN_MODES.has(g.mode));  // each row keeps its server index `i`
+  // The daily challenge is a 2-minute arithmetic game like any other (tagged Daily in Results).
+  list = list.map(g => (g.mode === 'daily' ? { ...g, mode: 'standard', daily: true } : g));
   allGames = list;
   // games / sprints: the chosen game's 2-minute and 30-second scores, for the tiles and chart.
   const chosen = list.filter(g => (g.mode || 'standard') === chartGame);
@@ -939,6 +943,12 @@ $('#add').addEventListener('submit', async e => {
 });
 
 $('#recent').addEventListener('click', async e => {
+  const rp = e.target.closest('.bd-replay');
+  if (rp) {
+    const ts = rp.closest('tr.detail-row').previousElementSibling.dataset.ts;
+    const g = allGames.find(x => x.ts === ts);
+    return replay.open(await getDetail(ts), g);
+  }
   const sort = e.target.closest('.bd-sort');
   if (sort) return expandGame(sort.closest('tr.detail-row').previousElementSibling, sort.dataset.slow !== '1');
   const game = e.target.closest('tr.has-detail');
@@ -1179,6 +1189,93 @@ document.addEventListener('keydown', e => {
 });
 
 load().then(openFromHash);
+
+// ---------- replay: a saved game played back question by question ----------
+// Each question shows for as long as it took, and its answer appears as it was finished (the log
+// has each answer's time, not each keystroke). Long stalls are called out as they pass, and the
+// bar under the game is every question's time: click it to jump.
+const replay = (() => {
+  const dlg = $('#replay');
+  let qs = [], starts = [], total = 0, pos = 0, speed = 1, playing = false, last = 0, raf = 0, median = 0, game = null;
+  const W = 800, H = 90;
+  const at = ms => { let i = starts.findIndex((s, k) => ms < s + qs[k].t); return i < 0 ? qs.length - 1 : i; };
+  function drawLine() {
+    const top = Math.max(...qs.map(q => q.t), 1), bw = W / qs.length;
+    let h = '';
+    qs.forEach((q, i) => {
+      const y = H - 4 - (q.t / top) * (H - 10);
+      h += `<rect class="op-${esc(q.o)}" x="${i * bw + Math.min(1, bw * 0.15)}" y="${y}" width="${Math.max(0.6, bw - Math.min(2, bw * 0.3))}" height="${H - 4 - y}"></rect>`;
+    });
+    h += `<line class="gridline" x1="0" x2="${W}" y1="${H - 4}" y2="${H - 4}"/><line class="head" x1="0" x2="0" y1="0" y2="${H}"/>`;
+    $('#rp-line').setAttribute('viewBox', `0 0 ${W} ${H}`);
+    $('#rp-line').innerHTML = h;
+  }
+  function frame() {
+    const i = at(pos), q = qs[i], into = pos - starts[i], done = pos >= total;
+    // The answer goes in over the last part of the question's time (at most 0.4 s of it).
+    const typing = Math.min(400, q.t * 0.4), shown = done || into >= q.t ? 1 : Math.max(0, (into - (q.t - typing)) / typing);
+    const ans = String(q.a), typed = ans.slice(0, Math.round(ans.length * shown));
+    const scored = qs.slice(0, i + (done ? 1 : 0)).filter(x => x.r === 'y').length;
+    $('#rp-q').textContent = q.q;
+    $('#rp-typed').innerHTML = q.r === 'n' && shown >= 1 ? `<s>${esc(q.g)}</s>${esc(ans)}` : q.r === 's' && shown >= 1 ? '<span style="color:#555">skipped</span>' : esc(typed);
+    $('#rp-score').textContent = scored;
+    $('#rp-clock').textContent = clock(Math.floor(pos / 1000));
+    $('#rp-qn').textContent = `Question ${i + 1} of ${qs.length}`;
+    const slow = q.t >= median * 2 && q.t >= 1500;
+    $('#rp-note').innerHTML = slow && into > median ? `<b>Stall:</b> ${secs(q.t)} s on this one, ${round1(q.t / median)}× your median` : q.c ? `${plural(q.c, 'correction')} on this one` : '';
+    const x = (pos / total) * W;
+    const head = $('#rp-line .head');
+    head.setAttribute('x1', x); head.setAttribute('x2', x);
+    $('#rp-line').querySelectorAll('rect').forEach((r, k) => r.classList.toggle('past', k < i));
+    $('#rp-play').textContent = playing ? 'Pause' : done ? 'Again' : 'Play';
+  }
+  function loop(now) {
+    if (!playing) return;
+    pos = Math.min(total, pos + (now - last) * speed);
+    last = now;
+    if (pos >= total) playing = false;
+    frame();
+    if (playing) raf = requestAnimationFrame(loop);
+  }
+  const play = () => { if (pos >= total) pos = 0; playing = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); };
+  const pause = () => { playing = false; cancelAnimationFrame(raf); frame(); };
+  const seek = ms => { pos = Math.max(0, Math.min(total, ms)); if (playing) last = performance.now(); frame(); };
+  const step = d => seek(starts[Math.max(0, Math.min(qs.length - 1, at(pos) + d))]);
+  $('#rp-play').addEventListener('click', () => (playing ? pause() : play()));
+  $('#rp-prev').addEventListener('click', () => step(into() > 300 ? 0 : -1));
+  const into = () => pos - starts[at(pos)];
+  $('#rp-next').addEventListener('click', () => step(1));
+  $('#rp-close').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('close', pause);
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+  $('#rp-line').addEventListener('click', e => { const r = e.currentTarget.getBoundingClientRect(); seek(((e.clientX - r.left) / r.width) * total); });
+  $('#rp-speed').addEventListener('click', e => {
+    const b = e.target.closest('[data-speed]');
+    if (!b) return;
+    speed = Number(b.dataset.speed);
+    $('#rp-speed').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  });
+  dlg.addEventListener('keydown', e => {
+    if (e.key === ' ' && !e.target.closest('button')) { e.preventDefault(); playing ? pause() : play(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(into() > 300 ? 0 : -1); }
+  });
+  return {
+    open(list, g) {
+      if (!list.length) return;
+      qs = list; game = g; let sum = 0;
+      starts = qs.map(q => { const s = sum; sum += q.t; return s; });
+      total = sum; pos = 0; playing = false;
+      const sorted = qs.map(q => q.t).sort((a, b) => a - b);
+      median = sorted[Math.floor(sorted.length / 2)] || 1;
+      $('#rp-sub').textContent = game ? `${modeName(game.mode)} · ${longDate(parseDate(game.date))} · scored ${game.score}` : '';
+      drawLine();
+      frame();
+      dlg.showModal();
+      $('#rp-play').focus();
+    },
+  };
+})();
 
 // ---------- first-visit welcome (three steps; "How it works" reopens it) ----------
 (() => {

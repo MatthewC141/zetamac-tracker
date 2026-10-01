@@ -64,9 +64,9 @@ create table if not exists public.scores (
   ts text not null check (ts ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$'),
   date date not null,
   score int not null check (score between 0 and 999999),
-  seconds int not null check (seconds in (0, 30, 120, 480)),
+  seconds int not null,
   source text not null check (source in ('game', 'manual')),
-  mode text not null check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80')),
+  mode text not null,
   elapsed int not null default 0 check (elapsed between 0 and 999999),
   detail jsonb check (detail is null or (jsonb_typeof(detail) = 'array' and pg_column_size(detail) < 2000000)),
   has_detail boolean generated always as (detail is not null) stored,
@@ -79,15 +79,23 @@ alter table public.scores drop constraint if exists scores_ts_date;
 alter table public.scores add constraint scores_ts_date check (left(ts, 10) = date::text);
 alter table public.scores drop constraint if exists scores_timed_max;
 alter table public.scores add constraint scores_timed_max check (seconds = 0 or score <= 500);
+-- Games: zetamac arithmetic ('standard'), the daily challenge (arithmetic on everyone's same
+-- questions for the day), squares, practice drills ('sub-borrow', 'sub-easy', and 'drill' for
+-- your weak spots), combined operations, and the quant tests (marked right minus wrong).
 alter table public.scores drop constraint if exists scores_mode_check;
 alter table public.scores add constraint scores_mode_check
-  check (mode in ('standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80'));
--- Game lengths: endless (0), 30 s, 2 minutes, and 8 minutes for the 80-in-8 test only.
+  check (mode in ('standard', 'daily', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'drill', 'guided', 'mixed', 'o80', 'seq', 'frac', 'est'));
+-- Game lengths: endless (0), 30 s and 2 minutes; each quant test has its own fixed length and
+-- question count (80 in 8: 80 in 8:00; sequences 30, fractions 60 and estimation 40 in 4:00).
+-- The daily challenge is always 2 minutes.
 alter table public.scores drop constraint if exists scores_seconds_check;
-alter table public.scores add constraint scores_seconds_check
-  check (seconds in (0, 30, 120) or (seconds = 480 and mode = 'o80'));
+alter table public.scores add constraint scores_seconds_check check (case mode
+  when 'o80' then seconds = 480 when 'seq' then seconds = 240 when 'frac' then seconds = 240 when 'est' then seconds = 240
+  when 'daily' then seconds = 120 else seconds in (0, 30, 120) end);
 alter table public.scores drop constraint if exists scores_o80_length;
-alter table public.scores add constraint scores_o80_length check (mode <> 'o80' or (seconds = 480 and score <= 80));
+alter table public.scores drop constraint if exists scores_test_length;
+alter table public.scores add constraint scores_test_length check (score <= case mode
+  when 'o80' then 80 when 'seq' then 30 when 'frac' then 60 when 'est' then 40 else 999999 end);
 alter table public.scores drop constraint if exists scores_detail_len;
 alter table public.scores add constraint scores_detail_len check (detail is null or jsonb_array_length(detail) <= 5000);
 -- A question takes about 75 bytes in the log; 200 each leaves plenty of room. Measured before
@@ -99,6 +107,7 @@ alter table public.scores add constraint scores_detail_size
 create index if not exists scores_user_ts on public.scores (user_id, ts);
 create index if not exists scores_user_created on public.scores (user_id, created_at);
 create index if not exists scores_board on public.scores (mode, seconds, score desc) where verified;
+create index if not exists scores_daily on public.scores (date, score desc) where mode = 'daily' and verified;
 alter table public.scores enable row level security;
 drop policy if exists "read own scores" on public.scores;
 drop policy if exists "add own scores" on public.scores;
@@ -122,13 +131,19 @@ grant select on public.profiles to authenticated;
 -- game counts for the leaderboard: it was played in the browser game, scored at least a point, and
 -- its question log holds up, with one entry per point scored, every answer timed at 150 ms or more,
 -- and the times adding up to no more than the game's length (the run's length for endless).
--- The 80-in-8 test is marked right minus wrong, so its log holds every question answered or
--- skipped (at most 80, each marked r = y, n or s) and the score must be rights minus wrongs.
--- Hand-logged scores never count.
+-- The quant tests are marked right minus wrong, so their logs hold every question answered or
+-- skipped (at most the test's count, each marked r = y, n or s) and the score must be rights
+-- minus wrongs. Hand-logged scores never count.
+-- The daily challenge is played once a day: a second one for the same day is dropped without an
+-- error (so a batch of imported games still saves the rest), and it counts only on a date within
+-- a day of the database's own (time zones).
 create or replace function public.check_score() returns trigger
 language plpgsql set search_path = '' as $$
-declare n int; bad int; total numeric; fastest numeric; rights int; wrongs int;
+declare n int; bad int; total numeric; fastest numeric; rights int; wrongs int; utc date := (now() at time zone 'utc')::date;
 begin
+  if new.mode = 'daily' and exists (select 1 from public.scores where user_id = new.user_id and mode = 'daily' and date = new.date) then
+    return null;
+  end if;
   if (select count(*) from public.scores where user_id = new.user_id) >= 20000 then
     raise exception 'This account has reached its limit of 20,000 games.';
   end if;
@@ -144,20 +159,22 @@ begin
     end if;
   end if;
   new.verified := false;
-  if new.source <> 'game' or new.mode = 'guided' or new.detail is null
-     or new.date > (now() at time zone 'utc')::date + 1 then
+  if new.source <> 'game' or new.mode = 'guided' or new.detail is null or new.date > utc + 1
+     or (new.mode = 'daily' and new.date < utc - 1) then
     return new;
   end if;
   n := jsonb_array_length(new.detail);
   select count(*) filter (where coalesce(jsonb_typeof(q -> 't'), '') <> 'number') into bad
     from jsonb_array_elements(new.detail) q;
-  if new.mode = 'o80' then
-    if new.seconds <> 480 or new.score = 0 or n > 80 or bad > 0 then return new; end if;
+  if new.mode in ('o80', 'seq', 'frac', 'est') then
+    if new.score = 0 or n > (case new.mode when 'o80' then 80 when 'seq' then 30 when 'frac' then 60 else 40 end) or bad > 0 then
+      return new;
+    end if;
     select count(*) filter (where q ->> 'r' = 'y'), count(*) filter (where q ->> 'r' = 'n'),
            coalesce(sum((q ->> 't')::numeric), 0), coalesce(min((q ->> 't')::numeric) filter (where q ->> 'r' <> 's'), 150)
       into rights, wrongs, total, fastest from jsonb_array_elements(new.detail) q;
     new.verified := new.score = greatest(0, rights - wrongs) and fastest >= 150
-      and new.elapsed between 1 and 480 and total <= new.elapsed * 1000 + 2000;
+      and new.elapsed between 1 and new.seconds and total <= new.elapsed * 1000 + 2000;
     return new;
   end if;
   if new.score = 0 or n <> new.score or bad > 0 then return new; end if;
@@ -174,16 +191,32 @@ create trigger scores_check before insert on public.scores
 
 -- ---- leaderboard ---------------------------------------------------------------------------
 -- Each player's best verified game per board: names and figures only, readable by anyone. On the
--- 80-in-8 board a tie on score goes to fewer wrong answers, then the faster finish.
+-- quant tests' boards a tie on score goes to fewer wrong answers, then the faster finish.
+-- leaderboard_week is the same for games played this week (from Monday), and daily_board is every
+-- daily challenge result, one a player a day.
+create or replace function public.wrongs_in(p_mode text, p_detail jsonb) returns int
+language sql immutable set search_path = '' as $$
+  select case when p_mode in ('o80', 'seq', 'frac', 'est') then (select count(*)::int from jsonb_array_elements(p_detail) q where q ->> 'r' = 'n') end;
+$$;
 create or replace view public.leaderboard with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
-    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date,
-    case when s.mode = 'o80' then (select count(*)::int from jsonb_array_elements(s.detail) q where q ->> 'r' = 'n') end as wrongs
+    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
   from public.scores s join public.profiles p on p.id = s.user_id
-  where s.verified and not p.private
+  where s.verified and not p.private and s.mode not in ('daily', 'drill')
   order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
-revoke all on public.leaderboard from public;
-grant select on public.leaderboard to anon, authenticated;
+create or replace view public.leaderboard_week with (security_invoker = false) as
+  select distinct on (s.user_id, s.mode, s.seconds)
+    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
+  from public.scores s join public.profiles p on p.id = s.user_id
+  where s.verified and not p.private and s.mode not in ('daily', 'drill')
+    and s.date >= date_trunc('week', now() at time zone 'utc')::date
+  order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
+create or replace view public.daily_board with (security_invoker = false) as
+  select p.username, s.date, s.score
+  from public.scores s join public.profiles p on p.id = s.user_id
+  where s.mode = 'daily' and s.verified and not p.private;
+revoke all on public.leaderboard, public.leaderboard_week, public.daily_board from public;
+grant select on public.leaderboard, public.leaderboard_week, public.daily_board to anon, authenticated;
 
 -- ---- deleting an account -------------------------------------------------------------------
 -- Removes the signed-in player's login, profile and every score.
@@ -242,6 +275,9 @@ alter table public.matches add column if not exists p1_delta int;  -- ranked: ea
 alter table public.matches add column if not exists p2_delta int;
 alter table public.matches add column if not exists rematch_code text;  -- a rematch offered after this match
 alter table public.matches add column if not exists rematch_by int;     -- by which player (1 or 2)
+-- A challenge: a private match made for one named player, who sees it on their Duel page.
+alter table public.matches add column if not exists invitee uuid references auth.users on delete set null;
+create index if not exists matches_invitee on public.matches (invitee) where status = 'waiting';
 alter table public.matches drop constraint if exists matches_game_check;
 alter table public.matches add constraint matches_game_check
   check (game in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h', 'any'));  -- 'any' only while waiting
@@ -270,8 +306,53 @@ drop policy if exists "read own rating" on public.ratings;
 create policy "read own rating" on public.ratings for select to authenticated using (user_id = (select auth.uid()));
 revoke all on public.ratings from anon, authenticated;
 grant select on public.ratings to authenticated;
-create or replace view public.ladder with (security_invoker = false) as
-  select p.username, r.elo, r.games, r.wins, r.losses, r.draws, r.peak
+
+-- Seasons: one a quarter (2026-Q4 and so on). When a new one starts, each rating moves halfway
+-- back to 1000 and the season's wins and losses start over; the season that ended is kept in
+-- season_peaks with its highest rating (the badge for the best rank reached). Ratings roll over
+-- the next time the player is rated or opens Duel (mm_roll); until then everything that shows a
+-- rating shows the rolled-over figure (mm_elo).
+alter table public.ratings add column if not exists season text;
+create or replace function public.season_now() returns text
+language sql stable set search_path = '' as $$ select to_char(now() at time zone 'utc', 'YYYY-"Q"Q'); $$;
+update public.ratings set season = public.season_now() where season is null;
+alter table public.ratings alter column season set default public.season_now();
+create or replace function public.mm_elo(p_elo int, p_season text) returns int
+language sql stable set search_path = '' as $$
+  select case when p_season = public.season_now() then p_elo else 1000 + round((p_elo - 1000) / 2.0)::int end;
+$$;
+create table if not exists public.season_peaks (
+  user_id uuid not null references auth.users on delete cascade,
+  season text not null,
+  peak int not null,
+  elo int not null,
+  primary key (user_id, season)
+);
+alter table public.season_peaks enable row level security;
+drop policy if exists "read own seasons" on public.season_peaks;
+create policy "read own seasons" on public.season_peaks for select to authenticated using (user_id = (select auth.uid()));
+revoke all on public.season_peaks from anon, authenticated;
+grant select on public.season_peaks to authenticated;
+create or replace function public.mm_roll(p_user uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.ratings; s text := public.season_now();
+begin
+  select * into r from public.ratings where user_id = p_user for update;
+  if not found or r.season = s then return; end if;
+  if r.wins + r.losses + r.draws > 0 then
+    insert into public.season_peaks (user_id, season, peak, elo) values (p_user, r.season, r.peak, r.elo) on conflict do nothing;
+  end if;
+  update public.ratings set elo = public.mm_elo(r.elo, r.season), peak = public.mm_elo(r.elo, r.season),
+    wins = 0, losses = 0, draws = 0, season = s where user_id = p_user;
+end $$;
+
+drop view if exists public.ladder;
+create view public.ladder with (security_invoker = false) as
+  select p.username, public.mm_elo(r.elo, r.season) as elo, r.games,
+    case when r.season = public.season_now() then r.wins else 0 end as wins,
+    case when r.season = public.season_now() then r.losses else 0 end as losses,
+    case when r.season = public.season_now() then r.draws else 0 end as draws,
+    case when r.season = public.season_now() then r.peak else public.mm_elo(r.elo, r.season) end as peak
   from public.ratings r join public.profiles p on p.id = r.user_id
   where r.games >= 5 and not p.private;
 revoke all on public.ladder from public;
@@ -279,8 +360,21 @@ grant select on public.ladder to anon, authenticated;
 
 create or replace function public.mm_rating(p_user uuid) returns int
 language sql stable security definer set search_path = '' as $$
-  select coalesce((select elo from public.ratings where user_id = p_user), 1000);
+  select coalesce((select public.mm_elo(elo, season) from public.ratings where user_id = p_user), 1000);
 $$;
+
+-- Your rating for the Duel page (rolled into this season first) and your past seasons.
+create or replace function public.mm_me() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in first.'; end if;
+  perform public.mm_roll(auth.uid());
+  return jsonb_build_object(
+    'season', public.season_now(),
+    'rating', (select to_jsonb(r) - 'user_id' from public.ratings r where r.user_id = auth.uid()),
+    'seasons', coalesce((select jsonb_agg(jsonb_build_object('season', season, 'peak', peak, 'elo', elo) order by season desc)
+                         from public.season_peaks where user_id = auth.uid()), '[]'::jsonb));
+end $$;
 
 -- What the functions hand back: the match, plus the database's clock so both browsers can agree
 -- when the match starts.
@@ -322,6 +416,8 @@ begin
           and x.created_at > now() - interval '1 day'
           and ((x.p1 = m.p1 and x.p2 = m.p2) or (x.p1 = m.p2 and x.p2 = m.p1))) < 3 then
     insert into public.ratings (user_id) values (m.p1), (m.p2) on conflict (user_id) do nothing;
+    perform public.mm_roll(m.p1);
+    perform public.mm_roll(m.p2);
     select elo, games into r1, g1 from public.ratings where user_id = m.p1 for update;
     select elo, games into r2, g2 from public.ratings where user_id = m.p2 for update;
     e1 := 1 / (1 + power(10, (r2 - r1) / 400.0));
@@ -390,6 +486,18 @@ begin
   return public.mm_out(m);
 end $$;
 
+-- A six-character code no match has used.
+create or replace function public.mm_code() returns text
+language plpgsql set search_path = '' as $$
+declare c text;
+begin
+  loop
+    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '') into c from generate_series(1, 6);
+    exit when not exists (select 1 from public.matches where code = c);
+  end loop;
+  return c;
+end $$;
+
 -- Private match: a six-character code for a friend to type.
 create or replace function public.mm_create(p_game text, p_rule text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -397,10 +505,7 @@ declare nm text := public.mm_ready(); m public.matches; c text;
 begin
   if p_game not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h') then raise exception 'Unknown game.'; end if;
   if p_rule not in ('race', 'clock') then raise exception 'Unknown rule.'; end if;
-  loop
-    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '') into c from generate_series(1, 6);
-    exit when not exists (select 1 from public.matches where code = c);
-  end loop;
+  c := public.mm_code();
   insert into public.matches (code, is_public, rule, game, goal, seconds, p1, p1_name)
     values (c, false, p_rule, p_game, case when p_rule = 'race' then 25 else 0 end, 120, auth.uid(), nm) returning * into m;
   return public.mm_out(m);
@@ -414,9 +519,66 @@ begin
   if not found then raise exception 'No match has that code. Check it and try again.'; end if;
   if m.p1 = auth.uid() then raise exception 'That’s your own code. Send it to your opponent.'; end if;
   if m.status <> 'waiting' or m.seen_at < now() - interval '6 seconds' then raise exception 'That match has already started or closed. Ask for a new code.'; end if;
+  if m.invitee is not null and m.invitee <> auth.uid() then raise exception 'That challenge is for another player.'; end if;
   update public.matches set p2 = auth.uid(), p2_name = nm, status = 'live', starts_at = clock_timestamp() + interval '6 seconds'
     where id = m.id returning * into m;
   return public.mm_out(m);
+end $$;
+
+-- Challenges: a private match for one named player. It waits like a code match (the challenger's
+-- page keeps it open), and the other player sees it on their Duel page (mm_invites) to accept
+-- (mm_join with its code) or decline.
+create or replace function public.mm_challenge(p_name text, p_game text, p_rule text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare nm text; m public.matches; v_to uuid; v_name text;
+begin
+  if p_game not in ('standard', 'mixed', 'sq99', 'sq99h', 'sq999', 'sq999h') then raise exception 'Unknown game.'; end if;
+  if p_rule not in ('race', 'clock') then raise exception 'Unknown rule.'; end if;
+  select id, username into v_to, v_name from public.profiles where lower(username) = lower(btrim(coalesce(p_name, '')));
+  if not found then raise exception 'No player has that name.'; end if;
+  if v_to = auth.uid() then raise exception 'That’s your own name.'; end if;
+  nm := public.mm_ready();
+  insert into public.matches (code, is_public, rule, game, goal, seconds, p1, p1_name, p2_name, invitee)
+    values (public.mm_code(), false, p_rule, p_game, case when p_rule = 'race' then 25 else 0 end, 120, auth.uid(), nm, v_name, v_to) returning * into m;
+  return public.mm_out(m);
+end $$;
+
+create or replace function public.mm_invites() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', id, 'code', code, 'from', p1_name, 'game', game, 'rule', rule, 'goal', goal, 'seconds', seconds) order by created_at desc), '[]'::jsonb)
+  from (select * from public.matches where invitee = auth.uid() and status = 'waiting' and seen_at > now() - interval '6 seconds'
+        order by created_at desc limit 5) x;
+$$;
+
+create or replace function public.mm_decline(p_id uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.matches set status = 'cancelled' where id = p_id and invitee = auth.uid() and status = 'waiting';
+$$;
+
+-- A ghost to race while the queue is empty: a real saved 2-minute arithmetic game that reached 25,
+-- replayed answer by answer. Your own best, or a game by the player nearest your rating (never a
+-- private account's). Only the first 25 questions and their times are handed out.
+create or replace function public.mm_ghost(p_mine boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_user uuid; s public.scores; my int := public.mm_rating(auth.uid());
+begin
+  if auth.uid() is null then raise exception 'Sign in first.'; end if;
+  if coalesce(p_mine, false) then
+    v_user := auth.uid();
+  else
+    select x.user_id into v_user from (
+      select distinct s2.user_id from public.scores s2 join public.profiles p on p.id = s2.user_id
+      where s2.mode = 'standard' and s2.seconds = 120 and s2.verified and s2.score >= 25 and s2.user_id <> auth.uid() and not p.private) x
+    order by abs(public.mm_rating(x.user_id) - my), random() limit 1;
+    if not found then return null; end if;
+  end if;
+  select * into s from public.scores where user_id = v_user and mode in ('standard', 'daily') and seconds = 120 and verified and score >= 25
+    order by case when coalesce(p_mine, false) then score end desc nulls last, random() limit 1;
+  if not found then return null; end if;
+  return jsonb_build_object('name', (select username from public.profiles where id = v_user), 'mine', v_user = auth.uid(),
+    'score', s.score, 'date', s.date, 'rating', public.mm_rating(v_user),
+    'log', (select jsonb_agg(jsonb_build_object('q', q -> 'q', 'a', q -> 'a', 't', q -> 't') order by i)
+            from jsonb_array_elements(s.detail) with ordinality as e(q, i) where i <= 25));
 end $$;
 
 -- Polled about once a second by both players: keeps a waiting match open, and settles a match
@@ -456,10 +618,7 @@ begin
     end if;
   end if;
   nm := public.mm_ready();
-  loop
-    select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + floor(random() * 31)::int, 1), '') into c from generate_series(1, 6);
-    exit when not exists (select 1 from public.matches where code = c);
-  end loop;
+  c := public.mm_code();
   insert into public.matches (code, is_public, rule, game, goal, seconds, p1, p1_name)
     values (c, false, old.rule, old.game, old.goal, old.seconds, auth.uid(), nm) returning * into m;
   update public.matches set rematch_code = c, rematch_by = seat where id = old.id;
@@ -502,9 +661,11 @@ begin
   return public.mm_out(public.mm_settle(m));
 end $$;
 
-revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready(), public.mm_rating(uuid) from public, anon, authenticated;
-revoke execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid) from public, anon;
-grant execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid) to authenticated;
+revoke execute on function public.mm_out(public.matches), public.mm_settle(public.matches), public.mm_name(), public.mm_ready(), public.mm_rating(uuid), public.mm_roll(uuid), public.mm_code() from public, anon, authenticated;
+revoke execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid),
+  public.mm_me(), public.mm_challenge(text, text, text), public.mm_invites(), public.mm_decline(uuid), public.mm_ghost(boolean) from public, anon;
+grant execute on function public.mm_queue(text, boolean), public.mm_create(text, text), public.mm_join(text), public.mm_poll(uuid), public.mm_cancel(uuid), public.mm_score(uuid, int, int, boolean), public.mm_rematch(uuid),
+  public.mm_me(), public.mm_challenge(text, text, text), public.mm_invites(), public.mm_decline(uuid), public.mm_ghost(boolean) to authenticated;
 
 -- ---- after a duel: quick chat ---------------------------------------------------------------
 -- The two players can talk once the match is over: short messages (a "gg", an emoji), readable
@@ -545,3 +706,27 @@ begin
 end $$;
 revoke execute on function public.mm_say(uuid, text) from public, anon;
 grant execute on function public.mm_say(uuid, text) to authenticated;
+
+-- ---- public profiles -----------------------------------------------------------------------
+-- profile.html#name: a player's bests on each board, duel rating and past seasons, and how many
+-- games they played each day of the last 13 weeks. Private accounts have no profile.
+create or replace function public.profile(p_name text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_id uuid; v_name text; v_joined timestamptz;
+begin
+  select id, username, created_at into v_id, v_name, v_joined from public.profiles
+    where lower(username) = lower(btrim(coalesce(p_name, ''))) and not private;
+  if not found then return null; end if;
+  return jsonb_build_object(
+    'username', v_name, 'joined', v_joined::date,
+    'bests', coalesce((select jsonb_agg(jsonb_build_object('mode', mode, 'seconds', seconds, 'score', score, 'elapsed', elapsed, 'wrongs', wrongs, 'date', date))
+                       from public.leaderboard where username = v_name), '[]'::jsonb),
+    'rating', (select jsonb_build_object('elo', elo, 'games', games, 'wins', wins, 'losses', losses, 'draws', draws, 'peak', peak)
+               from public.ladder where username = v_name),
+    'seasons', coalesce((select jsonb_agg(jsonb_build_object('season', season, 'peak', peak) order by season desc)
+                         from public.season_peaks where user_id = v_id), '[]'::jsonb),
+    'days', coalesce((select jsonb_object_agg(d, n) from (select date::text d, count(*) n from public.scores
+                       where user_id = v_id and date > (now() at time zone 'utc')::date - 98 and mode <> 'guided' group by date) x), '{}'::jsonb));
+end $$;
+revoke execute on function public.profile(text) from public;
+grant execute on function public.profile(text) to anon, authenticated;

@@ -32,6 +32,37 @@
     renderList();
   }
 
+  // Your rating after each ranked match, oldest first, with the ranks' lines behind it. A new
+  // season (the rating moved halfway back to 1000) breaks the line. Past seasons are listed under it
+  // with the rank each one peaked at.
+  function renderRating(you) {
+    const ranked = all.filter(m => m.ranked && Number.isInteger(m.elo) && Number.isInteger(m.delta)).reverse();
+    const box = $('#rating-box');
+    box.hidden = !ranked.length && !you.seasons.length;
+    if (box.hidden) return;
+    $('#rating-sub').textContent = `Season ${M.seasonName(you.season)} · peak ${you.peak}`;
+    $('#seasons').innerHTML = you.seasons.map(x => { const k = M.rank(x.peak); return `<li class="rk-${k.tier}"><span>${M.seasonName(x.season)}</span><b>${k.name}</b></li>`; }).join('');
+    const svg = $('#rating-graph');
+    if (ranked.length < 2) { svg.style.display = 'none'; return; }
+    svg.style.display = '';
+    const pts = ranked.map(m => ({ before: m.elo, after: m.elo + m.delta }));
+    const W = svg.clientWidth || 360, H = 170, pad = { l: 8, r: 70, t: 10, b: 10 };
+    const vals = pts.flatMap(p => [p.before, p.after]);
+    const lo = Math.min(...vals) - 20, hi = Math.max(...vals) + 20;
+    const X = i => pad.l + (i / pts.length) * (W - pad.l - pad.r);
+    const Y = v => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+    let h = '';
+    for (const [min, name] of M.RANKS) if (min > lo && min < hi) h += `<line class="band" x1="${pad.l}" x2="${W - pad.r}" y1="${Y(min)}" y2="${Y(min)}"/><text x="${W - pad.r + 6}" y="${Y(min) + 4}">${name}</text>`;
+    let d = `M${X(0)},${Y(pts[0].before)}`;
+    pts.forEach((p, i) => { if (i && p.before !== pts[i - 1].after) d += `M${X(i)},${Y(p.before)}`; d += `L${X(i + 1)},${Y(p.after)}`; });
+    h += `<path class="line" d="${d}"/>`;
+    const peak = pts.reduce((b, p, i) => (p.after > pts[b].after ? i : b), 0);
+    h += `<circle class="pt" cx="${X(pts.length)}" cy="${Y(pts[pts.length - 1].after)}" r="3.5"/><circle class="peak" cx="${X(peak + 1)}" cy="${Y(pts[peak].after)}" r="4"><title>Peak ${pts[peak].after}</title></circle>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('aria-label', `Rating over ${pts.length} ranked matches: from ${pts[0].before} to ${pts[pts.length - 1].after}, peak ${pts[peak].after}`);
+    svg.innerHTML = h;
+  }
+
   $('#filter').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -45,13 +76,18 @@
   const brand = document.querySelector('.lt-brand span');
   function open() {
     if (!cloud.user()) return;
+    // From a finished match's screen: back to the page first (mid-match, the link waits).
+    if ($('#game').style.display === 'block') {
+      if ($('#end').style.display !== 'block') return;
+      $('#lobby').click();
+    }
     $('#lobby-view').hidden = true;
     $('#history-view').hidden = false;
     brand.textContent = 'Duel history';
     document.title = 'Duel History';
     shown = PAGE;
     $('#note').textContent = 'Loading your matches…';
-    M.load().then(list => { all = list; render(); })
+    Promise.all([M.load(), M.mine().catch(() => null)]).then(([list, you]) => { all = list; render(); if (you) renderRating(you); })
       .catch(err => { $('#note').textContent = `Couldn’t load your matches: ${err.message || 'try again.'}`; });
     scrollTo(0, 0);
   }

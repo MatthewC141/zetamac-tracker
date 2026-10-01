@@ -17,7 +17,9 @@
 
   const SCORES = 'zm-web-scores';
   const DETAIL = 'zm-web-detail:';  // + timestamp → that game's question log (JSON text)
-  const MODES = new Set(['standard', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'guided', 'mixed', 'o80']);
+  const MODES = new Set(['standard', 'daily', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'drill', 'guided', 'mixed', 'o80', 'seq', 'frac', 'est']);
+  // The quant tests: each has a fixed length and question count (its highest score).
+  const TESTS = { o80: [480, 80], seq: [240, 30], frac: [240, 60], est: [240, 40] };
 
   const pad = n => String(n).padStart(2, '0');
   const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -29,19 +31,21 @@
     return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d;
   };
   const parseInt6 = s => (/^\d{1,6}$/.test(s || '') ? Number(s) : null);
-  const parseSeconds = s => (!s || s === '120' ? 120 : s === '30' ? 30 : s === '480' ? 480 : 0);
+  const parseSeconds = s => (!s || s === '120' ? 120 : s === '30' ? 30 : s === '480' ? 480 : s === '240' ? 240 : 0);
   const parseMode = s => (!s ? 'standard' : MODES.has(s) ? s : '');
-  // The 80-in-8 test is always 8 minutes (and scores at most 80); nothing else is.
-  const lengthFits = (mode, seconds, score) => (mode === 'o80' ? seconds === 480 && score <= 80 : seconds !== 480);
+  // Each quant test has its own length and highest score, and no other game uses those lengths.
+  // The daily challenge is always 2 minutes.
+  const lengthFits = (mode, seconds, score) => (TESTS[mode] ? seconds === TESTS[mode][0] && score <= TESTS[mode][1]
+    : mode === 'daily' ? seconds === 120 : seconds !== 480 && seconds !== 240);
 
   // Saved rows are read back as untrusted: a row is kept only if every field has the shape the
   // server itself would write, and only those fields are kept, so nothing else reaches the page.
   const whole = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
   const validRow = e => e && typeof e === 'object' &&
     typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
-    whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120, 480].includes(e.seconds) && whole(e.elapsed, 999999) &&
+    whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120, 240, 480].includes(e.seconds) && whole(e.elapsed, 999999) &&
     e.ts.slice(0, 10) === e.date && (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode) &&
-    (e.seconds === 0 ? e.mode !== 'o80' : lengthFits(e.mode, e.seconds, e.score));
+    (e.seconds === 0 ? !TESTS[e.mode] && e.mode !== 'daily' : lengthFits(e.mode, e.seconds, e.score));
   const fields = ({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed });
 
   const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -77,9 +81,9 @@
     if (!endless && !seconds) throw new Refused('Game length must be 30 or 120 seconds.');
     const mode = parseMode(get('mode'));
     if (!mode) throw new Refused('Unknown game mode.');
-    if (endless ? mode === 'o80' : !lengthFits(mode, seconds, score)) throw new Refused('That game length doesn’t fit that game.');
-    // How long it took, in seconds: an endless run's length, or the 80-in-8 test's (its tie-break).
-    const elapsed = endless ? parseInt6(get('elapsed')) : mode === 'o80' ? Math.min(480, parseInt6(get('elapsed')) ?? 0) : 0;
+    if (endless ? TESTS[mode] || mode === 'daily' : !lengthFits(mode, seconds, score)) throw new Refused('That game length doesn’t fit that game.');
+    // How long it took, in seconds: an endless run's length, or a quant test's (its tie-break).
+    const elapsed = endless ? parseInt6(get('elapsed')) : TESTS[mode] ? Math.min(seconds, parseInt6(get('elapsed')) ?? 0) : 0;
     if (elapsed === null) throw new Refused('Endless runs need an elapsed time in seconds.');
     const e = entry(score, dateKey(new Date()), 'game', seconds, mode);
     e.elapsed = elapsed;
@@ -127,6 +131,7 @@
     const list = load();
     if (route === 'scores' || route === 'game') {
       const { e, detail } = newScore(route, new URLSearchParams(body || ''));
+      if (e.mode === 'daily' && list.some(x => x.mode === 'daily' && x.date === e.date)) throw new Refused('You’ve already played today’s challenge.');
       list.push(e);
       store(list);
       if (detail) { try { localStorage.setItem(DETAIL + e.ts, detail); } catch {} }  // the score still counts if the log doesn't fit
@@ -162,6 +167,29 @@
 
   // ---- the player's account (signed in) ----
   const cloud = () => window.ZM_CLOUD?.ready && window.ZM_CLOUD.user() ? window.ZM_CLOUD : null;
+  // Offline: games finished without a connection wait here ({ uid, e, detail } each) and go up
+  // the next time a page opens online, or the connection comes back. The account's scores as last
+  // seen are kept too, so the tracker still shows them (with the waiting games) while offline.
+  const PENDING = 'zm-pending', SEEN = 'zm-account-seen';
+  const offline = err => !err.status && !err.signedOut;  // the request never reached the database
+  const readJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+  const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const pendingFor = uid => readJSON(PENDING, []).filter(p => p && p.uid === uid && validRow(p.e));
+  const seenView = c => {
+    const seen = readJSON(SEEN, null), uid = c.user().id;
+    const rows = seen?.uid === uid && Array.isArray(seen.rows) ? seen.rows.filter(validRow) : [];
+    return [...rows, ...pendingFor(uid).map(p => p.e)].map((e, i) => ({ i, ...fields(e), detail: false }));
+  };
+  async function flushPending() {
+    const c = cloud();
+    if (!c || !navigator.onLine) return;
+    const uid = c.user().id, mine = pendingFor(uid);
+    if (!mine.length) return;
+    try {
+      await insertRows(c, mine.map(({ e, detail }) => ({ e, detail })));
+      writeJSON(PENDING, readJSON(PENDING, []).filter(p => !mine.some(m => m.e.ts === p.e?.ts && m.uid === p.uid)));
+    } catch {}
+  }
   const COLS = 'id,ts,date,score,seconds,source,mode,elapsed,has_detail';
   async function accountRows(c) {  // every row, 1000 at a time (the database's page size)
     const rows = [];
@@ -186,7 +214,12 @@
   });
 
   async function account(c, route, method, url, body) {
-    if (method === 'GET' && route === 'scores') return reply(200, accountView(await accountRows(c)));
+    if (method === 'GET' && route === 'scores') {
+      await flushPending();
+      const rows = await accountRows(c);
+      writeJSON(SEEN, { uid: c.user().id, rows: rows.map(r => fields(r)) });
+      return reply(200, accountView(rows));
+    }
     if (method === 'GET' && route === 'detail') {
       const ts = url.searchParams.get('ts') || '';
       if (!/^[\d:T-]{19}$/.test(ts)) return fail(400, 'Bad game timestamp.');
@@ -196,7 +229,14 @@
     }
     if (method !== 'POST') return fail(404, 'not found');
     if (route === 'scores' || route === 'game') {
-      await insertRows(c, [newScore(route, new URLSearchParams(body || ''))]);
+      const row = newScore(route, new URLSearchParams(body || ''));
+      try {
+        await insertRows(c, [row]);
+      } catch (err) {
+        if (!offline(err)) throw err;
+        writeJSON(PENDING, [...readJSON(PENDING, []), { uid: c.user().id, ...row }]);
+        return reply(200, seenView(c));
+      }
       return reply(200, accountView(await accountRows(c)));
     }
     if (route === 'delete') {
@@ -245,6 +285,15 @@
     },
   };
 
+  addEventListener('online', flushPending);
+  setTimeout(flushPending, 0);  // once this page's scripts are in (cloud.js loads first)
+
+  // Install on a phone and play offline: a service worker keeps the pages for when there's no
+  // connection (pages always come from the network when there is one).
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
@@ -262,6 +311,8 @@
       if (err.signedOut && (method === 'GET' || m[1] === 'game' || m[1] === 'scores')) {
         try { return local(m[1], method, url, init.body); } catch (e2) { if (e2 instanceof Refused) return fail(400, e2.message); }
       }
+      // Offline and signed in: the tracker shows the account as last seen, plus games waiting to go up.
+      if (c && offline(err) && method === 'GET' && m[1] === 'scores') return reply(200, seenView(c));
       return fail(500, c ? `Couldn’t reach your account: ${err.message}` : 'Couldn’t save in this browser. Storage may be full or blocked (private windows can block it).');
     }
   };

@@ -7,11 +7,18 @@
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Zetamac Leaderboard</title>
 <link rel="stylesheet" href="site.css">
 <style>
-  .t-arith { --team: #f2f3f5; } .t-sq { --team: #ffa53d; } .t-mix { --team: #2fbf95; } .t-o80 { --team: #c9a7ff; } .t-rank { --team: #ffd21f; } .t-end { --team: #b9bfcc; }
+  .t-arith { --team: #f2f3f5; } .t-sq { --team: #ffa53d; } .t-mix { --team: #2fbf95; } .t-o80 { --team: #c9a7ff; } .t-rank { --team: #c3c8d4; } .t-end { --team: #b9bfcc; }
+  .t-daily { --team: #f2f3f5; } .t-seq { --team: #2fd0f5; } .t-frac { --team: #8fb3ff; } .t-est { --team: #ff62b8; }
+  .when { margin-bottom: 12px; }
+  #tower .who a { color: inherit; text-decoration: none; }
+  #tower .who a:hover { text-decoration: underline; text-decoration-color: var(--line-hi); }
   .lb { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; }
   .side { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 14px; }
 
@@ -30,7 +37,11 @@
   .board .place { text-align: right; }
   .board .place b { display: block; font: 700 22px/1 var(--figure); }
   .board .place span { display: block; margin-top: 4px; font: 500 13px/1 var(--figure); color: var(--muted); }
-  .board .place.none b { color: var(--dim); }
+  .board .place.none b { color: #6b7080; }
+  /* boards no one is on yet, folded into one row */
+  .open-boards { display: block; width: 100%; padding: 12px 12px 12px 28px; border: 0; border-bottom: 1px solid var(--grid); background: none; color: var(--muted); text-align: left; cursor: pointer; font: 700 12px/1.2 var(--label); letter-spacing: .12em; text-transform: uppercase; }
+  .open-boards small { display: block; margin-top: 6px; font: 500 13px/1.35 var(--figure); letter-spacing: 0; text-transform: none; }
+  .open-boards:hover { color: var(--ink); background: rgba(255, 255, 255, .025); }
   .board[aria-pressed="true"] .place span { color: var(--ink); }
 
   .join h3 { font: 700 13px/1.2 var(--label); letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px; }
@@ -69,13 +80,17 @@
     <h1 class="brand"><a class="home" href="./" title="Your progress">Zetamac <span>Leaderboard</span></a></h1>
     <a class="navbtn go" href="play.html">Play</a>
     <a class="navbtn" href="account.html" id="acct-link">Sign up</a>
-    <a class="navbtn" href="./">View progress</a>
+    <a class="navbtn" href="./">Progress</a>
   </header>
 
   <div class="lb">
     <div class="side">
       <section class="panel" aria-labelledby="stand-title">
         <div class="panel-head"><h2 id="stand-title">Your standings</h2><span class="sub" id="stand-sub"></span></div>
+        <div class="seg when" id="when" role="group" aria-label="Which games count">
+          <button type="button" data-when="all" aria-pressed="true">All time</button>
+          <button type="button" data-when="week" aria-pressed="false">This week</button>
+        </div>
         <ol class="boards" id="boards"></ol>
       </section>
       <section class="panel join" id="join" hidden>

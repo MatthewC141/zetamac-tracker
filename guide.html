@@ -7,6 +7,9 @@
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Zetamac Guide</title>
 <style>
@@ -27,7 +30,8 @@
     --ease: cubic-bezier(.16, 1, .3, 1);
   }
   .team-add { --team: #2fd0f5; } .team-sub { --team: #ff5147; } .team-mul { --team: #6d8bff; }
-  .team-div { --team: #ff62b8; } .team-table { --team: #f2f3f5; }
+  .team-div { --team: #ff62b8; } .team-table { --team: #f2f3f5; } .team-quant { --team: #b561ff; }
+  @media (max-width: 1100px) { .bay-eg { display: none; } }
   * { box-sizing: border-box; }
   html { background: var(--bg); scrollbar-color: #3a3d4a var(--bg); }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 500 15px/1.45 var(--figure); font-variant-numeric: tabular-nums; caret-color: var(--purple); -webkit-font-smoothing: antialiased; }
@@ -56,7 +60,7 @@
   .navbtn.go:hover { background: #fff; }
 
   /* ---- bay bar: one tab per operation ---- */
-  .bays { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 2px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
+  .bays { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 2px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
   .bay { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; align-items: center; gap: 0 12px; padding: 12px 14px 12px 12px; border: 0; border-radius: 2px; background: none; color: var(--muted); text-align: left; cursor: pointer; transition: background-color .2s var(--ease), color .2s var(--ease); }
   .bay:hover { color: var(--ink); background: rgba(255, 255, 255, .02); }
   .bay[aria-selected="true"] { background: var(--raise); color: var(--ink); box-shadow: inset 0 -2px 0 var(--purple); }
@@ -146,7 +150,7 @@
   .hold .v { font: 600 21px/1 var(--figure); color: var(--ink); }
   .ledger { list-style: none; margin: 12px 0 0; padding: 0; min-height: 132px; }
   .ledger li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 0; font: 500 18px/1.3 var(--figure); color: var(--muted); }
-  .ledger li .sn { font: 700 13px/1 var(--figure); color: var(--dim); text-align: right; }
+  .ledger li .sn { font: 700 13px/1 var(--figure); color: var(--muted); text-align: right; }
   .ledger li.cur { color: var(--ink); }
   .ledger li.cur .sn { color: var(--ink); }
   .ledger li.new { animation: line-in .45s var(--ease); }
@@ -289,7 +293,7 @@
   <header class="strip">
     <h1 class="brand"><a class="home" href="./" title="Your progress">Zetamac <span>Guide</span></a></h1>
     <a class="navbtn go" href="play.html">Play</a>
-    <a class="navbtn" href="./">View progress</a>
+    <a class="navbtn" href="./">Progress</a>
   </header>
 
   <div class="bays" role="tablist" aria-label="Operations">
@@ -298,6 +302,7 @@
     <button class="bay team-mul" role="tab" id="tab-mul" aria-controls="bay-mul" data-bay="mul"><span class="bay-stripe"></span><span><span class="bay-code">Mul</span><span class="bay-name">Multiplication</span></span><span class="bay-eg">7 × 43</span></button>
     <button class="bay team-div" role="tab" id="tab-div" aria-controls="bay-div" data-bay="div"><span class="bay-stripe"></span><span><span class="bay-code">Div</span><span class="bay-name">Division</span></span><span class="bay-eg">434 ÷ 7</span></button>
     <button class="bay team-table" role="tab" id="tab-table" aria-controls="bay-table" data-bay="table"><span class="bay-stripe"></span><span><span class="bay-code">Table</span><span class="bay-name">Times table</span></span><span class="bay-eg">2–12</span></button>
+    <button class="bay team-quant" role="tab" id="tab-quant" aria-controls="bay-quant" data-bay="quant"><span class="bay-stripe"></span><span><span class="bay-code">Tests</span><span class="bay-name">Quant tests</span></span><span class="bay-eg">12% of 850</span></button>
   </div>
 
   <!-- ADDITION -->
@@ -433,6 +438,60 @@
     <div class="work">
       <div class="panel drill" id="drill"></div>
     </div>
+  </section>
+
+  <!-- QUANT TESTS -->
+  <section class="bay-panel team-quant" id="bay-quant" role="tabpanel" aria-labelledby="tab-quant" data-bay="quant" hidden>
+    <div class="intro">
+      <h2>Count the places. Build from ten percent.</h2>
+      <p class="lede">The <a href="optiver.html">quant tests</a> add decimals, percentages, fractions, number sequences and estimates to the four operations. Each one has a quick way in, and every method below turns it back into whole-number arithmetic you already know.</p>
+      <p class="range"><b>Tests</b> 80 in 8 · sequences · fractions · estimation</p>
+    </div>
+    <div class="methods">
+      <div class="method" data-method="q-dec">
+        <div class="method-head"><h3>Decimals times decimals <span class="eg">3.4 × 2.5</span></h3><button class="work-one" type="button" data-work="q-dec">Work one</button></div>
+        <ol class="steps">
+          <li data-step="1"><span class="n">1</span><span class="stripe"></span><div><strong>Drop the points and multiply.</strong><p><span class="fig">34 × 25 = 850</span>, as whole numbers.</p></div></li>
+          <li data-step="2"><span class="n">2</span><span class="stripe"></span><div><strong>Count the decimal places in the question.</strong><p>3.4 has one and 2.5 has one: <span class="fig">2 places</span>.</p></div></li>
+          <li data-step="3"><span class="n">3</span><span class="stripe"></span><div><strong>Put that many back.</strong><p>850 with two places is <span class="fig">8.50</span>, so type <span class="fig">8.5</span>.</p></div></li>
+        </ol>
+        <p class="aside"><b>Dividing</b>Move both points the same way until the divisor is whole: 7.2 ÷ 0.8 is 72 ÷ 8 = 9. Adding and subtracting: line the points up, and fill a missing place with 0 (12.75 + 6.50).</p>
+      </div>
+      <div class="method" data-method="q-pct">
+        <div class="method-head"><h3>Percentages <span class="eg">12% of 850</span></h3><button class="work-one" type="button" data-work="q-pct">Work one</button></div>
+        <ol class="steps">
+          <li data-step="1"><span class="n">1</span><span class="stripe"></span><div><strong>Find 10%: move the point one place left.</strong><p>10% of 850 is <span class="fig">85</span>.</p></div></li>
+          <li data-step="2"><span class="n">2</span><span class="stripe"></span><div><strong>Build the rest from 10%, 5% and 1%.</strong><p>5% is half of 10%, and 1% is a tenth of it. Here 12% is 10% and two 1%s: <span class="fig">2% = 17</span>.</p></div></li>
+          <li data-step="3"><span class="n">3</span><span class="stripe"></span><div><strong>Add the pieces.</strong><p><span class="fig">85 + 17 = 102</span>.</p></div></li>
+        </ol>
+        <p class="aside"><b>Swap them</b>x% of y is y% of x, so pick the easier one: 8% of 25 is 25% of 8, which is 2. And 12.5% is an eighth, 2.5% a fortieth.</p>
+      </div>
+      <div class="method" data-method="q-frac">
+        <div class="method-head"><h3>Fractions to decimals <span class="eg">7/16</span></h3><button class="work-one" type="button" data-work="q-frac">Work one</button></div>
+        <ol class="steps">
+          <li data-step="1"><span class="n">1</span><span class="stripe"></span><div><strong>Know the one-part fraction.</strong><p>1/16 is <span class="fig">0.0625</span>. The ones worth learning: 1/8 = 0.125, 1/16 = 0.0625, 1/20 = 0.05, 1/25 = 0.04, 1/40 = 0.025.</p></div></li>
+          <li data-step="2"><span class="n">2</span><span class="stripe"></span><div><strong>Multiply by the top number.</strong><p><span class="fig">7 × 0.0625 = 0.4375</span>: think 7 × 625 = 4375, then four places.</p></div></li>
+        </ol>
+        <p class="aside"><b>Eighths</b>Learn them as a row: 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875. A percent is the decimal × 100 (3/8 = 37.5%), and “eighths in 0.375” runs it backwards: 0.375 ÷ 0.125 = 3.</p>
+      </div>
+      <div class="method" data-method="q-seq">
+        <div class="method-head"><h3>Number sequences <span class="eg">3, 7, 15, 31</span></h3></div>
+        <ol class="steps">
+          <li data-step="1"><span class="n">1</span><span class="stripe"></span><div><strong>Write the gaps between terms.</strong><p>3, 7, 15, 31 has gaps <span class="fig">4, 8, 16</span>. Same gap every time: add it once more.</p></div></li>
+          <li data-step="2"><span class="n">2</span><span class="stripe"></span><div><strong>Gaps growing? Look at them as their own sequence.</strong><p>4, 8, 16 doubles, so the next gap is 32: <span class="fig">31 + 32 = 63</span>. Gaps that grow by the same amount (2, 4, 6) mean the next grows by it too.</p></div></li>
+          <li data-step="3"><span class="n">3</span><span class="stripe"></span><div><strong>Nothing yet? Try ratios, squares, and two sequences at once.</strong><p>× 2 or × 3 each time, × 2 then + 1, squares or cubes plus a constant, each term the sum of the two before, or odd and even places running separately (2, 37, 8, 51, 14 is 2, 8, 14 and 37, 51).</p></div></li>
+        </ol>
+      </div>
+      <div class="method" data-method="q-est">
+        <div class="method-head"><h3>Estimation <span class="eg">48.7 × 21.3</span></h3></div>
+        <ol class="steps">
+          <li data-step="1"><span class="n">1</span><span class="stripe"></span><div><strong>Round each number to two figures.</strong><p><span class="fig">49 × 21</span>. Rounding one up and one down keeps the error small.</p></div></li>
+          <li data-step="2"><span class="n">2</span><span class="stripe"></span><div><strong>Multiply the round numbers.</strong><p><span class="fig">49 × 21 = 1029</span> (50 × 21 = 1050, less 21).</p></div></li>
+          <li data-step="3"><span class="n">3</span><span class="stripe"></span><div><strong>Stop there: within 5% counts.</strong><p>The exact answer is 1037.31, and 1029 is under 1% off. For a square root, find the squares either side: √5,200 sits just over 72 (72² = 5,184).</p></div></li>
+        </ol>
+      </div>
+    </div>
+    <div class="work" data-bench="quant"></div>
   </section>
 </main>
 <script src="guide.js"></script>

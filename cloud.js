@@ -105,8 +105,12 @@
         return call(`/rest/v1/${path}`, { ...opts, token: await token(true) });
       }
     },
-    // Public: every player's best verified game per board.
-    leaderboard: () => call('/rest/v1/leaderboard?select=username,mode,seconds,score,elapsed,date,wrongs'),
+    // Public: every player's best verified game per board, all time or this week (from Monday).
+    leaderboard: (week = false) => call(`/rest/v1/${week ? 'leaderboard_week' : 'leaderboard'}?select=username,mode,seconds,score,elapsed,date,wrongs`),
+    // Public: one day's daily-challenge results, best first.
+    daily: date => call(`/rest/v1/daily_board?select=username,score&date=eq.${encodeURIComponent(date)}&order=score.desc&limit=1000`),
+    // Public: a player's profile (null for no such player, or a private account).
+    profile: name => call('/rest/v1/rpc/profile', { method: 'POST', body: { p_name: name } }),
     // Public: ranked duel ratings of everyone past their placement matches.
     ladder: () => call('/rest/v1/ladder?select=username,elo,games,wins,losses,draws&order=elo.desc&limit=1000'),
   };

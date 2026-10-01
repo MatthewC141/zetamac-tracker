@@ -19,7 +19,7 @@ body.launch {
 html:has(body.launch) { background: #0b0c10; }
 body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 
-#settings.lt { color: var(--lt-ink); font: 500 15px/1.4 var(--lt-figure); font-variant-numeric: tabular-nums; width: auto; max-width: 1080px; margin: 0 auto; padding: 0 24px 40px; background: none; line-height: 1.4; }
+#settings.lt { color: var(--lt-ink); font: 500 15px/1.4 var(--lt-figure); font-variant-numeric: tabular-nums; width: auto; max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; background: none; line-height: 1.4; }
 .lt a { color: var(--lt-ink); text-underline-offset: 3px; text-decoration-color: var(--lt-line-hi); }
 .lt a:hover { text-decoration-color: var(--lt-ink); }
 .lt :focus-visible { outline: 2px solid var(--lt-purple); outline-offset: 2px; }
@@ -27,7 +27,7 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 
 /* ---- top strip: wordmark, game tabs, progress ---- */
 .lt-strip { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; padding: 18px 0 16px; margin-bottom: 18px; border-bottom: 1px solid var(--lt-line); }
-.lt-brand { order: 1; font: 700 20px/1 var(--lt-label); letter-spacing: .02em; text-transform: uppercase; margin: 0; }
+.lt-brand { order: 1; font: 700 20px/1 var(--lt-label); letter-spacing: .02em; text-transform: uppercase; margin: 0; min-width: 196px; }
 /* The wordmark links back to the progress tracker. */
 .lt-brand a.home { color: inherit; text-decoration: none; }
 .lt-brand a.home:hover span { color: var(--lt-ink); }
@@ -38,7 +38,14 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 .lt-tabs a[aria-current="page"] { background: var(--lt-raise); color: var(--lt-ink); box-shadow: inset 0 -2px 0 var(--lt-purple); }
 .lt-progress { order: 3; margin-left: auto; font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none !important; color: var(--lt-muted) !important; border: 1px solid var(--lt-line); border-radius: 3px; padding: 10px 14px; }
 .lt-progress:hover { color: var(--lt-ink) !important; border-color: var(--lt-line-hi); }
-.lt-guide + .lt-progress { margin-left: -18px; }  /* Guide and Progress sit together at the right */
+.lt-progress + .lt-progress { margin-left: -18px; }  /* Leaderboard, Guide and Progress sit together at the right */
+
+/* (Must follow the base strip rules.) Narrower than the whole row: the game tabs take their own full-width row under the wordmark. */
+@media (max-width: 1000px) {
+  .lt-brand { min-width: 0; }
+  .lt-tabs { order: 4; width: 100%; }
+  .lt-tabs a { flex: 1; text-align: center; }
+}
 
 /* ---- two panels: the tower of rows, and length + start ---- */
 .lt-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 14px; align-items: start; }
@@ -61,6 +68,8 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
 .lt-row.off { opacity: .42; }
 .lt-row.off .lt-stripe { transform: scaleY(0); opacity: 0; }
 .lt-row.off:hover { opacity: .7; }
+.lt-row.off:has(input.pick) { opacity: .62; }
+.lt-row.off:has(input.pick):hover { opacity: .85; }
 
 .team-add { --team: #2fd0f5; } .team-sub { --team: #ff5147; } .team-mul { --team: #6d8bff; }
 .team-div { --team: #ff62b8; } .team-sq { --team: #ffa53d; } .team-guide { --team: #b561ff; }
@@ -141,7 +150,8 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
   .lt-strip { column-gap: 12px; }
   .lt-brand span { display: none; }
   .lt-progress { padding: 9px 12px; }
-  .lt-guide + .lt-progress { margin-left: -6px; }
+  .lt-progress + .lt-progress { margin-left: -6px; }
+  .lt-board { display: none !important; }  /* phones: the wordmark's line holds two buttons; the leaderboard is a tap away on Progress */
   .lt-tabs a { flex: 1; text-align: center; padding: 11px 6px; }
   .lt-row { grid-template-columns: 16px 4px 38px minmax(0, 1fr) auto; gap: 0 9px; }
   .lt-pos { font-size: 15px; }
@@ -221,3 +231,27 @@ body.launch ::selection { background: var(--lt-purple); color: #0b0c10; }
   .mh-row .lt-stripe { grid-row: 1 / 3; height: 100%; min-height: 30px; }
   .mh-res, .mh-score { grid-row: 1 / 3; }
 }
+
+/* ---- an option row under the length (pace ghost) ---- */
+.lt-opt { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; margin-top: 12px; cursor: pointer; }
+.lt-opt b { display: block; font: 600 15px/1.2 var(--lt-figure); }
+.lt-opt small { display: block; margin-top: 2px; font-size: 13px; color: var(--lt-muted); }
+
+/* ---- the daily challenge, on the arithmetic start screen ---- */
+.lt-daily { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: 4px 14px; padding: 14px 14px 14px 12px; margin: 0 0 18px; background: var(--lt-bg); border: 1px solid var(--lt-line); border-radius: 3px; --team: var(--lt-ink); }
+.lt-daily[hidden] { display: none; }
+.lt-daily .lt-stripe { grid-row: 1 / 4; height: 100%; min-height: 34px; }
+.lt-daily h2 { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 0; font: 700 13px/1.2 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; }
+.lt-daily h2 span { color: var(--lt-muted); font-weight: 600; }
+.lt-daily p { margin: 2px 0 0; font-size: 14px; color: var(--lt-muted); }
+.lt-daily p b { color: var(--lt-ink); font: 700 17px/1 var(--lt-figure); }
+.lt-daily .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.lt-daily button, .lt-daily a.btn { display: inline-flex; align-items: center; min-height: 38px; padding: 0 14px; font: 700 12px/1 var(--lt-label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; border-radius: 3px; cursor: pointer; }
+.lt-daily button { color: var(--lt-ink); background: var(--lt-raise); border: 1px solid var(--lt-line-hi); }
+.lt-daily button:hover { background: #22232d; border-color: var(--lt-muted); }
+.lt-daily a.btn { color: var(--lt-muted); border: 1px solid var(--lt-line); }
+.lt-daily a.btn:hover { color: var(--lt-ink); border-color: var(--lt-line-hi); }
+@media (pointer: coarse) { .lt-daily button, .lt-daily a.btn { min-height: 44px; } }
+/* a drill that can't run yet (Practice: your weak spots, before there are games to build it from) */
+.lt-row.unavailable { opacity: .42; cursor: default; }
+.lt-row.unavailable:hover { background: none; }

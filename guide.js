@@ -137,13 +137,61 @@
       },
     },
   };
+  // Quant tests: answers are decimals, written without trailing zeros (8.50 → "8.5").
+  const fmt = x => String(Number(x.toFixed(4)));
+  const places = x => (String(x).split('.')[1] || '').length;
+  Object.assign(METHODS, {
+    'q-dec': {
+      label: 'Decimals', first: { x: 34, y: 25 },
+      gen: () => ({ x: rand(11, 99), y: [12, 15, 25, 35, 45, 4, 5, 6, 8][rand(0, 8)] }),
+      text: p => `${fmt(p.x / 10)} × ${fmt(p.y / 10)}`,
+      answer: p => fmt(p.x * p.y / 100),
+      walk(p) {
+        const a = fmt(p.x / 10), b = fmt(p.y / 10), whole = Number(a.replace('.', '')) * Number(b.replace('.', '')), n = places(a) + places(b), ans = fmt(p.x * p.y / 100);
+        return [
+          { step: 1, line: `${a.replace('.', '')} × ${b.replace('.', '')} = ${whole}`, hold: String(whole), ans: mask(ans, 0) },
+          { step: 2, line: `${places(a)} + ${places(b)} = ${n} decimal places`, hold: `${whole}, ${n} places`, ans: mask(ans, 0) },
+          { step: 3, line: `${whole} with ${n} places is ${(whole / 10 ** n).toFixed(n)}: ${ans}`, hold: '', ans },
+        ];
+      },
+    },
+    'q-pct': {
+      label: 'Percent', first: { pc: 12, n: 850 },
+      gen: () => ({ pc: [12, 15, 25, 35, 45, 30, 22, 6][rand(0, 7)], n: rand(4, 90) * 10 }),
+      text: p => `${p.pc}% of ${p.n}`,
+      answer: p => fmt(p.pc * p.n / 100),
+      walk(p) {
+        const ten = p.n / 10, tens = Math.floor(p.pc / 10), five = p.pc % 10 >= 5 ? 1 : 0, ones = p.pc % 10 - five * 5, ans = fmt(p.pc * p.n / 100);
+        const parts = [tens && [`${tens * 10}%`, tens * ten], five && ['5%', ten / 2], ones && [`${ones}%`, ones * ten / 10]].filter(Boolean);
+        return [
+          { step: 1, line: `10% of ${p.n} = ${fmt(ten)}`, hold: fmt(ten), ans: mask(ans, 0) },
+          { step: 2, line: parts.map(([k, v]) => `${k} = ${fmt(v)}`).join(', '), hold: parts.map(([, v]) => fmt(v)).join(' and '), ans: mask(ans, 0) },
+          { step: 3, line: `${parts.map(([, v]) => fmt(v)).join(' + ')} = ${ans}`, hold: '', ans },
+        ];
+      },
+    },
+    'q-frac': {
+      label: 'Fractions', first: { n: 7, d: 16 },
+      gen() { const d = [8, 16, 20, 25, 40][rand(0, 4)]; let n; do n = rand(1, d - 1); while (gcd(n, d) !== 1); return { n, d }; },
+      text: p => `${p.n}/${p.d}`,
+      answer: p => fmt(p.n / p.d),
+      walk(p) {
+        const unit = fmt(1 / p.d), ans = fmt(p.n / p.d);
+        return [
+          { step: 1, line: `1/${p.d} = ${unit}`, hold: unit, ans: mask(ans, 0) },
+          { step: 2, line: `${p.n} × ${unit} = ${ans}`, hold: '', ans },
+        ];
+      },
+    },
+  });
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   function borrowing() {
     for (;;) {
       const a = rand(11, 99), b = rand(10, 99), top = a + b;
       if (ones(top) < ones(a)) return { top, a };
     }
   }
-  const BAY_METHODS = { add: ['add'], sub: ['sub-plain', 'sub-up', 'sub-ten'], mul: ['mul-split', 'mul-11'], div: ['div'] };
+  const BAY_METHODS = { add: ['add'], sub: ['sub-plain', 'sub-up', 'sub-ten'], mul: ['mul-split', 'mul-11'], div: ['div'], quant: ['q-dec', 'q-pct', 'q-frac'] };
 
   // ---- the bench: one per operation, beside the article ----
   const benches = {};
@@ -165,7 +213,7 @@
       `</section>` +
       `<section class="panel try" aria-label="Try one">` +
         `<div class="panel-head"><h3>Try one</h3><span class="sub try-method"></span></div>` +
-        `<div class="try-row"><span class="q"></span><span class="eq">=</span><input class="answer" type="text" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Your answer"></div>` +
+        `<div class="try-row"><span class="q"></span><span class="eq">=</span><input class="answer" type="text" inputmode="${bay === 'quant' ? 'decimal' : 'numeric'}" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Your answer"></div>` +
         `<p class="try-out" aria-live="polite"></p>` +
         `<div class="try-ctl"><button class="btn" type="button" data-act="walk">Walk through this one</button><button class="btn" type="button" data-act="skip">Skip</button><span class="try-stats"></span></div>` +
       `</section>`;
@@ -295,7 +343,7 @@
   });
 
   // ---- tabs ----
-  const BAYS = ['add', 'sub', 'mul', 'div', 'table'];
+  const BAYS = ['add', 'sub', 'mul', 'div', 'table', 'quant'];
   const tabs = $$('.bay');
   let current = null;
   function select(bay, { focus = false, scroll = false } = {}) {

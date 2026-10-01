@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<script src="cloud.js"></script>
+<script src="store.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0c10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="color-scheme" content="dark">
+<title>Player</title>
+<link rel="stylesheet" href="site.css">
+<style>
+  .t-arith { --team: #f2f3f5; } .t-sq { --team: #ffa53d; } .t-mix { --team: #2fbf95; } .t-o80 { --team: #c9a7ff; } .t-end { --team: #b9bfcc; }
+  .t-seq { --team: #2fd0f5; } .t-frac { --team: #8fb3ff; } .t-est { --team: #ff62b8; }
+  .rk-bronze { --team: #c98a5a; } .rk-silver { --team: #c3c8d4; } .rk-gold { --team: #ffd21f; }
+  .rk-platinum { --team: #7fe3d3; } .rk-diamond { --team: #6d8bff; } .rk-quant { --team: #b561ff; }
+
+  .find { display: flex; gap: 6px; margin-left: auto; }
+  .find input { width: 190px; height: 38px; padding: 0 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; font: 600 15px/1 var(--figure); }
+  .find input:focus { outline: none; border-color: var(--purple); }
+  .find button { height: 38px; }
+
+  .pf { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 14px; align-items: start; }
+  .pf > .panel { margin: 0; }
+  .who-head { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; align-items: end; }
+  .who-head h2 { margin: 0; font: 700 56px/.9 var(--figure); overflow-wrap: anywhere; }
+  .who-head .meta { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+  .rank { display: grid; grid-template-columns: 4px auto; gap: 0 12px; align-items: center; }
+  .rank .stripe { width: 4px; height: 52px; border-radius: 1px; background: var(--team); }
+  .rank b { display: block; font: 700 24px/1 var(--figure); color: var(--team); }
+  .rank span { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; }
+  .rank .elo { color: var(--ink); font: 700 17px/1 var(--figure); }
+  .seasons { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .seasons li { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 8px; border: 1px solid var(--line); border-radius: 3px; font-size: 13px; color: var(--muted); }
+  .seasons li::before { content: ""; width: 3px; height: 14px; border-radius: 1px; background: var(--team); }
+  .seasons b { color: var(--ink); font-weight: 600; }
+
+  #bests li { grid-template-columns: 4px minmax(0, 1fr) auto 74px; padding-left: 10px; }
+  #bests .who small { font: 600 14px/1 var(--figure); color: var(--muted); margin-left: 8px; }
+  #bests .figure small { font-size: 13px; }
+  #bests .date { font: 500 14px/1 var(--figure); color: var(--muted); text-align: right; }
+
+  .heat-wrap { overflow-x: auto; }
+  #heat text { fill: var(--muted); font: 500 11px var(--figure); }
+  .heat-sum { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .heat-sum b { color: var(--ink); font: 700 17px/1 var(--figure); }
+  .msg-big { font-size: 17px; color: var(--muted); max-width: 52ch; }
+
+  @media (max-width: 900px) { .pf { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 600px) {
+    .who-head { grid-template-columns: 1fr; }
+    .who-head h2 { font-size: 42px; }
+    .find { margin-left: 0; width: 100%; }
+    .find input { flex: 1; width: auto; }
+    #bests li { grid-template-columns: 4px minmax(0, 1fr) auto; }
+    #bests .date { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="strip">
+    <h1 class="brand"><a class="home" href="./" title="Your progress">Zetamac <span>Player</span></a></h1>
+    <form class="find" id="find" role="search"><label class="sr" for="find-name">Find a player</label><input id="find-name" placeholder="Find a player" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="20"><button class="navbtn" type="submit">Go</button></form>
+    <a class="navbtn" href="leaderboard.html">Leaderboard</a>
+    <a class="navbtn" href="./">Progress</a>
+  </header>
+
+  <p class="msg-big" id="state" role="status">Loading…</p>
+
+  <div class="pf" id="pf" hidden>
+    <section class="panel who-head" aria-labelledby="p-name">
+      <div><h2 id="p-name"></h2><p class="meta" id="p-meta"></p></div>
+      <div class="rank" id="p-rank" hidden><span class="stripe"></span><div><b id="p-rank-name"></b><span><span class="elo" id="p-elo"></span> <span id="p-record"></span></span></div></div>
+      <ul class="seasons" id="p-seasons" aria-label="Past seasons"></ul>
+    </section>
+    <section class="panel" aria-labelledby="bests-title">
+      <div class="panel-head"><h2 id="bests-title">Personal bests</h2><span class="sub">games on the leaderboard</span></div>
+      <ol class="tower" id="bests"></ol>
+    </section>
+    <section class="panel" aria-labelledby="heat-title">
+      <div class="panel-head"><h2 id="heat-title">Games played</h2><span class="sub">last 13 weeks</span></div>
+      <div class="heat-wrap"><svg id="heat" role="img"></svg></div>
+      <p class="heat-sum" id="heat-sum"></p>
+    </section>
+  </div>
+</main>
+<script src="matches.js"></script>
+<script src="profile.js"></script>
+</body>
+</html>
