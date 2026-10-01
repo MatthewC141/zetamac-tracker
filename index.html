@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0c10">
+<meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Zetamac Live Timing</title>
@@ -612,26 +612,28 @@
     #welcome[open], .w-step.enter { animation: none; }
   }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
-<main>
-  <header class="strip">
-    <div class="ident">
-      <h1 class="brand">Zetamac <span>Live timing</span></h1>
-      <div class="session"><span class="live" id="session-date">Session</span></div>
-    </div>
-    <nav class="nav" aria-label="Games">
-      <a class="play-btn go" href="play.html">Arithmetic</a>
-      <a class="play-btn" href="squares.html">Squares</a>
-      <a class="play-btn" href="mixed.html">Combined</a>
-      <a class="play-btn" href="practice.html">Practice</a>
-      <a class="play-btn" href="optiver.html">Tests</a>
-      <a class="play-btn" href="duel.html">Duel</a>
+<a class="zh-skip" href="#main">Skip to content</a>
+<main id="main">
+  <header class="zh">
+    <a class="zh-mark" href="./" translate="no">Zetamac</a>
+    <nav class="zh-nav" aria-label="Games">
+      <a href="./" aria-current="page">Progress</a>
+      <a href="play.html">Arithmetic</a>
+      <a href="squares.html">Squares</a>
+      <a href="mixed.html">Combined</a>
+      <a href="practice.html">Practice</a>
+      <a href="optiver.html">Tests</a>
+      <a href="duel.html">Duel</a>
     </nav>
-    <a class="help-btn" href="leaderboard.html">Leaderboard</a>
-    <a class="help-btn" href="guide.html">Guide</a>
-    <button class="help-btn" id="help-open" type="button">How it works</button>
-    <a class="help-btn acct-btn" href="account.html" id="acct-btn" hidden>Sign up</a>
+    <nav class="zh-side" aria-label="More">
+      <a href="leaderboard.html">Leaderboard</a>
+      <a href="guide.html">Guide</a>
+      <button id="help-open" type="button">How it works</button>
+      <a class="zh-acct" href="account.html" id="acct-btn" hidden>Sign up</a><span id="session-date" hidden></span>
+    </nav>
   </header>
 
   <p class="flash" id="flash" role="status" hidden></p>
@@ -658,6 +660,7 @@
       <section class="panel score-panel" aria-labelledby="score-title">
         <div class="panel-head"><h2 id="score-title">2-minute score</h2><span class="sub">Arithmetic</span></div>
         <div id="score"></div>
+        <p class="zh-cta"><a class="go" href="play.html">Play 2:00</a><span>or <a href="play.html">today’s daily challenge</a> · <a href="practice.html#weak">drill your weak spots</a></span></p>
         <p class="o80-line" id="o80-line" hidden></p>
       </section>
       <section class="panel heat-panel" aria-labelledby="heat-title">
@@ -761,7 +764,7 @@
         <label>Game length
           <select id="f-len"><option value="120" selected>120 seconds</option><option value="30">30 seconds</option></select>
         </label>
-        <label>Score <input type="number" name="score" id="f-score" min="0" max="500" inputmode="numeric" required placeholder="e.g. 48"></label>
+        <label>Score <input type="number" name="score" id="f-score" min="0" max="500" inputmode="numeric" required placeholder="e.g. 48…"></label>
         <button class="primary" type="submit">Add score</button>
         <p class="msg" id="f-msg" aria-live="polite"></p>
       </form>

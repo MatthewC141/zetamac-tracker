@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0c10">
+<meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Squares Game</title>
 <style>
@@ -65,16 +65,16 @@
     #answer { height: 42px; }
   }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body class="launch">
+<a class="zh-skip" href="#main">Skip to content</a>
 
 <div id="settings" class="lt">
-  <header class="lt-strip">
-    <h1 class="lt-brand"><a class="home" href="./" title="Your progress">Zetamac<span>Squares</span></a></h1>
-    <a class="lt-progress lt-board" href="leaderboard.html">Leaderboard</a>
-    <a class="lt-progress lt-guide" href="guide.html">Guide</a>
-    <a class="lt-progress" href="./">Progress</a>
-    <nav class="lt-tabs" aria-label="Games">
+  <header class="zh">
+    <a class="zh-mark" href="./" translate="no">Zetamac</a>
+    <nav class="zh-nav" aria-label="Games">
+      <a href="./">Progress</a>
       <a href="play.html">Arithmetic</a>
       <a href="squares.html" aria-current="page">Squares</a>
       <a href="mixed.html">Combined</a>
@@ -82,9 +82,14 @@
       <a href="optiver.html">Tests</a>
       <a href="duel.html">Duel</a>
     </nav>
+    <nav class="zh-side" aria-label="More">
+      <a href="leaderboard.html">Leaderboard</a>
+      <a href="guide.html">Guide</a>
+      <a class="zh-acct" href="account.html">Account</a>
+    </nav>
   </header>
 
-  <div class="lt-grid">
+  <div class="lt-grid" id="main">
     <section class="lt-panel" aria-labelledby="ops-title">
       <div class="lt-head"><h2 id="ops-title">Squares</h2><span class="sub">each mode keeps its own chart</span></div>
       <ol class="lt-tower">

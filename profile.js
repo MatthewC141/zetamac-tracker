@@ -90,7 +90,6 @@
     const counts = Object.values(days).filter(n => n > 0).sort((a, b) => a - b);
     const cut = p => counts[Math.min(counts.length - 1, Math.floor(p * counts.length))];
     const cuts = counts.length ? [cut(0.25), cut(0.5), cut(0.75)] : [];
-    const SHADES = ['#181a21', '#2c303c', '#545a6b', '#969cad', '#eceef2'];
     let h = '', total = 0, played = 0, lastMonth = -1;
     [['Mon', 1], ['Wed', 3], ['Fri', 5]].forEach(([l, r]) => { h += `<text x="0" y="${top + r * pitch + cell * 0.8}">${l}</text>`; });
     for (let d = new Date(start), i = 0; d <= end; d.setDate(d.getDate() + 1), i++) {
@@ -101,7 +100,7 @@
       }
       if (n) { total += n; played++; }
       const level = n ? 1 + cuts.filter(c => n > c).length : 0;
-      h += `<rect x="${left + col * pitch}" y="${top + row * pitch}" width="${cell}" height="${cell}" rx="1.5" fill="${SHADES[level]}"><title>${n ? `${n} game${n === 1 ? '' : 's'}` : 'No games'} · ${MONTHS[d.getMonth()]} ${d.getDate()}</title></rect>`;
+      h += `<rect x="${left + col * pitch}" y="${top + row * pitch}" width="${cell}" height="${cell}" rx="3" fill="var(--heat-${level})"><title>${n ? `${n} game${n === 1 ? '' : 's'}` : 'No games'} · ${MONTHS[d.getMonth()]} ${d.getDate()}</title></rect>`;
     }
     const W = left + weeks * pitch, H = top + 7 * pitch;
     svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);

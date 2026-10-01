@@ -9,7 +9,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b0c10">
+<meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Duel</title>
 <style>
@@ -219,16 +219,17 @@
     #answer { height: 42px; }
   }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body class="launch">
+<a class="zh-skip" href="#main">Skip to content</a>
 
 <div id="settings" class="lt">
-  <header class="lt-strip">
-    <h1 class="lt-brand"><a class="home" href="./" title="Your progress">Zetamac<span>Duel</span></a></h1>
-    <a class="lt-progress lt-board" href="leaderboard.html">Leaderboard</a>
-    <a class="lt-progress lt-guide" href="guide.html">Guide</a>
-    <a class="lt-progress" href="./">Progress</a>
-    <nav class="lt-tabs" aria-label="Games">
+  <header class="zh">
+    <a class="zh-mark" href="./" translate="no">Zetamac</a>
+    <span class="lt-brand" hidden><span></span></span>
+    <nav class="zh-nav" aria-label="Games">
+      <a href="./">Progress</a>
       <a href="play.html">Arithmetic</a>
       <a href="squares.html">Squares</a>
       <a href="mixed.html">Combined</a>
@@ -236,10 +237,15 @@
       <a href="optiver.html">Tests</a>
       <a href="duel.html" aria-current="page">Duel</a>
     </nav>
+    <nav class="zh-side" aria-label="More">
+      <a href="leaderboard.html">Leaderboard</a>
+      <a href="guide.html">Guide</a>
+      <a class="zh-acct" href="account.html">Account</a>
+    </nav>
   </header>
 
   <div id="lobby-view">
-  <div class="lt-grid">
+  <div class="lt-grid" id="main">
     <section class="lt-panel" aria-labelledby="games-title">
       <div class="lt-head"><h2 id="games-title">Problems</h2><span class="sub" id="games-sub">both players get the same questions</span></div>
       <ol class="lt-tower" id="game-rows">
@@ -307,12 +313,12 @@
           <div class="d-row"><button class="d-btn grow" type="button" id="create">Make a code</button></div>
           <form class="d-join" id="join-form">
             <label class="sr" for="code">Match code</label>
-            <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Friend’s code">
+            <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Friend’s code…">
             <button class="d-btn" type="submit" id="join">Join</button>
           </form>
           <form class="d-join d-challenge" id="challenge-form">
             <label class="sr" for="rival">Player’s name</label>
-            <input id="rival" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Challenge by name">
+            <input id="rival" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Challenge by name…">
             <button class="d-btn" type="submit" id="challenge">Challenge</button>
           </form>
         </div>
@@ -423,7 +429,7 @@
       <button type="button">gg</button><button type="button">gg wp</button><button type="button">👏</button><button type="button">🔥</button><button type="button">😂</button><button type="button">😤</button><button type="button">rematch?</button>
     </div>
     <ol class="msgs" id="msgs" aria-live="polite"></ol>
-    <form class="say" id="say-form"><input id="say" maxlength="120" autocomplete="off" placeholder="Say something" aria-label="Message"><button type="submit">Send</button></form>
+    <form class="say" id="say-form"><input id="say" maxlength="120" autocomplete="off" placeholder="Say something…" aria-label="Message"><button type="submit">Send</button></form>
     <p class="chat-msg" id="chat-msg" role="status"></p>
   </section>
 </div>

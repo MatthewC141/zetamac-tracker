@@ -1,0 +1,286 @@
+/* The site's look: near-black panels, soft white ink, hairlines, one amber accent, Geist with tabular
+   figures, and one header on every page. Loaded after each page's own styles and layered over them;
+   the white game and after-game screens are untouched.
+   ponytail: layered over the older per-page styles (hence the !importants); fold the two together
+   the next time the pages are restyled. */
+@font-face { font-family: "Geist"; font-weight: 100 900; font-display: swap; src: url(fonts/Geist-Variable.woff2) format("woff2"); }
+@font-face { font-family: "Geist Mono"; font-weight: 100 900; font-display: swap; src: url(fonts/GeistMono-Variable.woff2) format("woff2"); }
+
+/* (Game pages keep their own white-screen colors while a game is on: only the start screen is restyled.) */
+:root:not(:has(#game)), body.launch {
+  --bg: #fafafa; --panel: #ffffff; --raise: #f4f4f5; --grid: #efeff1; --line: #e4e4e7; --line-hi: #c9c9cf;
+  --ink: #0a0a0a; --prose: #3f3f46; --muted: #63636b; --dim: #a1a1aa;
+  --accent: #1a56db; --accent-soft: #e8effd;
+  --purple: var(--accent); --green: #0b7d45; --yellow: #b45309; --red: #c81e1e;
+  --good: var(--green); --bad: var(--red);
+  --t-add: #0891b2; --t-sub: #dc2626; --t-mul: #4f46e5; --t-div: #db2777; --t-sq: #d97706; --t-mix: #0d9488;
+  --proj: #9ca3af; --sprint: var(--t-add); --sq: var(--t-sq); --dot: rgba(10, 10, 10, .2);
+  --heat-0: #ededf0; --heat-1: #c7d6f7; --heat-2: #93b0f1; --heat-3: #4f7ee6; --heat-4: #1a56db;
+  --label: "Geist", system-ui, sans-serif; --figure: "Geist", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace;
+  --lt-bg: #fafafa; --lt-panel: #ffffff; --lt-raise: #f4f4f5; --lt-grid: #efeff1; --lt-line: #e4e4e7; --lt-line-hi: #c9c9cf;
+  --lt-ink: #0a0a0a; --lt-muted: #63636b; --lt-purple: var(--accent); --lt-green: #0b7d45; --lt-yellow: #b45309; --lt-red: #c81e1e;
+  --lt-label: "Geist", system-ui, sans-serif; --lt-figure: "Geist", system-ui, sans-serif;
+  --on-ink: #ffffff; --ink-hover: color-mix(in srgb, var(--ink) 86%, var(--bg)); --bar: color-mix(in srgb, var(--ink) 72%, var(--bg)); --shadow: rgba(10, 10, 10, .16);
+  --r: 10px; --r-sm: 7px;
+  color-scheme: var(--scheme, light);
+}
+html:not(:has(#game)), html:has(body.launch) { background: var(--page, #fafafa); scrollbar-color: var(--line-hi) var(--page, #fafafa); }
+body:not(:has(#game)), body.launch { background: var(--bg); color: var(--ink); font-family: "Geist", system-ui, sans-serif; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+::selection, body.launch ::selection { background: var(--accent); color: var(--on-ink); }
+::-webkit-scrollbar-thumb { background: var(--line-hi); border-color: var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+:focus-visible, .lt :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Sentence case everywhere outside the game: the old uppercase tracked labels were the racing voice. */
+body :not(#game, #game *, .lt-code, .code, .bay-code) { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* ---- one header for every page ---- */
+.zh-skip { position: absolute; left: 12px; top: -48px; z-index: 100; padding: 10px 14px; background: var(--ink); color: var(--on-ink); border-radius: var(--r-sm); font: 500 14px/1 "Geist", sans-serif; text-decoration: none; }
+.zh-skip:focus { top: 12px; }
+.zh { display: flex; align-items: center; gap: 8px 28px; flex-wrap: wrap; padding: 16px 0 0; margin-bottom: 26px; border-bottom: 1px solid var(--line); font-family: "Geist", sans-serif; }
+.zh-mark { font: 700 17px/1 "Geist", sans-serif; letter-spacing: -.02em !important; color: var(--ink) !important; text-decoration: none !important; padding-bottom: 16px; display: inline-flex; align-items: center; gap: 9px; }
+.zh-mark::before { content: ""; width: 18px; height: 18px; background: var(--ink); -webkit-mask: var(--zmark) center/100% no-repeat; mask: var(--zmark) center/100% no-repeat; mask-mode: luminance; --zmark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23fff'/%3E%3Cpath d='M9 9.5h14L9 22.5h14' fill='none' stroke='%23000' stroke-width='3.6' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.zh-nav { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.zh-nav::-webkit-scrollbar { display: none; }
+.zh-nav a { position: relative; padding: 8px 12px 18px; font: 500 14px/1 "Geist", sans-serif; color: var(--muted) !important; text-decoration: none !important; white-space: nowrap; border-radius: 6px 6px 0 0; transition: color .15s; }
+.zh-nav a:hover { color: var(--ink) !important; }
+.zh-nav a[aria-current="page"] { color: var(--ink) !important; }
+.zh-nav a[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; background: var(--ink); }
+.zh-side { display: flex; align-items: center; gap: 4px; margin-left: auto; padding-bottom: 10px; }
+.zh-side a, .zh-side button { font: 500 14px/1 "Geist", sans-serif; color: var(--muted) !important; background: none; border: 0; padding: 8px 10px; border-radius: var(--r-sm); text-decoration: none !important; cursor: pointer; white-space: nowrap; transition: color .15s, background-color .15s; }
+.zh-side a:hover, .zh-side button:hover { color: var(--ink) !important; background: var(--raise); }
+.zh-side a[aria-current="page"] { color: var(--ink) !important; }
+.zh-side .zh-acct { color: var(--ink) !important; border: 1px solid var(--line); padding: 7px 12px; }
+.zh-side [hidden] { display: none !important; }
+@media (max-width: 760px) {
+  .zh { gap: 6px 12px; padding-top: 12px; margin-bottom: 18px; }
+  .zh-mark { padding-bottom: 6px; }
+  .zh-side { padding-bottom: 0; gap: 0; }
+  .zh-side a, .zh-side button { padding: 8px 8px; font-size: 13px; }
+  .zh-nav { order: 3; width: 100%; margin: 0 -10px; padding: 0; }
+  .zh { overflow: hidden; }
+  .zh-nav a { padding: 10px 10px 14px; }
+  .zh-nav a[aria-current="page"]::after { left: 10px; right: 10px; }
+}
+@media (pointer: coarse) { .zh-side a, .zh-side button { min-height: 44px; display: inline-flex; align-items: center; } .zh-nav a { min-height: 44px; display: inline-flex; align-items: center; } }
+
+/* ---- shared surfaces: panels, headings, controls ---- */
+main { max-width: 1180px; }
+#settings.lt { max-width: 1180px; font-family: "Geist", sans-serif; }
+.panel, .lt-panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: none; }
+h2, .panel-head h2, .panel-head h3, .lt-head h2, .d-state h2, .join h3, .facts-head h3, .sb-laps-head h3, .d-ghost h3, .lt-daily h2 { font: 600 15px/1.3 "Geist", sans-serif !important; color: var(--ink) !important; }
+.facts-head h3, .sb-laps-head h3, .facts-col h4 { font-size: 13px !important; color: var(--muted) !important; font-weight: 500 !important; }
+.sub, .h-note, .lt-head .sub, .panel-head .sub { font: 400 13px/1.3 "Geist", sans-serif !important; color: var(--muted); }
+.seg, .tabs, .lt-seg, .mh-filter, .lt-tabs { border: 0; background: var(--raise); border-radius: 8px; padding: 3px; }
+.seg button, .tabs button, .mh-filter button { font: 500 13px/1 "Geist", sans-serif; color: var(--muted); padding: 7px 11px; border-radius: 6px; }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"], .tabs button[aria-pressed="true"], .mh-filter button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(10, 10, 10, .06); }
+.btn, .navbtn, .help-btn, .play-btn, .d-btn, .edit-toggle, .mh-all, .mh-more, .lt-progress, .legend button, .rp-btn, .bd-replay, .w-ghost {
+  font: 500 14px/1 "Geist", sans-serif !important; color: var(--ink) !important; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.btn:hover, .navbtn:hover, .help-btn:hover, .play-btn:hover, .d-btn:hover, .edit-toggle:hover, .mh-all:hover, .mh-more:hover, .legend button:hover, .rp-btn:hover, .bd-replay:hover, .w-ghost:hover { background: var(--raise); border-color: var(--line-hi) !important; color: var(--ink) !important; }
+.d-btn.quiet { color: var(--muted) !important; }
+.primary, .slab, .w-go, .rp-play, .navbtn.go, .play-btn.go, .btn.go { background: var(--ink) !important; color: var(--on-ink) !important; border-color: var(--ink) !important; border-radius: var(--r-sm); font-family: "Geist", sans-serif !important; }
+.primary:hover, .slab:hover, .w-go:hover, .rp-play:hover { background: var(--ink-hover) !important; }
+.slab b { font: 600 22px/1 "Geist", sans-serif; }
+.slab span { color: color-mix(in srgb, var(--on-ink) 60%, var(--ink)); font: 500 12px/1 "Geist Mono", monospace; }
+.primary { font: 500 14px/1 "Geist", sans-serif !important; padding: 13px 18px; }
+:is(.primary, .slab, .w-go, .btn, .d-btn, .play-btn, #start):active { transform: translateY(1px); }
+/* (never the game's own answer box) */
+input:not(.switch, .pick, [type=radio], [type=checkbox], [type=color], [type=file], #game *), select, .dd-btn { background: var(--panel) !important; color: var(--ink) !important; border: 1px solid var(--line) !important; border-radius: var(--r-sm) !important; font-family: "Geist", sans-serif !important; color-scheme: light; }
+input:not(#game *):hover, .dd-btn:hover { border-color: var(--line-hi) !important; }
+input:not(#game *):focus-visible, .dd.open .dd-btn, .lt input.num:focus, .d-join input:focus, .find input:focus { border-color: var(--accent) !important; outline: 2px solid var(--accent-soft); outline-offset: 0; }
+input:not(#game *)::placeholder { color: var(--muted) !important; opacity: .75; }
+label, th, .w-rows .k, .rec span, .runs-sum span, .bd-stats span { font: 500 12.5px/1.2 "Geist", sans-serif !important; color: var(--muted) !important; }
+code, kbd, .o-keys kbd { font-family: "Geist Mono", monospace; background: var(--raise); color: var(--ink); border-color: var(--line) !important; }
+.dd-menu { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px -6px var(--shadow), 0 2px 6px -2px var(--shadow); }
+.dd-opt { color: var(--ink); font-family: "Geist", sans-serif; border-radius: 6px; }
+.dd-opt.active { background: var(--raise); }
+.dd-opt[aria-selected="true"]::before { background: var(--accent); }
+.dd-group { font: 500 12px/1 "Geist", sans-serif !important; color: var(--muted); }
+.tip { background: var(--ink); color: var(--on-ink); border-radius: 8px; box-shadow: 0 8px 24px -8px rgba(10, 10, 10, .35); }
+.heat-tip span { color: color-mix(in srgb, var(--on-ink) 70%, var(--ink)); }
+.msg.ok { color: var(--green); } .msg.err, .d-msg.err { color: var(--red); }
+.flash { background: var(--accent-soft); border-color: transparent; border-radius: var(--r); }
+.banner { background: color-mix(in srgb, var(--red) 12%, var(--panel)); border-color: color-mix(in srgb, var(--red) 40%, var(--panel)); color: var(--ink); border-radius: var(--r); }
+.aside { background: var(--raise); border-radius: var(--r-sm); color: var(--prose); }
+dialog { overscroll-behavior: contain; }
+#welcome, #replay { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 24px 60px -20px rgba(10, 10, 10, .35); }
+#welcome::backdrop, #replay::backdrop { background: rgba(10, 10, 10, .45); }
+.w-step h2 { font: 600 30px/1.08 "Geist", sans-serif !important; letter-spacing: -.03em !important; text-wrap: balance; }
+.w-track li[aria-current="step"]::before { background: var(--ink); }
+.w-demo { background: var(--bg); border-radius: var(--r); }
+.w-x { border-radius: var(--r-sm); background: var(--panel); }
+
+/* figures: tight Geist, tabular */
+.sb-fig > b, .tower .time, .time, .tower .figure, .board .place b, .rec b, .runs-sum b, .readout b, .laps li, .lt-seg b, .d-wait-clock, .d-code, .d-rank-elo, .mh-score b, .bd-stats b, .o-rules b, .who-head h2, .board-head h2, .me-name {
+  font-family: "Geist", sans-serif !important; font-variant-numeric: tabular-nums; letter-spacing: -.03em !important; }
+.code, .lt-code, .pos, .lt-pos, .tower .pos, .mh-res b { font-family: "Geist Mono", monospace !important; font-weight: 500 !important; }
+
+/* ---- timing rows (weak spots, leaderboard, start screens) ---- */
+.tower li, .lt-row, .mh-row, .board, .by li, .w-rows li { border-color: var(--grid) !important; }
+.tower li.me, .board[aria-pressed="true"] { background: var(--accent-soft); box-shadow: none; }
+.board[aria-pressed="true"] .place span { color: var(--prose); }
+.board:hover, .lt-row:hover { background: var(--bg); }
+.stripe, .lt-stripe, .board .stripe { width: 3px; border-radius: 2px; }
+.track { background: var(--grid); height: 6px; border-radius: 3px; }
+.track i { background: var(--bar); border-radius: 3px; }
+.tower.facts .track i { background: var(--dim); }
+.time { color: var(--ink) !important; }
+/* faster / slower / fastest is said once, by the figure beside the time */
+.tower li[class*="s-"] .gap { color: var(--sector); font-weight: 600; }
+.s-purple .time, .tower .figure.p1, .board .place.p1 b { color: var(--accent) !important; }
+.pos, .lt-pos { color: var(--dim) !important; font-size: 13px !important; }
+.code, .lt-code { font-size: 13px !important; color: var(--ink); text-transform: uppercase !important; letter-spacing: .02em !important; }
+.key span::before { height: 6px; width: 6px; border-radius: 50%; }
+.tower .you { background: var(--accent); color: var(--on-ink); border-radius: 4px; }
+span.pb { background: var(--accent); color: var(--on-ink); border-radius: 4px; font: 600 11px/1 "Geist", sans-serif !important; padding: 3px 5px; }
+.drill-cta { border-radius: var(--r-sm); background: var(--bg); }
+.drill-cta b { font: 600 14px/1.2 "Geist", sans-serif !important; }
+.drill-cta:hover { background: var(--raise); border-color: var(--line-hi); }
+.tower .gap.acc.low { color: var(--red); }
+.open-boards { font: 500 13px/1.2 "Geist", sans-serif !important; }
+
+/* ---- dashboard ---- */
+.sb-fig.main > b { font-size: 112px; font-weight: 600; line-height: .8; letter-spacing: -.06em !important; }
+.sb-fig.last > b { font-weight: 600; }
+.sb-fig .lbl { font: 500 13px/1 "Geist", sans-serif !important; color: var(--muted); }
+.sb-fig.last .lbl::before { width: 6px; height: 6px; border-radius: 50%; }
+.laps li { background: var(--bg); border: 1px solid var(--grid); border-radius: var(--r-sm); color: var(--ink); font-weight: 600; position: relative; }
+.laps li::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: var(--sector, transparent); }
+.laps li small { font-family: "Geist", sans-serif; }
+.zh-cta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin: 20px 0 4px; padding-top: 18px; border-top: 1px solid var(--grid); }
+.zh-cta a:not(.go) { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--line-hi); }
+.zh-cta a.go { display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-sm); background: var(--ink); color: var(--on-ink); font: 500 14px/1 "Geist", sans-serif; text-decoration: none; }
+.zh-cta a.go:hover { background: var(--ink-hover); }
+.zh-cta a.go kbd { font: 500 11px/1 "Geist Mono", monospace; background: color-mix(in srgb, var(--on-ink) 16%, transparent); color: var(--on-ink); padding: 3px 5px; border-radius: 4px; }
+.zh-cta span { font-size: 13px; color: var(--muted); }
+.o80-line .lbl { font: 500 13px/1 "Geist", sans-serif !important; }
+.o80-line .lbl::before { width: 6px; height: 6px; border-radius: 50%; }
+.o80-line a, .bd-sort { font: 500 13px/1 "Geist", sans-serif !important; color: var(--accent) !important; text-decoration: none; }
+.readout b { font-weight: 600; }
+.readout .down { color: var(--yellow); }
+.chart text, #heat text { font-family: "Geist", sans-serif; fill: var(--muted); }
+.chart .best { stroke: var(--ink); stroke-width: 1.75; }
+.chart .best-pt.pb-pt, .legend-note::before { fill: var(--accent); background: var(--accent); }
+.chart .target { stroke: var(--accent); } .chart .target-label { fill: var(--accent); font-family: "Geist", sans-serif; }
+.chart .proj-pt { fill: var(--panel); }
+.chart .guide { stroke: var(--dim); }
+.legend button[aria-pressed="false"] { opacity: .5; }
+#heat rect { rx: 3; }
+.heat-legend i { border-radius: 3px; }
+.len { font: 500 12px/1.2 "Geist", sans-serif !important; }
+.len.o8 { color: var(--accent); } .len.dy { color: var(--muted); } .len.end { color: var(--muted); }
+#recent tr.has-detail:hover td, #recent tr.open td, tr.detail-row > td { background: var(--bg); }
+.bd-stats { background: var(--line); border-color: var(--line); border-radius: var(--r-sm); }
+.bd-stats div { background: var(--panel); }
+.bd-list { background: var(--panel); border-radius: var(--r-sm); }
+.bd-list .slow { color: var(--yellow); } .bd-list .fast { color: var(--green); }
+.del:hover { background: var(--raise); }
+.fold:hover { color: var(--accent); }
+.rp-stage { border: 1px solid var(--line); }
+.live::before { background: var(--green); box-shadow: 0 0 0 3px rgba(11, 125, 69, .15); }
+
+/* ---- game start screens ---- */
+.lt-strip { display: none; }
+.lt a { color: var(--ink); }
+.lt-name { font: 500 15.5px/1.25 "Geist", sans-serif; }
+.lt-detail, .lt-lede, .d-sub, .d-rule, .lt-save { font-family: "Geist", sans-serif; color: var(--muted); }
+.lt-row .lt-meta { font: 500 12px/1.3 "Geist", sans-serif !important; }
+.lt-seg label { border-radius: 6px; color: var(--muted); }
+.lt-seg label:has(input:checked) { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(10, 10, 10, .06); }
+.lt-seg b { font-weight: 600; font-size: 24px; }
+.lt-seg small { font: 500 12px/1 "Geist", sans-serif !important; }
+:is(.lt, body) input.switch { border-radius: 12px; background: var(--line-hi); }
+:is(.lt, body) input.switch::after { border-radius: 50%; background: var(--panel); box-shadow: 0 1px 2px rgba(10, 10, 10, .25); }
+:is(.lt, body) input.switch:checked { background: var(--ink); }
+:is(.lt, body) input.switch:checked::after { background: var(--panel); }
+.lt input.pick { border-color: var(--line-hi); background: var(--panel); }
+.lt input.pick:checked { border-color: var(--ink); }
+.lt input.pick:checked::after { background: var(--ink); }
+.lt-row.off:has(input.pick) { opacity: 1; }
+.lt-row.off:has(input.pick) .lt-name { color: var(--prose); }
+.lt-row:has(input.pick:checked) { background: var(--bg); }
+.lt input.num.changed { border-color: var(--yellow) !important; color: var(--yellow) !important; }
+.lt-save::before { width: 6px; height: 6px; margin-top: 7px; }
+#settings.lt #start { background: var(--ink); border-color: var(--ink); color: var(--on-ink); border-radius: var(--r); gap: 22px; }
+#settings.lt #start:hover { background: var(--ink-hover); }
+.lt-lights { background: color-mix(in srgb, var(--on-ink) 10%, transparent); border-radius: 8px; }
+.lt-lights i { background: color-mix(in srgb, var(--on-ink) 18%, transparent); box-shadow: none; }
+#start.arming .lt-lights i.on, .d-found .lt-lights i.on { background: #ff4d4f; box-shadow: 0 0 10px rgba(255, 77, 79, .6); }
+.d-found .lt-lights { background: var(--ink); }
+.lt-go b { font: 600 52px/.9 "Geist", sans-serif; letter-spacing: -.04em !important; }
+.lt-go span { color: color-mix(in srgb, var(--on-ink) 60%, var(--ink)); font: 500 12px/1 "Geist Mono", monospace; }
+.lt-daily { background: var(--bg); border-radius: var(--r-sm); border-color: var(--line); }
+.lt-daily button { background: var(--panel); }
+.lt-opt b { font: 500 14.5px/1.2 "Geist", sans-serif; }
+.o-rules, .rec { border-radius: var(--r-sm); background: var(--bg); }
+.d-rank, .d-invites li { border-radius: var(--r-sm); background: var(--bg); }
+.d-invites li { border-color: var(--accent); }
+.d-scan i { background: var(--line); }
+.mh-ranked { color: var(--accent); }
+.d-rank.rk-none b { color: var(--muted); }
+.d-rule { margin: 12px 0 12px; }
+.d-graph .line { stroke: var(--ink); } .d-graph .pt { fill: var(--ink); } .d-graph .peak { fill: var(--accent); }
+.rk-silver { --team: var(--muted); } .rk-gold { --team: var(--yellow); } .rk-platinum { --team: var(--t-mix); } .rk-quant { --team: var(--accent); }
+.team-arith, .t-arith, .t-daily { --team: var(--ink) !important; }
+.team-add { --team: var(--t-add); } .team-sub { --team: var(--t-sub); } .team-mul { --team: var(--t-mul); } .team-div { --team: var(--t-div); } .team-sq { --team: var(--t-sq); }
+.team-guide, .team-o80, .t-o80, .team-quant { --team: var(--accent) !important; }
+.t-end, .t-rank, .team-any { --team: var(--muted) !important; }
+
+/* ---- leaderboard, account, profile, guide ---- */
+.board-head h2, .who-head h2 { font-weight: 600 !important; font-size: 34px !important; }
+.who-head h2 { font-size: 52px !important; letter-spacing: -.04em !important; }
+.me-name { font: 600 34px/1.05 "Geist", sans-serif !important; letter-spacing: -.03em !important; }
+.btn.danger { color: var(--red) !important; }
+.btn.danger:hover { border-color: var(--red) !important; }
+:is(.lt, body) input.switch:disabled { opacity: .5; cursor: default; }
+.board .name { font: 500 15.5px/1.2 "Geist", sans-serif; }
+.tower .who { font: 500 16px/1.2 "Geist", sans-serif; }
+.tower .figure { font-weight: 600; }
+.empty, .msg-big, .rules, .note { color: var(--muted); }
+.seasons li, .d-seasons li { border-radius: var(--r-sm); }
+.strip { display: none; }
+.bays { background: var(--raise); border: 0; border-radius: 10px; padding: 3px; }
+.bay { border-radius: 8px; }
+.bay[aria-selected="true"] { background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(10, 10, 10, .06); }
+.intro h2 { font: 600 34px/1.08 "Geist", sans-serif !important; letter-spacing: -.03em !important; text-wrap: balance; }
+.fig { font-family: "Geist Mono", monospace; }
+.bay-code { font-family: "Geist Mono", monospace; font-size: 13px; }
+.bay-eg { display: none; }
+
+@media (max-width: 640px) {
+  .sb-fig.main > b { font-size: 88px; }
+  .lt-go b { font-size: 40px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---- palette: onyx with an amber accent ("slower" is pink so it can't be mistaken for the accent) ---- */
+html { --page: #050506; }
+:root:not(:has(#game)), body.launch {
+  --scheme: dark; --on-accent: #1c1100; --bg: #050506; --panel: #0e0e10; --raise: #18181b; --grid: #17171a; --line: #222226; --line-hi: #3a3a40;
+  --ink: #f4f4f5; --prose: #c8c8cd; --muted: #9a9aa3; --dim: #63636c; --on-ink: #050506;
+  --accent: #f59e0b; --accent-soft: #2b1b04; --green: #45d08d; --yellow: #ff6f91; --red: #ff6f6f;
+  --t-add: #38c8ea; --t-sub: #ff6b62; --t-mul: #8098ff; --t-div: #ff75c0; --t-sq: #ffae4d; --t-mix: #3fcaa2;
+  --proj: #63636c; --dot: color-mix(in srgb, #f4f4f5 24%, transparent); --shadow: rgba(0, 0, 0, .6);
+  --heat-0: #18181b; --heat-1: #452a06; --heat-2: #85520b; --heat-3: #c27d0c; --heat-4: #f59e0b;
+  --lt-bg: #050506; --lt-panel: #0e0e10; --lt-raise: #18181b; --lt-grid: #17171a; --lt-line: #222226; --lt-line-hi: #3a3a40;
+  --lt-ink: #f4f4f5; --lt-muted: #9a9aa3; --lt-green: #45d08d; --lt-yellow: #ff6f91; --lt-red: #ff6f6f;
+}
+/* No white buttons: small primary buttons take the accent, the big Start slab is dark with an accent edge. */
+.primary, .slab, .w-go, .rp-play, .navbtn.go, .play-btn.go, .btn.go, .zh-cta a.go { background: var(--accent) !important; border-color: var(--accent) !important; color: #1c1100 !important; }
+.primary:hover, .slab:hover, .w-go:hover, .rp-play:hover, .btn.go:hover, .zh-cta a.go:hover { background: #fbbf24 !important; }
+.slab span, .zh-cta a.go kbd { color: #5a3a00; }
+#settings.lt #start { background: #111316; border-color: var(--accent); color: var(--ink); }
+#settings.lt #start:hover { background: #171a1e; }
+.lt-lights { background: #050506; }
+.lt-lights i { background: #1f2227; }
+.lt-go span { color: var(--muted); }
+:is(.lt, body) input.switch:checked { background: var(--accent); }
+:is(.lt, body) input.switch:checked::after { background: #1c1100; }
+.lt input.pick:checked { border-color: var(--accent); }
+.lt input.pick:checked::after { background: var(--accent); }
+.zh-nav a[aria-current="page"]::after { background: var(--accent); }
+.w-track li[aria-current="step"]::before { background: var(--accent); }
+.tip { background: #1f2227; color: var(--ink); border: 1px solid var(--line-hi); }
+.heat-tip span { color: var(--muted); }
+
+main > .find { justify-content: flex-end; margin: -10px 0 14px; }
