@@ -13,7 +13,6 @@ A clone of [zetamac](https://arithmetic.zetamac.com) that saves every game, plus
 - Quant tests, marked right minus wrong: 80 in 8 (Optiver-style), number sequences, fractions and estimation
 - Duels on the website: ranked (Elo, quarterly seasons) or unranked, a public queue, a private code or a challenge by name, and a ghost race against a saved game when nobody's around
 - Per-question timing, so you can see which kinds of problems slow you down, and a replay of any saved game
-- An optional pace ghost: your best game's score at the same second, beside the clock
 - Dashboard with score history, daily bests, a calendar heatmap, and slowest question types
 - A guide page with mental math shortcuts for each operation and the quant tests
 - Optional accounts, public profiles and a leaderboard (all time or this week) on Supabase

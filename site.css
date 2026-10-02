@@ -1,16 +1,11 @@
 /* Shared base styles for the account and leaderboard pages. */
-@font-face { font-family: "Titillium Web"; font-weight: 600; font-display: swap; src: url(fonts/TitilliumWeb-600.woff2) format("woff2"); }
-@font-face { font-family: "Titillium Web"; font-weight: 700; font-display: swap; src: url(fonts/TitilliumWeb-700.woff2) format("woff2"); }
-@font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url(fonts/BarlowSemiCondensed-500.woff2) format("woff2"); }
-@font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url(fonts/BarlowSemiCondensed-600.woff2) format("woff2"); }
-@font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; font-display: swap; src: url(fonts/BarlowSemiCondensed-700.woff2) format("woff2"); }
 
 :root {
   --bg: #0b0c10; --panel: #13141a; --raise: #1b1c24; --grid: #1c1e26;
   --line: #262833; --line-hi: #3d4050; --ink: #f2f3f5; --prose: #c7cad3; --muted: #9a9eab; --dim: #4a4d58;
   --purple: #b561ff; --green: #22d764; --yellow: #ffd21f; --red: #ff5147;
-  --label: "Titillium Web", "Barlow Semi Condensed", system-ui, sans-serif;
-  --figure: "Barlow Semi Condensed", "Titillium Web", system-ui, sans-serif;
+  --label: "Geist", system-ui, sans-serif;
+  --figure: "Geist", system-ui, sans-serif;
   --ease: cubic-bezier(.16, 1, .3, 1);
 }
 * { box-sizing: border-box; }
@@ -30,13 +25,6 @@ code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: va
 
 main { max-width: 1240px; margin: 0 auto; padding: 0 max(24px, env(safe-area-inset-right)) 72px max(24px, env(safe-area-inset-left)); }
 
-/* ---- strip ---- */
-.strip { display: flex; align-items: center; gap: 12px 10px; flex-wrap: wrap; padding: 18px 0 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
-.brand { font: 700 20px/1 var(--label); letter-spacing: .02em; text-transform: uppercase; margin: 0 auto 0 0; }
-/* The wordmark links back to the progress tracker. */
-.brand a.home { color: inherit; text-decoration: none; }
-.brand a.home:hover span { color: var(--ink); }
-.brand span { font-weight: 600; font-size: 13px; letter-spacing: .12em; color: var(--muted); margin-left: 8px; }
 .navbtn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 10px 14px; background: none; cursor: pointer; }
 .navbtn:hover { color: var(--ink); border-color: var(--line-hi); }
 .navbtn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -85,8 +73,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 max(24px, env(safe-area-ins
 
 @media (max-width: 600px) {
   main { padding: 0 max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); }
-  .strip { padding-top: 14px; }
-  .brand { flex-basis: 100%; }
+
   .navbtn { flex: 1; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
   .panel { padding: 16px; }
   .slab b { font-size: 34px; }

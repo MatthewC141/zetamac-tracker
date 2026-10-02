@@ -28,39 +28,10 @@
   a { color: var(--link); }
   input, select, button { font: inherit; color: var(--ink); }
 
-
   /* ---- game screen ---- */
   #game { display: none; }
   .bar { display: flex; justify-content: space-between; padding: 18px 20px 0; font-size: 18px; line-height: 23px; }
   .band { background: var(--box); margin-top: 199px; min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 11px; font-size: 37px; padding: 0 16px; }
-  /* Guided mode: 30 + 160 + 9 = the band's usual 199px offset, so the band stays put. */
-  #guide { max-width: 720px; height: 160px; margin: 30px auto 0; padding: 12px 16px; overflow: auto;
-           border: 1px dashed #bbb; border-radius: 6px; font-size: 20px; line-height: 1.4; text-align: center;
-           display: none; flex-direction: column; justify-content: center; }
-  .guided #guide { display: flex; }
-  .guided .band { margin-top: 9px; }
-  #guide .guide-empty { color: var(--muted); font-size: 15px; }
-  /* The worked problem sits in a box of its operation's color (set per problem in renderGuide). */
-  #guide { --gc: #999; }
-  #guide .ggrid, #guide .ldiv { border: 2px solid var(--gc); border-radius: 8px; padding: 4px 14px 0; }
-  /* --c-add etc. come from the guide color settings (applyGuideColors). */
-  #guide[data-op="add"] { --gc: var(--c-add); }
-  #guide[data-op="sub"] { --gc: var(--c-sub); }
-  #guide[data-op="mul"] { --gc: var(--c-mul); }
-  #guide[data-op="div"] { --gc: var(--c-div); }
-  #guide.no-color .ggrid, #guide.no-color .ldiv { border-color: transparent; }
-  /* Column-sum layout used by guides: one cell per digit, a rule, and an empty answer row. */
-  .gcap { font-size: 14px; color: var(--muted); margin-bottom: 6px; }
-  .ggrid { display: inline-grid; align-self: center; font-size: 30px; line-height: 1.15; }
-  .gd { text-align: center; min-width: .75em; }
-  .gd.overlap { background: color-mix(in srgb, var(--gc) 18%, transparent); border-radius: 3px; }
-  .gd.sign { color: var(--muted); }
-  .grule { grid-column: 1 / -1; border-top: 2px solid var(--ink); height: 1.15em; margin-top: 3px; }
-  /* Long division: the quotient space sits above the bar, blank. */
-  .ldiv { display: inline-flex; align-self: center; align-items: flex-end; font-size: 30px; line-height: 1.15; padding-top: 1.3em; }
-  .ldiv-d { padding: 0 .25em 0 0; }
-  .ldiv-n { border-top: 2px solid var(--ink); border-left: 2px solid var(--ink); border-top-left-radius: 10px 60%;
-            padding: 2px .35em 0 .4em; letter-spacing: .08em; }
   #answer { width: 186px; height: 47px; font-size: 37px; padding: 0 5px; border: 1px solid #767676; border-radius: 2px; background: #fff; }
   #answer:focus { outline: 2px solid #1a66d6; outline-offset: -1px; }
   #end { display: none; text-align: center; padding: 12px 0; }
@@ -76,7 +47,6 @@
     body { font-size: 16px; }
     .bar { font-size: 18px; padding: 16px 16px 0; }
     .band { margin-top: 90px; font-size: 30px; }
-    #guide { height: 120px; margin: 16px 12px 0; font-size: 17px; }
     #answer { width: 130px; height: 48px; font-size: 30px; }
     #end .score { font-size: 32px; }
     #end .links { font-size: 17px; }
@@ -95,18 +65,6 @@
     #answer { height: 42px; }
   }
 
-  /* Guided mode on phones: a taller box with smaller digits so every worked problem fits. */
-  @media (max-width: 600px) {
-    #guide { height: 150px; justify-content: safe center; padding: 8px 12px; }
-    .ggrid, .ldiv { font-size: 24px; }
-    .gcap { font-size: 13px; margin-bottom: 4px; }
-  }
-  @media (max-height: 500px) {
-    #guide { height: 112px; margin-top: 4px; padding: 4px 12px; justify-content: safe center; }
-    .guided .band { margin-top: 4px; }
-    .ggrid, .ldiv { font-size: 20px; }
-    .gcap { font-size: 12px; margin-bottom: 2px; }
-  }
 </style>
 <link rel="stylesheet" href="theme.css">
 </head>
@@ -195,7 +153,6 @@
     <a href="#" id="stop" hidden>Stop</a>
     <span>Score: <span id="score">0</span></span>
   </div>
-  <div id="guide" aria-live="polite"></div>
   <div class="band">
     <div id="play" style="display:contents">
       <span id="question"></span><span>=</span>
@@ -212,5 +169,6 @@
 
 <script src="problems.js"></script>
 <script src="play.js"></script>
+<script src="game.js"></script>
 </body>
 </html>

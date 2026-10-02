@@ -538,11 +538,11 @@
       if (run.timed) {
         const left = Math.max(0, 60 - (performance.now() - run.start) / 1000);
         $('#d-prog', el).innerHTML = `<b>${Math.ceil(left)}</b> s left · ${run.n} done`;
-        $('#d-rail', el).style.width = `${(1 - left / 60) * 100}%`;
+        $('#d-rail', el).style.transform = `scaleX(${1 - left / 60})`;
         if (left <= 0) finish();
       } else {
         $('#d-prog', el).innerHTML = `<b>${run.n}</b> of ${run.total}`;
-        $('#d-rail', el).style.width = `${run.n / run.total * 100}%`;
+        $('#d-rail', el).style.transform = `scaleX(${run.n / run.total})`;
       }
     }
     function ask() {
@@ -569,7 +569,7 @@
         `<div class="drill-sum"><span class="big">${(total / log.length).toFixed(2)}<small> s</small></span>` +
           `<span class="side"><b>${log.length} ${log.length === 1 ? 'fact' : 'facts'}</b>seconds per fact, ${total.toFixed(1)} s in all</span></div>` +
         `<p class="slow-head">Slowest facts</p>` +
-        `<ol class="slow">${slow.map(([q, t]) => `<li><span>${esc(q)}</span><span class="track"><i style="width:${(t / slow[0][1] * 100).toFixed(1)}%"></i></span><span class="t">${t.toFixed(2)} s</span></li>`).join('')}</ol>` +
+        `<ol class="slow">${slow.map(([q, t]) => `<li><span>${esc(q)}</span><span class="track"><i style="transform:scaleX(${(t / slow[0][1]).toFixed(3)})"></i></span><span class="t">${t.toFixed(2)} s</span></li>`).join('')}</ol>` +
         `<div class="drill-ctl"><button class="btn go" type="button" data-act="slow">Drill these again</button><button class="btn" type="button" data-act="setup">New drill</button></div>`;
       el.dataset.slow = JSON.stringify(slow.map(([q]) => q));
       $('[data-act="slow"]', el).focus();

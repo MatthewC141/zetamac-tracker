@@ -723,7 +723,7 @@ static void handle_client(int fd) {
       {"/sw.js", "sw.js"},          {"/manifest.webmanifest", "manifest.webmanifest"},
       {"/icons/icon-192.png", "icons/icon-192.png"}, {"/icons/icon-512.png", "icons/icon-512.png"},
       {"/icons/icon-maskable-512.png", "icons/icon-maskable-512.png"}, {"/icons/apple-touch-icon.png", "icons/apple-touch-icon.png"},
-      {"/theme.css", "theme.css"},
+      {"/theme.css", "theme.css"},   {"/game.js", "game.js"},
       {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
   if (method == "GET" && kPages.count(path)) {
     const std::string& page = kPages.at(path);

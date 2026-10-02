@@ -3,7 +3,8 @@
 window.ZM_MATCHES = (() => {
   const cloud = window.ZM_CLOUD;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }), dayYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const clockTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
   const GAMES = { standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
   const COLS = 'id,created_at,is_public,ranked,rule,game,goal,seconds,p1,p2,p1_name,p2_name,winner,p1_score,p2_score,p1_ms,p2_ms,p1_done,p2_done,p1_elo,p2_elo,p1_delta,p2_delta';
 
@@ -38,8 +39,7 @@ window.ZM_MATCHES = (() => {
 
   const when = d => {
     const now = new Date(), same = d.toDateString() === now.toDateString();
-    const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return same ? `Today ${time}` : `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() === now.getFullYear() ? '' : `, ${d.getFullYear()}`}`;
+    return same ? `Today ${clockTime.format(d)}` : (d.getFullYear() === now.getFullYear() ? day : dayYear).format(d);
   };
   const ruleText = m => (m.rule === 'race' ? `race to ${m.goal}` : '2:00');
   const LETTER = { won: 'W', lost: 'L', draw: 'D' }, WORD = { won: 'Won', lost: 'Lost', draw: 'Draw' };

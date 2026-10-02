@@ -13,13 +13,6 @@
 <meta name="color-scheme" content="dark">
 <title>Zetamac Live Timing</title>
 <style>
-  @font-face { font-family: "Titillium Web"; font-weight: 400; font-display: swap; src: url(fonts/TitilliumWeb-400.woff2) format("woff2"); }
-  @font-face { font-family: "Titillium Web"; font-weight: 600; font-display: swap; src: url(fonts/TitilliumWeb-600.woff2) format("woff2"); }
-  @font-face { font-family: "Titillium Web"; font-weight: 700; font-display: swap; src: url(fonts/TitilliumWeb-700.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 400; font-display: swap; src: url(fonts/BarlowSemiCondensed-400.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url(fonts/BarlowSemiCondensed-500.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url(fonts/BarlowSemiCondensed-600.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; font-display: swap; src: url(fonts/BarlowSemiCondensed-700.woff2) format("woff2"); }
 
   /* Live-timing world: near-black ground, flat panels, white tabular figures. Sector colors are
      the only bright ink: purple = best of the field, green = improved, yellow = slower.
@@ -54,8 +47,8 @@
     --heat-2: #545a6b;
     --heat-3: #969cad;
     --heat-4: #eceef2;
-    --label: "Titillium Web", "Barlow Semi Condensed", system-ui, sans-serif;
-    --figure: "Barlow Semi Condensed", "Titillium Web", system-ui, sans-serif;
+    --label: "Geist", system-ui, sans-serif;
+    --figure: "Geist", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html { background: var(--bg); scrollbar-color: #3a3d4a var(--bg); }
@@ -80,21 +73,6 @@
   h2 { font: 700 13px/1.2 var(--label); letter-spacing: .12em; text-transform: uppercase; margin: 0; }
   .sub { color: var(--muted); font-size: 13px; }
   .h-note { font: 500 14px/1 var(--figure); letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: 8px; }
-
-  /* ---- timing strip ---- */
-  .strip { display: flex; align-items: center; gap: 22px; padding: 14px 0; margin-bottom: 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .brand { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 20px/1 var(--label); letter-spacing: .02em; text-transform: uppercase; }
-  .brand span { font-weight: 400; color: var(--muted); letter-spacing: .14em; font-size: 13px; }
-  .ident { display: flex; flex-direction: column; gap: 7px; }
-  .session { display: flex; gap: 14px; font: 600 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .session b { color: var(--ink); font-weight: 600; }
-  .live { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
-  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 3px rgba(255, 81, 71, .18); }
-  .nav { margin-left: auto; display: flex; gap: 6px; }
-  .play-btn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; color: var(--ink); background: var(--raise); border: 1px solid var(--line); padding: 10px 16px; border-radius: 3px; transition: background .15s, border-color .15s; }
-  .play-btn:hover { border-color: #3d4050; background: #22232d; }
-  .play-btn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .play-btn.go:hover { background: #fff; }
 
   .flash { margin: 0 0 14px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--ink); font-size: 15px; }
   .flash::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 10px; vertical-align: 1px; }
@@ -129,7 +107,7 @@
   .stripe { width: 4px; height: 26px; border-radius: 1px; background: var(--team); }
   .code { font: 700 17px/1 var(--label); letter-spacing: .06em; }
   .track { position: relative; height: 8px; background: var(--grid); border-radius: 1px; overflow: hidden; }
-  .track i { position: absolute; inset: 0 auto 0 0; background: var(--sector, #6b7080); border-radius: 1px; transition: width .6s cubic-bezier(.16, 1, .3, 1); }
+  .track i { position: absolute; inset: 0; background: var(--sector, #6b7080); transform-origin: left; transition: transform .6s cubic-bezier(.16, 1, .3, 1); }
   .time { font: 700 21px/1 var(--figure); text-align: right; color: var(--sector, var(--ink)); }
   .time small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 1px; }
   .gap { font: 600 14px/1 var(--figure); color: var(--muted); text-align: right; }
@@ -156,6 +134,7 @@
   .facts-head h3 { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; margin: 0; color: var(--muted); }
   .tower.facts li { grid-template-columns: 26px 4px 128px minmax(0, 1fr) 70px 64px; height: 38px; }
   .tower.facts .stripe { height: 20px; }
+  .tower.facts.slowq li { grid-template-columns: 26px 4px minmax(150px, max-content) minmax(0, 1fr) 70px 64px; }
   .tower.facts .fact-name { font: 600 16px/1 var(--figure); white-space: nowrap; }
   .tower.facts .time { font-size: 18px; }
   .tower.facts .gap { font-size: 13px; }
@@ -183,10 +162,10 @@
   .laps li small { display: block; font: 500 11px/1 var(--figure); color: var(--muted); margin-top: 5px; white-space: nowrap; }
   .rail { position: relative; height: 44px; margin: 6px 0 18px; }
   .rail-track { position: absolute; left: 0; right: 0; top: 16px; height: 6px; background: var(--grid); border-radius: 1px; }
-  .rail-fill { position: absolute; left: 0; top: 16px; height: 6px; background: var(--ink); border-radius: 1px; transition: width .7s cubic-bezier(.16, 1, .3, 1); }
+  .rail-fill { position: absolute; left: 0; top: 16px; height: 6px; background: var(--ink); border-radius: 1px; }
   .rail-mark { position: absolute; top: 9px; width: 2px; height: 20px; background: var(--purple); }
   .rail-label { position: absolute; top: 31px; transform: translateX(-50%); font: 700 11px/1 var(--label); letter-spacing: .1em; color: var(--purple); white-space: nowrap; }
-  .rail-pb { position: absolute; top: 13px; width: 2px; height: 12px; background: var(--muted); }
+
   .rail-scale { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; font: 500 11px/1 var(--figure); color: var(--muted); }
 
   /* ---- stats readout strip (follows the series selector) ---- */
@@ -255,7 +234,6 @@
   .fold:hover { color: #fff; }
   .collapsible.folded .panel-head { margin-bottom: 0; }
   .collapsible.folded .panel-body { display: none; }
-
 
   .heat-scroll { overflow-x: auto; }
   #heat { display: block; }
@@ -456,50 +434,11 @@
   .help-btn:hover { color: var(--ink); border-color: #3d4050; }
   a.help-btn { text-decoration: none; }
   .help-btn[hidden] { display: none !important; }
-  .acct-btn { color: var(--ink); }
-  .strip .help-btn + .help-btn { margin-left: -16px; }
-  /* The header keeps every button on one line with the wordmark: buttons run a little tighter
-     here than elsewhere, and on narrower screens the date line, then the wordmark's subtitle,
-     step aside before anything wraps. Phones get their own stacked layout below. */
-  .strip { gap: 14px; }
-  .strip .play-btn { padding: 10px 12px; letter-spacing: .1em; }
-  .strip .help-btn { padding: 10px 11px; letter-spacing: .1em; }
-  .strip .help-btn + .help-btn { margin-left: -8px; }
-  @media (max-width: 1180px) {
-    .session { display: none; }
-    .strip .play-btn { padding: 10px 9px; }
-    .strip .help-btn { padding: 10px 8px; }
-  }
-  @media (max-width: 1100px) { .brand span { display: none; } }
-  /* Tablets: the wordmark, date and account on top, then every other button on one row. */
-  @media (min-width: 641px) and (max-width: 1000px) {
-    .strip { row-gap: 12px; }
-    .ident { order: -2; flex: 1 0 60%; }
-    .session { display: flex; }
-    .brand span { display: inline; }
-    .nav { order: 1; margin-left: 0; }
-    .strip .help-btn { order: 2; }
-    .strip .help-btn + .help-btn { margin-left: -8px; }
-    .strip .help-btn.acct-btn { order: -1; margin-left: 0; }
-  }
-  @media (min-width: 641px) and (max-width: 860px) {
-    .strip .play-btn, .strip .help-btn:not(.acct-btn) { padding: 10px 6px; font-size: 11px; letter-spacing: .06em; }
-  }
+
   @media (max-width: 640px) {
-    /* Phones: wordmark with the account at its right, the date line, the four games, then
-       Leaderboard / Guide / How it works as three equal buttons. */
-    .strip { gap: 10px 6px; }
-    .ident { order: -3; flex: 1; min-width: 0; gap: 9px; }
-    .session { display: flex; }
-    .brand { white-space: nowrap; }
-    .brand span { display: inline; }
-    .nav { order: 0; margin-left: 0; width: 100%; }
-    .nav .play-btn { flex: 1 1 auto; min-width: 0; text-align: center; padding: 10px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
-    /* The narrowest phones: the six games as two rows of three. */
-    @media (max-width: 380px) { .nav { flex-wrap: wrap; } .nav .play-btn { flex: 1 1 30%; padding: 10px 3px; letter-spacing: .03em; } }
+
     .help-btn { order: 1; flex: 1 1 0; text-align: center; padding: 9px 4px; font-size: 11px; letter-spacing: .08em; white-space: nowrap; }
-    .strip .help-btn + .help-btn { margin-left: 0; }
-    .strip .acct-btn { order: -2; flex: none; padding: 9px 12px; }
+
   }
   /* ---- replay ---- */
   #replay { width: min(860px, calc(100vw - 32px)); padding: 0; border: 1px solid #3d4050; border-radius: 4px; background: var(--panel); color: var(--ink); }
@@ -572,7 +511,6 @@
   .w-demo-foot { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
   .w-bar-head { margin: 22px 0 10px; padding-top: 16px; border-top: 1px solid var(--line); }
   .w-demo .rail { margin: 0; }
-  .w-demo .rail-fill { transition: none; }
   .w-demo .tower li { height: auto; grid-template-columns: 16px 4px 38px minmax(0, 1fr) 46px; gap: 0 8px; padding: 8px 4px 8px 0; }
   .w-demo .track i { transition: none; }
   .w-demo .tower .pos { font-size: 14px; }
@@ -632,7 +570,7 @@
       <a href="leaderboard.html">Leaderboard</a>
       <a href="guide.html">Guide</a>
       <button id="help-open" type="button">How it works</button>
-      <a class="zh-acct" href="account.html" id="acct-btn" hidden>Sign up</a><span id="session-date" hidden></span>
+      <a class="zh-acct" href="account.html" id="acct-btn" hidden>Sign up</a>
     </nav>
   </header>
 
@@ -907,10 +845,10 @@
       <div class="w-demo" aria-hidden="true">
         <div class="w-demo-head"><span>Example weak spots</span></div>
         <ol class="tower">
-          <li class="op-div s-yellow"><span class="pos">1</span><span class="stripe"></span><span class="code">DIV</span><span class="track"><i style="width:100%"></i></span><span class="time">2.06<small>s</small></span></li>
-          <li class="op-add s-yellow"><span class="pos">2</span><span class="stripe"></span><span class="code">ADD</span><span class="track"><i style="width:87%"></i></span><span class="time">1.79<small>s</small></span></li>
-          <li class="op-mul s-green"><span class="pos">3</span><span class="stripe"></span><span class="code">MUL</span><span class="track"><i style="width:76%"></i></span><span class="time">1.57<small>s</small></span></li>
-          <li class="op-sub s-purple"><span class="pos">4</span><span class="stripe"></span><span class="code">SUB</span><span class="track"><i style="width:72%"></i></span><span class="time">1.49<small>s</small></span></li>
+          <li class="op-div s-yellow"><span class="pos">1</span><span class="stripe"></span><span class="code">DIV</span><span class="track"><i style="transform:scaleX(1.0)"></i></span><span class="time">2.06<small>s</small></span></li>
+          <li class="op-add s-yellow"><span class="pos">2</span><span class="stripe"></span><span class="code">ADD</span><span class="track"><i style="transform:scaleX(0.87)"></i></span><span class="time">1.79<small>s</small></span></li>
+          <li class="op-mul s-green"><span class="pos">3</span><span class="stripe"></span><span class="code">MUL</span><span class="track"><i style="transform:scaleX(0.76)"></i></span><span class="time">1.57<small>s</small></span></li>
+          <li class="op-sub s-purple"><span class="pos">4</span><span class="stripe"></span><span class="code">SUB</span><span class="track"><i style="transform:scaleX(0.72)"></i></span><span class="time">1.49<small>s</small></span></li>
         </ol>
         <p class="w-demo-foot">Seconds per question. Purple is your fastest, green got faster, yellow got slower.</p>
       </div>

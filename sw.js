@@ -2,13 +2,10 @@
 // fetched, and served from here only when the network can't be reached, so an online visit
 // always gets the latest version. Scores are handled by the pages themselves (store.js): signed
 // out they live in the browser, signed in they wait for a connection to go up.
-const CACHE = 'zetamac-v2';
+const CACHE = 'zetamac-v3';
 const PAGES = ['./', 'index.html', 'play.html', 'squares.html', 'mixed.html', 'practice.html', 'optiver.html', 'duel.html', 'guide.html',
   'leaderboard.html', 'account.html', 'profile.html', 'cloud.js', 'store.js', 'launch.js', 'launch.css', 'site.css', 'theme.css', 'dashboard.js',
-  'play.js', 'squares.js', 'mixed.js', 'practice.js', 'optiver.js', 'problems.js', 'guide.js', 'manifest.webmanifest',
-  'fonts/TitilliumWeb-400.woff2', 'fonts/TitilliumWeb-600.woff2', 'fonts/TitilliumWeb-700.woff2', 'fonts/BarlowSemiCondensed-400.woff2',
-  'fonts/BarlowSemiCondensed-500.woff2', 'fonts/BarlowSemiCondensed-600.woff2', 'fonts/BarlowSemiCondensed-700.woff2',
-  'fonts/Geist-Variable.woff2', 'fonts/GeistMono-Variable.woff2'];
+  'game.js', 'play.js', 'squares.js', 'mixed.js', 'practice.js', 'optiver.js', 'problems.js', 'guide.js', 'manifest.webmanifest', 'fonts/Geist-Variable.woff2', 'fonts/GeistMono-Variable.woff2'];
 
 self.addEventListener('install', e => {
   // Best effort: a file that fails to load doesn't stop the rest from being kept.

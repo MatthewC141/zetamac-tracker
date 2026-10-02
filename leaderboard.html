@@ -17,6 +17,13 @@
   .t-arith { --team: #f2f3f5; } .t-sq { --team: #ffa53d; } .t-mix { --team: #2fbf95; } .t-o80 { --team: #c9a7ff; } .t-rank { --team: #c3c8d4; } .t-end { --team: #b9bfcc; }
   .t-daily { --team: #f2f3f5; } .t-seq { --team: #2fd0f5; } .t-frac { --team: #8fb3ff; } .t-est { --team: #ff62b8; }
   .when { margin-bottom: 12px; }
+  .day-step { display: inline-flex; gap: 4px; margin-right: auto; }
+  .day-step[hidden] { display: none; }
+  .day-step button { width: 34px; height: 34px; display: grid; place-items: center; background: var(--raise); border: 1px solid var(--line); border-radius: 7px; color: var(--ink); cursor: pointer; }
+  .day-step button:hover:not(:disabled) { border-color: var(--line-hi); }
+  .day-step button:disabled { opacity: .35; cursor: default; }
+  .day-step svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  @media (pointer: coarse) { .day-step button { width: 44px; height: 44px; } }
   #tower .who a { color: inherit; text-decoration: none; }
   #tower .who a:hover { text-decoration: underline; text-decoration-color: var(--line-hi); }
   .lb { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 14px; align-items: start; }
@@ -113,7 +120,12 @@
       </section>
     </div>
     <section class="panel" aria-live="polite">
-      <div class="board-head"><h2 id="b-title"></h2><span class="sub" id="b-sub"></span></div>
+      <div class="board-head"><h2 id="b-title"></h2>
+        <span class="day-step" id="day-step" hidden>
+          <button type="button" data-day="-1" aria-label="Previous day"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M8 2L4 6l4 4"/></svg></button>
+          <button type="button" data-day="1" id="day-next" aria-label="Next day"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg></button>
+        </span>
+        <span class="sub" id="b-sub"></span></div>
       <ol class="tower" id="tower"></ol>
       <p class="rules">Only games played on the site count, each checked against its question-by-question times. Hand-logged scores stay off the board.</p>
     </section>

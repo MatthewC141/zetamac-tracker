@@ -13,20 +13,14 @@
 <meta name="color-scheme" content="dark">
 <title>Zetamac Guide</title>
 <style>
-  @font-face { font-family: "Titillium Web"; font-weight: 600; font-display: swap; src: url(fonts/TitilliumWeb-600.woff2) format("woff2"); }
-  @font-face { font-family: "Titillium Web"; font-weight: 700; font-display: swap; src: url(fonts/TitilliumWeb-700.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 400; font-display: swap; src: url(fonts/BarlowSemiCondensed-400.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url(fonts/BarlowSemiCondensed-500.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url(fonts/BarlowSemiCondensed-600.woff2) format("woff2"); }
-  @font-face { font-family: "Barlow Semi Condensed"; font-weight: 700; font-display: swap; src: url(fonts/BarlowSemiCondensed-700.woff2) format("woff2"); }
 
   /* Each operation gets its own color. */
   :root {
     --bg: #0b0c10; --panel: #13141a; --raise: #1b1c24; --grid: #1c1e26;
     --line: #262833; --line-hi: #3d4050; --ink: #f2f3f5; --prose: #c7cad3; --muted: #9a9eab; --dim: #4a4d58;
     --purple: #b561ff; --green: #22d764; --yellow: #ffd21f; --red: #ff5147;
-    --label: "Titillium Web", "Barlow Semi Condensed", system-ui, sans-serif;
-    --figure: "Barlow Semi Condensed", "Titillium Web", system-ui, sans-serif;
+    --label: "Geist", system-ui, sans-serif;
+    --figure: "Geist", system-ui, sans-serif;
     --ease: cubic-bezier(.16, 1, .3, 1);
   }
   .team-add { --team: #2fd0f5; } .team-sub { --team: #ff5147; } .team-mul { --team: #6d8bff; }
@@ -47,13 +41,6 @@
 
   main { max-width: 1240px; margin: 0 auto; padding: 0 max(24px, env(safe-area-inset-right)) 72px max(24px, env(safe-area-inset-left)); }
 
-  /* ---- strip ---- */
-  .strip { display: flex; align-items: center; gap: 12px 10px; flex-wrap: wrap; padding: 18px 0 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
-  .brand { font: 700 20px/1 var(--label); letter-spacing: .02em; text-transform: uppercase; margin: 0 auto 0 0; }
-  /* The wordmark links back to the progress tracker. */
-.brand a.home { color: inherit; text-decoration: none; }
-.brand a.home:hover span { color: var(--ink); }
-.brand span { font-weight: 600; font-size: 13px; letter-spacing: .12em; color: var(--muted); margin-left: 8px; }
   .navbtn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 10px 14px; }
   .navbtn:hover { color: var(--ink); border-color: var(--line-hi); }
   .navbtn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -220,7 +207,7 @@
   .drill-top { display: flex; justify-content: space-between; align-items: baseline; font: 600 15px/1 var(--figure); color: var(--muted); }
   .drill-top b { color: var(--ink); font-weight: 700; }
   .drill-rail { height: 2px; background: var(--line); margin: 12px 0 22px; border-radius: 1px; overflow: hidden; }
-  .drill-rail i { display: block; height: 100%; width: 0; background: var(--purple); transition: width .3s var(--ease); }
+  .drill-rail i { display: block; height: 100%; background: var(--purple); transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease); }
   .drill-q { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; font: 700 56px/1 var(--figure); margin-bottom: 18px; }
   .drill-q .eq { color: var(--dim); }
   .drill-sum { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
@@ -233,7 +220,7 @@
   .slow li { display: grid; grid-template-columns: 76px minmax(0, 1fr) 58px; align-items: center; gap: 12px; height: 34px; border-top: 1px solid var(--grid); font: 600 16px/1 var(--figure); }
   .slow li:last-child { border-bottom: 1px solid var(--grid); }
   .slow .track { height: 6px; background: var(--grid); border-radius: 1px; overflow: hidden; }
-  .slow .track i { display: block; height: 100%; background: var(--yellow); }
+  .slow .track i { display: block; height: 100%; background: var(--yellow); transform-origin: left; }
   .slow .t { text-align: right; color: var(--yellow); }
   .drill-ctl { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 
@@ -256,8 +243,7 @@
   }
   @media (max-width: 600px) {
     main { padding: 0 max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); }
-    .strip { padding-top: 14px; }
-    .brand { flex-basis: 100%; }
+
     .navbtn { flex: 1; text-align: center; }
     .bay { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: 10px 2px 11px; gap: 7px; }
     .bay-stripe { width: 22px; height: 4px; }

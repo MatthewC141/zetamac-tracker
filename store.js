@@ -294,6 +294,26 @@
     addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
+  // A challenge waiting for you marks the Duel tab on every page (it only waits while the
+  // challenger keeps their page open, so this looks every few seconds while the tab is showing).
+  // ponytail: polling; a database push channel if the request count ever matters.
+  addEventListener('DOMContentLoaded', () => {
+    const tab = document.querySelector('.zh-nav a[href="duel.html"]');
+    if (!tab) return;
+    const look = async () => {
+      const c = cloud(), game = document.querySelector('#game');
+      if (!c || document.hidden || game?.style.display === 'block') return;
+      try {
+        const list = await c.rest('rpc/mm_invites', { method: 'POST', body: {} });
+        const n = Array.isArray(list) ? list.length : 0;
+        tab.toggleAttribute('data-invites', n > 0);
+        tab.title = n ? `${list[0].from} challenged you` : '';
+      } catch {}
+    };
+    look();
+    setInterval(look, 5000);
+  });
+
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);

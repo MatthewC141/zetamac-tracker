@@ -5,12 +5,13 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const cloud = window.ZM_CLOUD, M = window.ZM_MATCHES;
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmt = opts => { const f = new Intl.DateTimeFormat(undefined, opts); return d => f.format(d); };
+  const day = fmt({ month: 'short', day: 'numeric' }), dayYear = fmt({ month: 'short', day: 'numeric', year: 'numeric' }), monthName = fmt({ month: 'short' }), monthYear = fmt({ month: 'short', year: 'numeric' });
   const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const pad = n => String(n).padStart(2, '0');
   const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-  const dateText = s => { const d = parseDate(s); return `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() === new Date().getFullYear() ? '' : `, ${d.getFullYear()}`}`; };
+  const dateText = s => { const d = parseDate(s); return (d.getFullYear() === new Date().getFullYear() ? day : dayYear)(d); };
   // The same boards as the leaderboard, in its order.
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
@@ -52,7 +53,7 @@
     $('#p-name').textContent = p.username;
     const joined = parseDate(p.joined);
     const mine = cloud.user()?.name?.toLowerCase() === p.username.toLowerCase();
-    $('#p-meta').textContent = `Playing since ${MONTHS[joined.getMonth()]} ${joined.getFullYear()}${mine ? ' · this is you' : ''}`;
+    $('#p-meta').textContent = `Playing since ${monthYear(joined)}${mine ? ' · this is you' : ''}`;
 
     // Duel rank: shown once placed. Past seasons: the rank each one peaked at.
     const r = p.rating;
@@ -96,11 +97,11 @@
       const col = Math.floor(i / 7), row = d.getDay(), n = days[dayKey(d)] || 0;
       if (row === 0 && d.getMonth() !== lastMonth && d.getDate() <= 7) {
         lastMonth = d.getMonth();
-        if (col < weeks - 1) h += `<text x="${left + col * pitch}" y="10">${MONTHS[lastMonth]}</text>`;
+        if (col < weeks - 1) h += `<text x="${left + col * pitch}" y="10">${monthName(d)}</text>`;
       }
       if (n) { total += n; played++; }
       const level = n ? 1 + cuts.filter(c => n > c).length : 0;
-      h += `<rect x="${left + col * pitch}" y="${top + row * pitch}" width="${cell}" height="${cell}" rx="3" fill="var(--heat-${level})"><title>${n ? `${n} game${n === 1 ? '' : 's'}` : 'No games'} · ${MONTHS[d.getMonth()]} ${d.getDate()}</title></rect>`;
+      h += `<rect x="${left + col * pitch}" y="${top + row * pitch}" width="${cell}" height="${cell}" rx="3" fill="var(--heat-${level})"><title>${n ? `${n} game${n === 1 ? '' : 's'}` : 'No games'} · ${day(d)}</title></rect>`;
     }
     const W = left + weeks * pitch, H = top + 7 * pitch;
     svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);

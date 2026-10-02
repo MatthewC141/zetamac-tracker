@@ -125,6 +125,48 @@ grant select, delete on public.scores to authenticated;
 grant insert (ts, date, score, seconds, source, mode, elapsed, detail) on public.scores to authenticated;
 grant select on public.profiles to authenticated;
 
+-- ---- the daily challenge's questions --------------------------------------------------------
+-- The day's questions are built in the browser from a seed, and the seed comes from here: it's
+-- made from the date and a secret only the database holds, and handed out when a signed-in player
+-- starts their one try (daily_start), so no one can build a day's questions ahead of time. A
+-- result only counts if it's saved within 4 minutes of that start.
+create table if not exists public.daily_salt (
+  id boolean primary key default true check (id),
+  salt text not null default md5(random()::text || clock_timestamp()::text)
+);
+insert into public.daily_salt default values on conflict do nothing;
+create table if not exists public.daily_starts (
+  user_id uuid not null references auth.users on delete cascade,
+  day date not null,
+  started_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
+alter table public.daily_salt enable row level security;
+alter table public.daily_starts enable row level security;
+revoke all on public.daily_salt, public.daily_starts from anon, authenticated;
+create or replace function public.daily_start(p_date date) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare utc date := (now() at time zone 'utc')::date; t timestamptz;
+begin
+  if auth.uid() is null then raise exception 'Sign in to play the daily challenge with everyone.'; end if;
+  if p_date is null or p_date < utc - 1 or p_date > utc + 1 then raise exception 'That day’s challenge isn’t open.'; end if;
+  insert into public.daily_starts (user_id, day) values (auth.uid(), p_date) on conflict do nothing;
+  select started_at into t from public.daily_starts where user_id = auth.uid() and day = p_date;
+  return jsonb_build_object('started', t,
+    'seed', (select ('x' || substr(md5(salt || p_date::text), 1, 8))::bit(32)::int from public.daily_salt));
+end $$;
+revoke execute on function public.daily_start(date) from public, anon;
+grant execute on function public.daily_start(date) to authenticated;
+-- Whether that player started that day's challenge in the last 4 minutes (the score check asks
+-- this; players can't read the starts table themselves).
+create or replace function public.daily_started(p_user uuid, p_day date) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.daily_starts d where d.user_id = p_user and d.day = p_day
+                 and d.started_at > now() - interval '4 minutes');
+$$;
+revoke execute on function public.daily_started(uuid, date) from public, anon;
+grant execute on function public.daily_started(uuid, date) to authenticated;
+
 -- Each save is checked here. First, limits that keep one account from filling the database: 20,000
 -- games and 50 MB of question logs in all, and 1,000 saves or 25 MB of logs an hour (plenty for
 -- importing years of history). Then whether the
@@ -160,7 +202,7 @@ begin
   end if;
   new.verified := false;
   if new.source <> 'game' or new.mode = 'guided' or new.detail is null or new.date > utc + 1
-     or (new.mode = 'daily' and new.date < utc - 1) then
+     or (new.mode = 'daily' and (new.date < utc - 1 or not public.daily_started(new.user_id, new.date))) then
     return new;
   end if;
   n := jsonb_array_length(new.detail);
@@ -193,7 +235,8 @@ create trigger scores_check before insert on public.scores
 -- Each player's best verified game per board: names and figures only, readable by anyone. On the
 -- quant tests' boards a tie on score goes to fewer wrong answers, then the faster finish.
 -- leaderboard_week is the same for games played this week (from Monday), and daily_board is every
--- daily challenge result, one a player a day.
+-- daily challenge result, one a player a day. The squares boards count games from 1 October 2026,
+-- when numbers ending in 0 left the squares game (earlier games were on an easier set).
 create or replace function public.wrongs_in(p_mode text, p_detail jsonb) returns int
 language sql immutable set search_path = '' as $$
   select case when p_mode in ('o80', 'seq', 'frac', 'est') then (select count(*)::int from jsonb_array_elements(p_detail) q where q ->> 'r' = 'n') end;
@@ -203,12 +246,14 @@ create or replace view public.leaderboard with (security_invoker = false) as
     p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
   from public.scores s join public.profiles p on p.id = s.user_id
   where s.verified and not p.private and s.mode not in ('daily', 'drill')
+    and not (s.mode in ('sq99h', 'sq999h') and s.date < date '2026-10-01')
   order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
 create or replace view public.leaderboard_week with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
     p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
   from public.scores s join public.profiles p on p.id = s.user_id
   where s.verified and not p.private and s.mode not in ('daily', 'drill')
+    and not (s.mode in ('sq99h', 'sq999h') and s.date < date '2026-10-01')
     and s.date >= date_trunc('week', now() at time zone 'utc')::date
   order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
 create or replace view public.daily_board with (security_invoker = false) as

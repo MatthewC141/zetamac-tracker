@@ -6,7 +6,7 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const cloud = window.ZM_CLOUD;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }), dayYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const pad = n => String(n).padStart(2, '0');
   const now = new Date(), today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -28,7 +28,27 @@
   ];
   let chosen = BOARDS[0].key, week = false, showOpen = false;
   try { const k = localStorage.getItem('zm-board'); if (BOARDS.some(b => b.key === k)) chosen = k; week = localStorage.getItem('zm-board-week') === '1'; } catch {}
-  if (location.hash === '#daily') chosen = 'daily';
+  // The link carries what's showing (leaderboard.html#board=o80|480&when=week), so it can be shared.
+  // #daily is the short link to today's challenge board.
+  let viewDay = today;  // the daily board's day
+  const past = new Map();  // other days' daily boards, as they're looked at
+  const readURL = () => {
+    const q = new URLSearchParams(location.hash.slice(1));
+    if (location.hash === '#daily') chosen = 'daily';
+    if (BOARDS.some(b => b.key === q.get('board'))) chosen = q.get('board');
+    if (q.has('when')) week = q.get('when') === 'week';
+    viewDay = /^\d{4}-\d{2}-\d{2}$/.test(q.get('day') || '') && q.get('day') <= today ? q.get('day') : today;
+  };
+  readURL();
+  addEventListener('hashchange', () => { readURL(); load(true); });  // a link opened on this page
+  const syncURL = () => {
+    const q = new URLSearchParams();
+    if (chosen !== BOARDS[0].key) q.set('board', chosen);
+    if (week) q.set('when', 'week');
+    if (chosen === 'daily' && viewDay !== today) q.set('day', viewDay);
+    history.replaceState(null, '', `${q}` ? `#${q}` : location.pathname);
+  };
+  const shiftDay = (s, n) => { const [y, m, d] = s.split('-').map(Number), t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`; };
   let byBoard = new Map(), loaded = false;
   const me = () => cloud?.user()?.name?.toLowerCase() || null;
 
@@ -36,7 +56,7 @@
   if (user) { $('#acct-link').textContent = user.name; }
   $('#join').hidden = !(window.ZM_WEB && cloud?.ready && !user);
 
-  const dateText = s => { const [y, m, d] = s.split('-').map(Number); return `${MONTHS[m - 1]} ${d}${y === new Date().getFullYear() ? '' : `, ${y}`}`; };
+  const dateText = s => { const [y, m, d] = s.split('-').map(Number); return (y === new Date().getFullYear() ? day : dayYear).format(new Date(y, m - 1, d)); };
   const RANK = window.ZM_MATCHES?.rank;
   const timed = b => !b.daily && !b.elo;  // boards the week switch applies to
   // The figure, with what breaks ties on each board: the endless run's time, a test's wrong
@@ -77,8 +97,11 @@
   }
 
   function renderTower(animate = false) {
-    const b = BOARDS.find(x => x.key === chosen), list = byBoard.get(b.key) || [], mine = me();
-    $('#b-title').innerHTML = `${b.name}<small>${b.len}${week && timed(b) ? ' · this week' : ''}</small>`;
+    const b = BOARDS.find(x => x.key === chosen), mine = me();
+    const list = (b.daily && viewDay !== today ? past.get(viewDay) : byBoard.get(b.key)) || [];
+    $('#b-title').innerHTML = `${b.name}<small>${b.daily ? (viewDay === today ? 'Today' : dateText(viewDay)) : b.len}${week && timed(b) ? ' · this week' : ''}</small>`;
+    $('#day-step').hidden = !b.daily;
+    $('#day-next').disabled = viewDay >= today;
     $('#b-sub').textContent = list.length ? `${list.length} ${list.length === 1 ? 'player' : 'players'} · ${b.endless ? 'questions answered' : b.elo ? 'rating · ranked duels, this season' : b.daily ? 'one try each, the same questions for everyone' : b.test ? 'best score · ties: fewer wrong, then faster' : 'best score'}` : '';
     const tower = $('#tower');
     const pl = places(list);
@@ -88,7 +111,7 @@
       return `<li class="${b.team}${you ? ' me' : ''}"><span class="pos">${pl[i]}</span><span class="stripe"></span>` +
         `<span class="who">${nameLink(r.username)}${you ? '<span class="you">You</span>' : ''}${ahead ? `<span class="to-pass">${ahead.score - r.score + 1} to pass ${esc(ahead.username)}</span>` : ''}</span>` +
         `<span class="figure${pl[i] === 1 ? ' p1' : ''}">${figure(b, r)}</span><span class="gap">${behind(b, r, list[0])}</span><span class="date">${b.elo ? `${r.wins}–${r.losses}` : b.daily ? '' : dateText(r.date)}</span></li>`;
-    }).join('') : `<li class="empty-row"><p class="empty">${b.daily ? 'No one has played today’s challenge yet' : week && timed(b) ? 'No one on this board this week yet' : 'No one on this board yet'}. Play ${b.play || (b.endless ? 'an endless run' : `a ${b.len} ${b.name.toLowerCase()} game`)} on the site while signed in to set the first mark.</p></li>`;
+    }).join('') : `<li class="empty-row"><p class="empty">${b.daily ? (viewDay === today ? 'No one has played today’s challenge yet' : 'No one played that day’s challenge') : week && timed(b) ? 'No one on this board this week yet' : 'No one on this board yet'}${b.daily && viewDay !== today ? '.' : `. Play ${b.play || (b.endless ? 'an endless run' : `a ${b.len} ${b.name.toLowerCase()} game`)} on the site while signed in to set the first mark.`}</p></li>`;
     if (animate && !reduceMotion.matches) { tower.classList.remove('enter'); void tower.offsetWidth; tower.classList.add('enter'); }
     const row = tower.querySelector('li.me');
     if (animate && row && innerWidth > 900) row.scrollIntoView({ block: 'nearest', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
@@ -100,6 +123,7 @@
     if (!btn) return;
     chosen = btn.dataset.key;
     try { localStorage.setItem('zm-board', chosen); } catch {}
+    syncURL();
     renderBoards();
     renderTower(true);
     if (innerWidth <= 900) $('#tower').closest('.panel').scrollIntoView({ block: 'start', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
@@ -109,7 +133,22 @@
     if (!btn || (btn.dataset.when === 'week') === week) return;
     week = btn.dataset.when === 'week';
     try { localStorage.setItem('zm-board-week', week ? '1' : '0'); } catch {}
+    syncURL();
     load(true);
+  });
+  // The daily board steps back through earlier days (and forward again, up to today).
+  async function showDay(d) {
+    viewDay = d;
+    syncURL();
+    if (viewDay !== today && !past.has(viewDay)) {
+      try { past.set(viewDay, (await cloud.daily(viewDay)).filter(r => typeof r.username === 'string' && Number.isInteger(r.score)).map(r => ({ username: r.username, score: r.score, elapsed: 0 }))); }
+      catch { past.set(viewDay, []); }
+    }
+    renderTower(true);
+  }
+  $('#day-step').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b && !b.disabled) showDay(shiftDay(viewDay, Number(b.dataset.day)));
   });
 
   async function load(animate = false) {
@@ -141,7 +180,7 @@
           || (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       }
       renderBoards();
-      renderTower(animate);
+      if (chosen === 'daily' && viewDay !== today) await showDay(viewDay); else renderTower(animate);
     } catch (err) {
       $('#b-title').textContent = 'Leaderboard';
       $('#tower').innerHTML = `<li class="empty-row"><p class="empty">Couldn’t load the leaderboard: ${esc(err.message)}</p></li>`;

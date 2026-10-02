@@ -5,7 +5,9 @@ const EPOCH = new Date(2000, 0, 1);
 const RANGES = { '1m': 30, '3m': 91, '1y': 365, all: null };
 const RANGE_SHORT = { '1m': '1 mo', '3m': '3 mo', '1y': '1 yr', all: 'all time' };
 const RANGE_NAMES = { '1m': 'past month', '3m': 'past 3 months', '1y': 'past year', all: 'all time' };
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Dates are written the way the visitor's own locale writes them.
+const fmt = opts => { const f = new Intl.DateTimeFormat(undefined, opts); return d => f.format(d); };
+const monthName = fmt({ month: 'short' });
 
 let allGames = [], games = [], sprints = [], endless = [];  // everything / chosen game at 120 s / chosen game at 30 s / endless runs
 // sq99h and sq999h are the squares games; sq99 and sq999 are older games from when every number could come up.
@@ -35,9 +37,10 @@ const dateKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, 
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const today = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); };
 const dayIdx = d => Math.round((d - EPOCH) / DAY);
-const shortDate = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-const dateLabel = d => d.getFullYear() === new Date().getFullYear() ? shortDate(d) : `${shortDate(d)}, ${d.getFullYear()}`;
-const longDate = d => `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${shortDate(d)}, ${d.getFullYear()}`;
+const shortDate = fmt({ month: 'short', day: 'numeric' });
+const withYear = fmt({ month: 'short', day: 'numeric', year: 'numeric' });
+const dateLabel = d => (d.getFullYear() === new Date().getFullYear() ? shortDate(d) : withYear(d));
+const longDate = fmt({ weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 const round1 = v => Math.round(v * 10) / 10;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -161,7 +164,7 @@ function drawChart(svg, tip, { days, series, dots, tipFor, tipY, empty, target }
     for (let d = last; d >= first; d = addDays(d, -every)) ticks.push([d, shortDate(d)]);
   } else {
     for (let d = new Date(first.getFullYear(), first.getMonth() + 1, 1); d <= last; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
-      ticks.push([d, d.getMonth() === 0 ? String(d.getFullYear()) : MONTHS[d.getMonth()]]);
+      ticks.push([d, d.getMonth() === 0 ? String(d.getFullYear()) : monthName(d)]);
     }
   }
   ticks.sort((a, b) => a[0] - b[0]);
@@ -361,7 +364,7 @@ function renderHeatmap() {
     const x = left + col * (cell + gap), y = top + row * (cell + gap);
     if (row === 0 && d.getMonth() !== lastMonth && d.getDate() <= 7) {
       lastMonth = d.getMonth();
-      if (col < weeks - 1) h += `<text x="${x}" y="10">${MONTHS[lastMonth]}</text>`;
+      if (col < weeks - 1) h += `<text x="${x}" y="10">${monthName(d)}</text>`;
     }
     const info = days.get(dateKey(d)), sq = sqDays.get(dateKey(d));
     if (info || sq) played++;
@@ -520,7 +523,7 @@ const MIN_FACT = 3;
 const factRow = (f, i, top) => {
   const ranked = f.n >= MIN_FACT;
   return `<li class="op-${f.op}${ranked ? '' : ' none'}"><span class="pos">${ranked ? i + 1 : ''}</span><span class="stripe"></span>` +
-    `<span class="fact-name">${esc(f.k)}</span><span class="track" aria-hidden="true"><i style="width:${ranked ? (f.avg / top * 100).toFixed(1) : 0}%"></i></span>` +
+    `<span class="fact-name">${esc(f.k)}</span><span class="track" aria-hidden="true"><i style="transform:scaleX(${(ranked ? (f.avg / top * 100).toFixed(1) : 0) / 100})"></i></span>` +
     `<span class="time">${f.n ? `${secs2(f.avg)}<small>s</small>` : '—'}</span><span class="gap">${!f.n ? 'none yet' : ranked ? plural(f.n, 'q') : 'too few'}</span></li>`;
 };
 
@@ -551,6 +554,16 @@ function factsHTML(qs) {
     col('add', [['+ carry', 'Carry'], ['+ no carry', 'No carry']], 'Addition', 'words') +
     col('sub', [['– borrow', 'Borrow'], ['– no borrow', 'No borrow']], 'Subtraction', 'words') +
     col('mul', table('×'), 'Multiplication') + col('div', table('÷'), 'Division') + `</div>` + note;
+}
+
+// "Last game" also lists that game's five slowest questions, exactly as they came up.
+function slowestHTML(qs) {
+  const slow = [...qs].sort((a, b) => b.t - a.t).slice(0, 5);
+  if (!slow.length) return '';
+  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq">${slow.map((q, i) =>
+    `<li class="op-${esc(q.o)}"><span class="pos">${i + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
+    `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / slow[0].t).toFixed(3)})"></i></span>` +
+    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span></li>`).join('')}</ol>`;
 }
 
 async function renderWeak() {
@@ -587,12 +600,12 @@ async function renderWeak() {
     `<ol class="tower">${rows.map((r, i) => `<li class="op-${r.op} ${sector(r)}" data-op="${r.op}" data-sector="${sector(r)}">` +
       `<span class="pos">${i + 1}</span><span class="stripe"></span>` +
       `<span class="code" title="${OP_NAMES[r.op]}">${OP_CODES[r.op]}</span>` +
-      `<span class="track" aria-hidden="true"><i style="width:${(r.avg / slowest * 100).toFixed(1)}%"></i></span>` +
+      `<span class="track" aria-hidden="true"><i style="transform:scaleX(${((r.avg / slowest * 100).toFixed(1)) / 100})"></i></span>` +
       `<span class="time">${secs2(r.avg)}<small>s</small></span>` +
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    DRILL + factsHTML(qs);
+    DRILL + factsHTML(qs) + (weakWindow === '1' ? slowestHTML(qs) : '');
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;
@@ -629,14 +642,14 @@ function renderWeakO80(el, qs, prevQs, cur, prev) {
     `<ol class="tower">${rows.map((r, i) => `<li class="op-${r.op} ${sector(r)}" data-op="${r.op}" data-sector="${sector(r)}">` +
       `<span class="pos">${i + 1}</span><span class="stripe"></span>` +
       `<span class="code" title="${O80_NAMES[r.op]}">${O80_CODES[r.op]}</span>` +
-      `<span class="track" aria-hidden="true"><i style="width:${(r.avg / slowest * 100).toFixed(1)}%"></i></span>` +
+      `<span class="track" aria-hidden="true"><i style="transform:scaleX(${((r.avg / slowest * 100).toFixed(1)) / 100})"></i></span>` +
       `<span class="time">${secs2(r.avg)}<small>s</small></span>` +
       `<span class="gap acc${r.acc < 0.85 ? ' low' : ''}" title="Right, out of those answered">${pct(r.acc)}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per answer and accuracy · ${plural(total, 'answer')} from ${plural(cur.length, 'test')}${prev.length ? `, compared with the ${prev.length === 1 ? 'test' : plural(prev.length, 'test')} before` : ''} · skips left out</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : ''}</span></div>` +
     DRILL + `<div class="facts-head"><h3>Most missed</h3></div>` +
     (missed.length ? `<ol class="tower facts">${missed.map((r, i) => `<li class="op-${r.op}"><span class="pos">${i + 1}</span><span class="stripe"></span>` +
-      `<span class="fact-name">${O80_NAMES[r.op]}</span><span class="track" aria-hidden="true"><i style="width:${((1 - r.acc) * 100).toFixed(1)}%"></i></span>` +
+      `<span class="fact-name">${O80_NAMES[r.op]}</span><span class="track" aria-hidden="true"><i style="transform:scaleX(${(((1 - r.acc) * 100).toFixed(1)) / 100})"></i></span>` +
       `<span class="time">${pct(1 - r.acc)}<small> wrong</small></span><span class="gap">${acc[r.op].n} of ${acc[r.op].y + acc[r.op].n}</span></li>`).join('')}</ol>`
       : '<p class="facts-note">Nothing missed in these tests.</p>') +
     `<p class="facts-note">${wrongs ? `${plural(wrongs, 'wrong answer')} in all · each one costs a point on top of the one you didn’t get` : 'Every answer right'}</p>`;
@@ -836,8 +849,6 @@ const toggleGame = tr => tr.classList.contains('open') ? collapseGame(tr) : expa
 function render() {
   renderWeak(); renderScore(); renderO80Line();
   renderStats(); renderChart(); renderPractice(); renderEndless(); renderHeatmap(); renderRecent();
-  const t = today();
-  $('#session-date').textContent = `${t.toLocaleDateString(undefined, { weekday: 'short' })} ${t.getDate()} ${MONTHS[t.getMonth()]}`;
   syncAccount();
 }
 
