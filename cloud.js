@@ -64,6 +64,8 @@
     return renewing;
   }
 
+  let board = null;  // the all-time leaderboard, fetched once for standing()
+
   window.ZM_CLOUD = {
     ready: !!(SUPABASE_URL && SUPABASE_KEY),
     nameOk,
@@ -107,6 +109,18 @@
     },
     // Public: every player's best verified game per board, all time or this week (from Monday).
     leaderboard: (week = false) => call(`/rest/v1/${week ? 'leaderboard_week' : 'leaderboard'}?select=username,mode,seconds,score,elapsed,date,wrongs`),
+    // Public: where a score stands on a board's all-time leaderboard, as { beats, of }: how many
+    // other players' bests it is higher than, out of how many (the named player's own row left out).
+    // Null when fewer than 5 other players are on the board. The board is fetched once a page.
+    async standing(mode, seconds, score, me = '') {
+      board ||= this.leaderboard().catch(err => { board = null; throw err; });
+      const name = me.toLowerCase();
+      const others = (await board).filter(r => r.mode === mode && r.seconds === seconds && r.username.toLowerCase() !== name);
+      return others.length < 5 ? null : { beats: others.filter(r => r.score < score).length, of: others.length };
+    },
+    // "Better than 84% of 52 players", or the top of the board.
+    standingText: s => s.beats === s.of ? `Higher than all ${s.of} other players`
+      : `Better than ${Math.floor(100 * s.beats / s.of)}% of ${s.of} players`,
     // Public: one day's daily-challenge results, best first.
     daily: date => call(`/rest/v1/daily_board?select=username,score&date=eq.${encodeURIComponent(date)}&order=score.desc&limit=1000`),
     // Public: a player's profile (null for no such player, or a private account).

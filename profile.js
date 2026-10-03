@@ -81,6 +81,19 @@
     }).join('') || '<li style="display:block;border:0"><p class="msg">No leaderboard games yet.</p></li>';
 
     heat(p.days || {});
+    standings(p.username, BOARDS.filter(([k]) => best.has(k)).map(([k]) => [k, best.get(k)]));
+  }
+
+  // Under each best, how it stands among the board's other players (once a board has enough).
+  async function standings(name, rows) {
+    const items = $('#bests').children;
+    await Promise.all(rows.map(async ([k, b], i) => {
+      let s;
+      try { s = await cloud.standing(b.mode, b.seconds, b.score, name); } catch { return; }
+      const who = items[i]?.querySelector('.who');
+      if (!s || !who || $('#p-name').textContent !== name) return;
+      who.insertAdjacentHTML('beforeend', `<span class="pct">${esc(cloud.standingText(s))}</span>`);
+    }));
   }
 
   // 13 weeks of squares, one a day, shaded by how many games were played.

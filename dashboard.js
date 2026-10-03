@@ -712,9 +712,24 @@ function renderScore() {
         `<small>${esc(shortDate(parseDate(last.date)))} · ${lastNote}</small>` +
         `<span class="sb-avg"><b>${round1(avg)}</b> average of your last ${last10.length}</span></div>` +
     `</div>` +
+    `<p class="sb-pct" hidden></p>` +
     `<div class="sb-laps-head"><h3>Last ${recent.length} games</h3>` +
       `<span class="key">${SECTORS.map(([cls, label]) => `<span class="${cls}">${label}</span>`).join('')}</span></div>` +
     `<ol class="laps">${recent.map(r => `<li class="${r.cls}" title="${longDate(parseDate(r.g.date))}">${r.g.score}<small>${esc(shortDate(parseDate(r.g.date)))}</small></li>`).join('')}</ol>`;
+  renderStanding(pb);
+}
+
+// Where the 2-minute best stands among everyone on the website's leaderboard. Website only, and
+// only once the board has enough players to make a percentage mean something.
+async function renderStanding(pb) {
+  const cloud = window.ZM_CLOUD;
+  if (!window.ZM_WEB || !cloud?.ready) return;
+  let s;
+  try { s = await cloud.standing('standard', 120, pb, cloud.user()?.name); } catch { return; }
+  const el = $('#score .sb-pct');
+  if (!s || !el) return;
+  el.innerHTML = `Your best of <b>${pb}</b> · ${esc(cloud.standingText(s))} on the <a href="leaderboard.html">leaderboard</a>`;
+  el.hidden = false;
 }
 
 // The quant tests at the foot of the score panel, one line each: best and latest, with a link to
