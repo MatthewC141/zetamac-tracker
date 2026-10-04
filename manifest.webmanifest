@@ -1,7 +1,7 @@
 {
-  "name": "Zetamac Tracker",
-  "short_name": "Zetamac",
-  "description": "Zetamac arithmetic drills, quant tests and duels, with every question timed.",
+  "name": "Zetamach",
+  "short_name": "Zetamach",
+  "description": "Zetamach: zetamac-style arithmetic drills, quant tests and duels, with every question timed.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

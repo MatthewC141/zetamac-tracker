@@ -1011,7 +1011,7 @@ $('#export').addEventListener('click', async () => {
     const file = new Blob([JSON.stringify({ app: 'zetamac-tracker', version: 1, exported: new Date().toISOString(), scores })], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(file);
-    a.download = `zetamac-scores-${dateKey(today())}.json`;
+    a.download = `zetamach-scores-${dateKey(today())}.json`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     msg.className = 'msg ok'; msg.textContent = `Exported ${plural(scores.length, 'game')}.`;

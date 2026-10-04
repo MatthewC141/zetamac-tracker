@@ -34,7 +34,7 @@
     if (!name) {
       const me = cloud?.user()?.name;
       if (me) { location.replace(`#${encodeURIComponent(me)}`); return; }
-      document.title = 'Player';
+      document.title = 'Player · Zetamach';
       return state('Type a player’s name above, or open one from the <a href="leaderboard.html">leaderboard</a>.', true);
     }
     if (!window.ZM_WEB || !cloud?.ready) return state('Profiles live on the website version of the tracker.');
@@ -47,7 +47,7 @@
   }
 
   function render(p) {
-    document.title = `${p.username} · Zetamac`;
+    document.title = `${p.username} · Zetamach`;
     $('#state').hidden = true;
     $('#pf').hidden = false;
     $('#p-name').textContent = p.username;

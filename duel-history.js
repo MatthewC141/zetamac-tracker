@@ -84,7 +84,7 @@
     $('#lobby-view').hidden = true;
     $('#history-view').hidden = false;
     brand.textContent = 'Duel history';
-    document.title = 'Duel History';
+    document.title = 'Duel history · Zetamach';
     shown = PAGE;
     $('#note').textContent = 'Loading your matches…';
     Promise.all([M.load(), M.mine().catch(() => null)]).then(([list, you]) => { all = list; render(); if (you) renderRating(you); })
@@ -95,7 +95,7 @@
     $('#history-view').hidden = true;
     $('#lobby-view').hidden = false;
     brand.textContent = 'Duel';
-    document.title = 'Duel';
+    document.title = 'Duel · Zetamach';
     if (location.hash === '#history') history.replaceState(null, '', location.pathname);
   }
   $('#history-back').addEventListener('click', e => { e.preventDefault(); close(); $('#start')?.focus(); });

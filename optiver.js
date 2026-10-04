@@ -30,7 +30,7 @@ function pickTest(t) {
   $('#lede').textContent = LEDES[t];
   $('#est-note').hidden = t !== 'est';
   $('#custom-note').dataset.default = `Saves to your tracker and the ${T().name} leaderboard.`;
-  document.title = T().name;
+  document.title = `${T().name} · Zetamach`;
   try { localStorage.setItem('zm-test', t); } catch {}
   $('#settings').dispatchEvent(new Event('change'));  // the launcher's rows and best line follow
 }
