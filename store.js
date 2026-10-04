@@ -237,7 +237,10 @@
         writeJSON(PENDING, [...readJSON(PENDING, []), { uid: c.user().id, ...row }]);
         return reply(200, seenView(c));
       }
-      return reply(200, accountView(await accountRows(c)));
+      // Saved. If reading the account back fails, still say so (a "couldn't save" here would invite
+      // a retry, and a second copy of the game): the scores as last seen, with this one added.
+      try { return reply(200, accountView(await accountRows(c))); }
+      catch { const list = seenView(c); return reply(200, [...list, { i: list.length, ...fields(row.e), detail: false }]); }
     }
     if (route === 'delete') {
       const form = new URLSearchParams(body || '');

@@ -112,17 +112,27 @@ const daily = (() => {
   }
   // Signed in on the website, the day's questions come from the database as the try starts (so no
   // one can see them early) and the result goes on the board. Otherwise the set is built from the
-  // date here: the same daily habit, but this browser's own set and no board.
+  // date here: the same daily habit, but this browser's own set and no board. Only the first try
+  // counts: a try started before (and left unsaved, after a reload say) is offered as practice.
   async function play() {
     if (mineToday(history)) return render();
     const date = today(), P = window.ZM_PROBLEMS, cloud = window.ZM_CLOUD;
     let seed = P.daySeed(date);
+    const go = () => start({ ops: ['add', 'sub', 'mul', 'div'], r: { ...DEFAULTS }, duration: 120, tracked: true, mode: 'daily', daily: P.list('daily', seed, 500), at: 0 });
     if (window.ZM_WEB && cloud?.ready && cloud.user()) {
       $('#daily-go').disabled = true;
-      try { seed = (await cloud.rest('rpc/daily_start', { method: 'POST', body: { p_date: date } })).seed; }
-      catch { text.textContent = 'Couldn’t reach the server for today’s questions, so this one is a practice set and won’t go on the board.'; }
+      try {
+        const r = await cloud.rest('rpc/daily_start', { method: 'POST', body: { p_date: date } });
+        seed = r.seed;
+        if (r.tries > 1) {
+          text.textContent = 'You started today’s challenge earlier, so another try is practice: it won’t go on the board.';
+          acts.innerHTML = '<button type="button" id="daily-go">Play it as practice</button><a class="btn" href="leaderboard.html#daily">Today’s board</a>';
+          $('#daily-go').addEventListener('click', go);
+          return;
+        }
+      } catch { text.textContent = 'Couldn’t reach the server for today’s questions, so this one is a practice set and won’t go on the board.'; }
     }
-    start({ ops: ['add', 'sub', 'mul', 'div'], r: { ...DEFAULTS }, duration: 120, tracked: true, mode: 'daily', daily: P.list('daily', seed, 500), at: 0 });
+    go();
   }
   return { render, streak };
 })();

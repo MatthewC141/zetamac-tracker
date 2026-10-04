@@ -108,7 +108,15 @@
       }
     },
     // Public: every player's best verified game per board, all time or this week (from Monday).
-    leaderboard: (week = false) => call(`/rest/v1/${week ? 'leaderboard_week' : 'leaderboard'}?select=username,mode,seconds,score,elapsed,date,wrongs`),
+    // Fetched 1,000 rows at a time (the most the database sends at once) in a fixed order.
+    async leaderboard(week = false) {
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        const page = await call(`/rest/v1/${week ? 'leaderboard_week' : 'leaderboard'}?select=username,mode,seconds,score,elapsed,date,wrongs&order=mode,seconds,username&offset=${from}&limit=1000`);
+        rows.push(...(page || []));
+        if (!page || page.length < 1000) return rows;
+      }
+    },
     // Public: where a score stands on a board's all-time leaderboard, as { beats, of }: how many
     // other players' bests it is higher than, out of how many (the named player's own row left out).
     // Null when fewer than 5 other players are on the board. The board is fetched once a page.

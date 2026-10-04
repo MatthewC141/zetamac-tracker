@@ -9,7 +9,8 @@
   const day = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }), dayYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const pad = n => String(n).padStart(2, '0');
-  const now = new Date(), today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const todayKey = () => { const n = new Date(); return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`; };
+  let today = todayKey();  // moved on by load() when a tab stays open past midnight
 
   // `daily` and `elo` boards don't change with the week switch: today's challenge, and ratings.
   const BOARDS = [
@@ -152,6 +153,8 @@
   });
 
   async function load(animate = false) {
+    const t = todayKey();
+    if (t !== today) { if (viewDay === today) viewDay = t; today = t; }
     if (!cloud?.ready) {
       $('#b-title').textContent = 'Leaderboard';
       $('#tower').innerHTML = '<li class="empty-row"><p class="empty">The leaderboard isn’t switched on for this copy of the site yet.</p></li>';

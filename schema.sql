@@ -129,7 +129,8 @@ grant select on public.profiles to authenticated;
 -- The day's questions are built in the browser from a seed, and the seed comes from here: it's
 -- made from the date and a secret only the database holds, and handed out when a signed-in player
 -- starts their one try (daily_start), so no one can build a day's questions ahead of time. A
--- result only counts if it's saved within 4 minutes of that start.
+-- result only counts if it's saved within 4 minutes of that start, and only on the first try:
+-- starting again (after a reload, say) hands back the same questions, so later tries never count.
 create table if not exists public.daily_salt (
   id boolean primary key default true check (id),
   salt text not null default md5(random()::text || clock_timestamp()::text)
@@ -141,28 +142,30 @@ create table if not exists public.daily_starts (
   started_at timestamptz not null default now(),
   primary key (user_id, day)
 );
+alter table public.daily_starts add column if not exists tries int not null default 1;
 alter table public.daily_salt enable row level security;
 alter table public.daily_starts enable row level security;
 revoke all on public.daily_salt, public.daily_starts from anon, authenticated;
 create or replace function public.daily_start(p_date date) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare utc date := (now() at time zone 'utc')::date; t timestamptz;
+declare utc date := (now() at time zone 'utc')::date; t timestamptz; n int;
 begin
   if auth.uid() is null then raise exception 'Sign in to play the daily challenge with everyone.'; end if;
   if p_date is null or p_date < utc - 1 or p_date > utc + 1 then raise exception 'That day’s challenge isn’t open.'; end if;
-  insert into public.daily_starts (user_id, day) values (auth.uid(), p_date) on conflict do nothing;
-  select started_at into t from public.daily_starts where user_id = auth.uid() and day = p_date;
-  return jsonb_build_object('started', t,
+  insert into public.daily_starts as d (user_id, day) values (auth.uid(), p_date)
+    on conflict (user_id, day) do update set tries = d.tries + 1
+    returning started_at, tries into t, n;
+  return jsonb_build_object('started', t, 'tries', n,
     'seed', (select ('x' || substr(md5(salt || p_date::text), 1, 8))::bit(32)::int from public.daily_salt));
 end $$;
 revoke execute on function public.daily_start(date) from public, anon;
 grant execute on function public.daily_start(date) to authenticated;
--- Whether that player started that day's challenge in the last 4 minutes (the score check asks
--- this; players can't read the starts table themselves).
+-- Whether that player started that day's challenge once, in the last 4 minutes (the score check
+-- asks this; players can't read the starts table themselves).
 create or replace function public.daily_started(p_user uuid, p_day date) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.daily_starts d where d.user_id = p_user and d.day = p_day
-                 and d.started_at > now() - interval '4 minutes');
+                 and d.tries = 1 and d.started_at > now() - interval '4 minutes');
 $$;
 revoke execute on function public.daily_started(uuid, date) from public, anon;
 grant execute on function public.daily_started(uuid, date) to authenticated;

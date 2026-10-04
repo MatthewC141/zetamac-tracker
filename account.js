@@ -162,19 +162,25 @@
   const BOARDS = [
     ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
     ['mixed|120', 'Combined operations', '2:00', 't-mix'],
-    ['o80|480', '80 in 8', '8:00', 't-o80'],
+    ['o80|480', '80 in 8', '8:00', 't-o80', true], ['seq|240', 'Sequences', '4:00', 't-seq', true],
+    ['frac|240', 'Fractions', '4:00', 't-frac', true], ['est|240', 'Estimation', '4:00', 't-est', true],
     ['sq99h|120', 'Two-digit squares', '2:00', 't-sq'], ['sq999h|120', 'Three-digit squares', '2:00', 't-sq'],
     ['standard|0', 'Arithmetic', 'Endless', 't-end'],
   ];
+  // The leaderboard's order: best score, then an endless run's faster time, or a test's fewer wrong
+  // answers and then faster time. Players level on all of it share a place.
+  const big = v => (Number.isInteger(v) && v > 0 ? v : Infinity);
+  const order = (key, test) => (a, b) => b.score - a.score || (key.endsWith('|0') ? a.elapsed - b.elapsed : 0)
+    || (test ? (a.wrongs ?? Infinity) - (b.wrongs ?? Infinity) || big(a.elapsed) - big(b.elapsed) : 0);
   async function showPlaces(name) {
     const me = name.toLowerCase();
     try {
       const rows = await cloud.leaderboard();
-      const mine = BOARDS.map(([key, name, len, team]) => {
-        const list = rows.filter(r => `${r.mode}|${r.seconds}` === key).sort((a, b) => b.score - a.score || (key.endsWith('|0') ? a.elapsed - b.elapsed : 0));
+      const mine = BOARDS.map(([key, name, len, team, test]) => {
+        const list = rows.filter(r => `${r.mode}|${r.seconds}` === key).sort(order(key, test));
         const at = list.findIndex(r => r.username.toLowerCase() === me);
         if (at < 0) return null;
-        const place = list.findIndex(r => r.score === list[at].score) + 1;  // ties share a place
+        const place = list.findIndex(r => order(key, test)(r, list[at]) === 0) + 1;  // ties share a place
         return `<li class="${team}"><span class="pos">P${place}</span><span class="stripe"></span><span class="who board-name">${name}<small>${len}</small></span><span class="figure${place === 1 ? ' p1' : ''}">${list[at].score}<small>of ${list.length}</small></span></li>`;
       }).filter(Boolean);
       $('#places').innerHTML = mine.join('');
