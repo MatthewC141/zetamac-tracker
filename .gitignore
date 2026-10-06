@@ -3,3 +3,5 @@ scores.csv
 *.tmp
 .DS_Store
 details/
+node_modules/
+tests/shots/

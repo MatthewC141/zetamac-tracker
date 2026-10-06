@@ -65,8 +65,12 @@ const weak = (() => {
     const arith = newest(games.filter(g => ['standard', 'daily'].includes(g.mode) && g.seconds > 0 && g.detail)).slice(0, RECENT);
     const tests = newest(games.filter(g => g.mode === 'o80' && g.detail)).slice(0, 3);
     const drills = newest(games.filter(g => g.mode === 'drill' && g.detail)).slice(0, 30);
-    const logOf = async g => ({ ts: g.ts, qs: ((await (await fetch(`api/detail?ts=${encodeURIComponent(g.ts)}`)).json()).questions || []).map(clean).filter(Boolean) });
-    const [A, T, D] = await Promise.all([arith, tests, drills].map(list => Promise.all(list.map(g => logOf(g).catch(() => ({ ts: g.ts, qs: [] }))))));
+    // Every log needed, in one request (api/details).
+    let logs = {};
+    const want = [...arith, ...tests, ...drills].map(g => g.ts);
+    try { logs = (await (await fetch(`api/details?ts=${want.map(encodeURIComponent).join(',')}`)).json()).details || {}; } catch {}
+    const logOf = g => ({ ts: g.ts, qs: (Array.isArray(logs[g.ts]) ? logs[g.ts] : []).map(clean).filter(Boolean) });
+    const [A, T, D] = [arith, tests, drills].map(list => list.map(logOf));
 
     // Slowest kinds of arithmetic question (3 answers or more), and each operation's usual time.
     const byFact = {}, byOp = {};

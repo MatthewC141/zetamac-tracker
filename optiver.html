@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co wss://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="stylesheet" href="launch.css">
@@ -12,6 +12,16 @@
 <meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Quant tests · Zetamach</title>
+<meta name="description" content="Quant interview tests: 80 in 8, sequences, fractions and estimation, marked right minus wrong.">
+<meta property="og:site_name" content="Zetamach">
+<meta property="og:title" content="Quant tests · Zetamach">
+<meta property="og:description" content="Quant interview tests: 80 in 8, sequences, fractions and estimation, marked right minus wrong.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://matthewc141.github.io/zetamac-tracker/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zetamach: 47 + 38 = 85. Mental math, timed.">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   /* Same look as play.html (the zetamac clone). */
   :root {
@@ -69,7 +79,7 @@
   /* Wrong answers, for a look back once the test is over. */
   #misses { max-width: 560px; margin: 16px auto 0; padding: 0 16px; font-size: 16px; }
   #misses[hidden] { display: none; }
-  #misses h2 { font-size: 15px; font-weight: normal; color: var(--muted); margin: 0 0 6px; }
+  #misses h2 { margin: 0 0 6px; }
   #misses ol { list-style: none; margin: 0; padding: 0; }
   #misses li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid #e3e3e3; font-variant-numeric: tabular-nums; }
   #misses .got { color: var(--bad); text-decoration: line-through; margin-right: 8px; }
@@ -175,7 +185,7 @@
       <div class="split" id="split"></div>
       <div class="pace" id="pace"></div>
       <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Back</a> <a href="./">View progress</a></div>
-      <div class="saved" id="saved"></div>
+      <div class="saved" id="saved" aria-live="polite"></div>
     </div>
   </div>
   <p class="hint" id="hint"><span class="keys">Enter answers · Tab skips · </span><a href="#" id="skip">Skip</a></p>
@@ -186,6 +196,8 @@
 </div>
 
 <script src="problems.js"></script>
+<script src="save.js"></script>
+<script src="say.js"></script>
 <script src="optiver.js"></script>
 </body>
 </html>

@@ -1,11 +1,7 @@
 // The arithmetic game (play.html): its settings, its questions and the daily challenge. The game
 // loop itself is game.js. Kept out of the page so the page's security policy can refuse inline scripts.
 const $ = s => document.querySelector(s);
-const DEFAULTS = {
-  'add-a-lo': 2, 'add-a-hi': 100, 'add-b-lo': 2, 'add-b-hi': 100,
-  'mul-a-lo': 2, 'mul-a-hi': 12, 'mul-b-lo': 2, 'mul-b-hi': 100,
-};
-const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const DEFAULTS = window.ZM_PROBLEMS.ARITH_DEFAULTS;  // zetamac's ranges
 const num = id => parseInt($('#' + id).value, 10);
 
 function readSettings() {
@@ -34,19 +30,7 @@ document.querySelectorAll('#settings input, #settings select').forEach(el => el.
 
 
 // The next question: the day's list for the daily challenge, or a random one from the ranges.
-function nextQuestion(cfg) {
-  if (cfg.daily) return cfg.daily[cfg.at++];  // the same for everyone
-  const { r, ops } = cfg;
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  if (op === 'add' || op === 'sub') {
-    const a = rand(r['add-a-lo'], r['add-a-hi']), b = rand(r['add-b-lo'], r['add-b-hi']);
-    return op === 'add' ? { q: `${a} + ${b}`, a: a + b, o: op } : { q: `${a + b} – ${a}`, a: b, o: op };
-  }
-  let a = rand(r['mul-a-lo'], r['mul-a-hi']);
-  while (op === 'div' && a === 0) a = rand(r['mul-a-lo'], r['mul-a-hi']);
-  const b = rand(r['mul-b-lo'], r['mul-b-hi']);
-  return op === 'mul' ? { q: `${a} × ${b}`, a: a * b, o: op } : { q: `${a * b} ÷ ${a}`, a: b, o: op };
-}
+const nextQuestion = cfg => (cfg.daily ? cfg.daily[cfg.at++] : window.ZM_PROBLEMS.arith(cfg.r, cfg.ops));  // (the daily is the same for everyone)
 
 // What the shared game loop (game.js) needs from this game.
 const GAME = {

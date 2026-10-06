@@ -43,10 +43,12 @@ const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function tick() {
   const left = Math.max(0, Math.ceil((startAt + T().seconds * 1000 - performance.now()) / 1000));
   $('#secs').textContent = clock(left);
+  zmSay.clock(left);
   if (left === 0) finish();
 }
 function show() {
   $('#question').textContent = qs[idx].q;
+  zmSay.question(`${idx ? '' : 'Go. '}${qs[idx].q}${test === 'seq' ? ', next' : ''}`);
   $('#qnum').textContent = idx + 1;
   input.value = '';
   prevLen = 0; fixes = 0;
@@ -56,6 +58,7 @@ function tally() { $('#rights').textContent = rights; $('#wrongs').textContent =
 
 function start() {
   qs = P.list(test, (Math.random() * 2 ** 31) | 0, T().count);
+  zmSay.reset();
   idx = rights = wrongs = skips = 0;
   log = [];
   tally();
@@ -123,6 +126,7 @@ function finish() {
   $('#play').style.display = 'none';
   $('#hint').hidden = true;
   $('#final').textContent = score;
+  zmSay(`Time. You scored ${score}: ${rights} right, ${wrongs} wrong.`);
   $('#split').innerHTML = `<span class="r">${rights} right</span> · <span class="w">${wrongs} wrong</span> · ${skips} skipped${left ? ` · ${left} not reached` : ''}`;
   const done = log.filter(q => q.r !== 's').length;
   $('#pace').textContent = done ? `${(elapsed / done).toFixed(1)} s per answer · ${clock(elapsed)}` : '';
@@ -144,33 +148,12 @@ function finish() {
 }
 
 async function save(score, elapsed) {
-  const saved = $('#saved'), mode = test, seconds = T().seconds;
+  const saved = $('#saved'), mode = test, name = T().name;
   saved.className = 'saved';
   if (!log.length) { saved.textContent = 'Nothing answered: not saved.'; return; }
-  const same = history.filter(g => g.mode === mode && g.seconds === seconds);
-  const prevBest = same.reduce((m, g) => Math.max(m, g.score), 0);
-  saved.textContent = 'Saving…';
-  try {
-    const r = await fetch('api/game', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
-      body: new URLSearchParams({ score, elapsed, detail: JSON.stringify(log), seconds, mode }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error);
-    if (Array.isArray(data)) history = data;
-    const mine = history[history.length - 1];  // the server appends, so the newest row is this game
-    if (same.length && score > prevBest) {
-      saved.className = 'saved pb';
-      saved.textContent = `New personal best! (was ${prevBest})`;
-    } else {
-      saved.textContent = same.length ? `Saved · personal best ${Math.max(prevBest, score)}` : `Saved: your first ${P.TESTS[mode].name} test.`;
-    }
-    if (mine?.detail) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
-  } catch {
-    saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
-    $('#retry').onclick = e => { e.preventDefault(); save(score, elapsed); };
-  }
+  history = await zmSave(saved, { mode, seconds: T().seconds, score, elapsed, log }, history, ({ final, prevBest, same }) =>
+    same.length && final > prevBest ? { pb: true, text: `New personal best! (was ${prevBest})` }
+    : { text: same.length ? `Saved · personal best ${Math.max(prevBest, final)}` : `Saved: your first ${name} test.` });
 }
 
 $('#start').addEventListener('click', start);

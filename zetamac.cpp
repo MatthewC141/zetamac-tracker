@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <regex>
 #include <random>
 #include <set>
 #include <sstream>
@@ -704,31 +705,23 @@ static void handle_client(int fd) {
   path = path.substr(0, path.find('?'));
   if (!allowed_host(lower)) return respond_error(fd, "421 Misdirected Request", "Open the tracker at http://127.0.0.1:" + std::to_string(g_port) + "/");
 
-  // Pages by file name (the links between them are relative, so the same files also work as a
-  // static website) plus the short names older bookmarks use.
-  static const std::map<std::string, std::string> kPages = {
-      {"/", "index.html"},          {"/index.html", "index.html"},     {"/play", "play.html"},
-      {"/play.html", "play.html"},  {"/squares", "squares.html"},      {"/squares.html", "squares.html"},
-      {"/practice", "practice.html"}, {"/practice.html", "practice.html"}, {"/store.js", "store.js"},
-      {"/launch.js", "launch.js"},  {"/launch.css", "launch.css"},       {"/dashboard.js", "dashboard.js"},
-      {"/play.js", "play.js"},      {"/squares.js", "squares.js"},      {"/practice.js", "practice.js"},
-      {"/guide", "guide.html"},     {"/guide.html", "guide.html"},      {"/guide.js", "guide.js"},
-      {"/leaderboard", "leaderboard.html"}, {"/leaderboard.html", "leaderboard.html"}, {"/leaderboard.js", "leaderboard.js"},
-      {"/account", "account.html"}, {"/account.html", "account.html"},  {"/account.js", "account.js"},
-      {"/mixed", "mixed.html"},     {"/mixed.html", "mixed.html"},      {"/mixed.js", "mixed.js"},
-      {"/duel", "duel.html"},       {"/duel.html", "duel.html"},        {"/duel.js", "duel.js"},
-      {"/problems.js", "problems.js"}, {"/matches.js", "matches.js"}, {"/duel-history.js", "duel-history.js"},
-      {"/optiver", "optiver.html"}, {"/optiver.html", "optiver.html"}, {"/optiver.js", "optiver.js"},
-      {"/profile", "profile.html"}, {"/profile.html", "profile.html"}, {"/profile.js", "profile.js"},
-      {"/sw.js", "sw.js"},          {"/manifest.webmanifest", "manifest.webmanifest"},
-      {"/icons/icon-192.png", "icons/icon-192.png"}, {"/icons/icon-512.png", "icons/icon-512.png"},
-      {"/icons/icon-maskable-512.png", "icons/icon-maskable-512.png"}, {"/icons/apple-touch-icon.png", "icons/apple-touch-icon.png"},
-      {"/theme.css", "theme.css"},   {"/game.js", "game.js"},
-      {"/cloud.js", "cloud.js"},    {"/site.css", "site.css"}};
-  if (method == "GET" && kPages.count(path)) {
-    const std::string& page = kPages.at(path);
+  // The site's own files by name: pages, scripts and styles next to the binary, and its images
+  // (lower-case names only, so scores.csv, the question logs and the source are never served),
+  // plus the short page names older bookmarks use. The links between pages are relative, so the
+  // same files also work as a static website.
+  static const std::map<std::string, std::string> kShort = {
+      {"/", "index.html"}, {"/play", "play.html"}, {"/squares", "squares.html"}, {"/practice", "practice.html"},
+      {"/guide", "guide.html"}, {"/leaderboard", "leaderboard.html"}, {"/account", "account.html"}, {"/mixed", "mixed.html"},
+      {"/duel", "duel.html"}, {"/optiver", "optiver.html"}, {"/profile", "profile.html"}};
+  auto site_file = [](const std::string& p) {
+    static const std::regex kFile(R"(/((icons/)?[a-z0-9-]+\.(html|js|css|png|webmanifest)))");
+    std::smatch m;
+    return std::regex_match(p, m, kFile) ? m[1].str() : std::string();
+  };
+  const std::string page = kShort.count(path) ? kShort.at(path) : site_file(path);
+  if (method == "GET" && !page.empty()) {
     std::ifstream f(g_home / page, std::ios::binary);
-    if (!f) return respond_error(fd, "500 Internal Server Error", page + " not found next to zetamac");
+    if (!f) return respond_error(fd, "404 Not Found", "not found");
     std::stringstream ss;
     ss << f.rdbuf();
     const std::string ext = page.substr(page.rfind('.'));
@@ -748,6 +741,20 @@ static void handle_client(int fd) {
     return respond(fd, "200 OK", "font/woff2", ss.str());
   }
   if (method == "GET" && path == "/api/scores") return respond(fd, "200 OK", "application/json", scores_json());
+  if (method == "GET" && path == "/api/details") {  // several games' logs at once: {"details":{ts:questions}}
+    std::string out = "{\"details\":{", list = parse_form(query)["ts"];
+    std::stringstream ids(list);
+    std::set<std::string> seen;
+    for (std::string ts; std::getline(ids, ts, ',') && seen.size() < 500;) {
+      if (!valid_ts(ts) || !seen.insert(ts).second) continue;
+      std::ifstream f(detail_path(ts));
+      if (!f) continue;
+      std::stringstream ss;
+      ss << f.rdbuf();
+      out += (out.back() == '{' ? "\"" : ",\"") + ts + "\":" + ss.str();
+    }
+    return respond(fd, "200 OK", "application/json", out + "}}");
+  }
   if (method == "GET" && path == "/api/detail") {
     std::string ts = parse_form(query)["ts"];
     if (!valid_ts(ts)) return respond_error(fd, "400 Bad Request", "Bad game timestamp.");

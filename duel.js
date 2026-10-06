@@ -14,7 +14,7 @@
   // The match being played.
   let qs = [], idx = 0, score = 0, lastMs = 0, startPerf = 0, timer = 0, playing = false, finished = false, sending = false, queued = false;
 
-  if (!window.ZM_WEB || !cloud?.ready) return show('st-off');
+  if (!window.ZM_WEB || !cloud?.ready) { $('#st-off a')?.setAttribute('href', `${window.ZM_SITE}duel.html`); return show('st-off'); }
   if (!cloud.user()) return show('st-need');
 
   const rpc = (name, body) => cloud.rest(`rpc/${name}`, { method: 'POST', body });
@@ -123,6 +123,7 @@
     const m = match;
     lobby();
     if (m) { try { await rpc('mm_cancel', { p_id: m.id }); } catch {} }
+    if (m?.invitee && m.p2_name) cloud.ping(cloud.inviteTopic(m.p2_name));  // a challenge taken back leaves their list now
   }
   $('#copy').addEventListener('click', async () => {
     const url = new URL(`duel.html#join=${match.code}`, location.href).href;
@@ -132,13 +133,17 @@
   });
 
   // ---- challenges by name ----
-  // Sent: a private match for that player, waiting like a code match. Received: listed at the top
-  // of the lobby (checked every few seconds while it shows), to accept or decline.
+  // Sent: a private match for that player, waiting like a code match, and a nudge to their page
+  // (cloud.ping). Received: listed at the top of the lobby, to accept or decline.
   $('#challenge-form').addEventListener('submit', async e => {
     e.preventDefault();
     const name = $('#rival').value.trim();
     if (!cloud.nameOk(name)) { $('#msg').className = 'd-msg err'; $('#msg').textContent = 'Names are 3 to 20 letters, digits or underscores.'; return $('#rival').focus(); }
-    try { enter(await call('mm_challenge', { p_name: name, p_game: game() === 'any' ? 'standard' : game(), p_rule: rule() })); } catch (err) { fail(err); $('#rival').focus(); }
+    try {
+      const m = await call('mm_challenge', { p_name: name, p_game: game() === 'any' ? 'standard' : game(), p_rule: rule() });
+      enter(m);
+      cloud.ping(cloud.inviteTopic(m.p2_name || name));  // their page asks the database right away
+    } catch (err) { fail(err); $('#rival').focus(); }
   });
   $('#rival').addEventListener('keydown', e => { if (e.key === 'Enter') e.stopPropagation(); });
   async function loadInvites() {
@@ -166,7 +171,7 @@
     }));
     box.hidden = !box.children.length;
   }
-  setInterval(loadInvites, 3000);
+  addEventListener('zm-invites', loadInvites);  // store.js hears of new challenges (a Realtime nudge) and says so
 
   // ---- ghosts: a saved game to race while nobody's searching ----
   // After 20 seconds in the queue, a ghost race is offered: your own best 2-minute game, or one by
@@ -312,6 +317,7 @@
   }
   function ask() {
     $('#question').textContent = qs[idx].q;
+    zmSay.question(qs[idx].q);
     input.value = '';
   }
   const elapsed = () => Math.max(0, Math.round(performance.now() - startPerf));
@@ -408,6 +414,7 @@
     const r = $('#result');
     r.className = `result ${draw ? '' : won ? 'win' : 'lose'}`;
     r.textContent = draw ? 'Draw' : won ? 'You win' : `${them(m)} wins`;
+    zmSay(`${r.textContent}. ${m[`p${me}_score`]} to ${m[`p${3 - me}_score`]}.`);
     $('#res-sub').textContent = ruleText(m);
     showElo(m);
     standings(m);

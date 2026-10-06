@@ -1,7 +1,7 @@
-// Question lists built from a seed, the same in every browser: duels (both players build the same
-// list from the match's seed), the daily challenge (the day's date is the seed), and the quant
-// tests. The problems match the solo games: zetamac's default arithmetic, the combined game's four
-// kinds, the squares modes, and the quant tests' kinds.
+// Every game's questions, in one place: the solo games ask at random, and duels, the daily challenge
+// and the quant tests build lists from a seed, the same in every browser (both duel players build
+// the same list from the match's seed; the daily's seed comes from the database, which builds the
+// same list to check a result: schema.sql, private.zm_daily_list).
 window.ZM_PROBLEMS = (() => {
   // mulberry32: a small seeded generator, the same in every browser.
   const seeded = seed => () => {
@@ -116,44 +116,70 @@ window.ZM_PROBLEMS = (() => {
     }
   }
 
+  // ---- the games' questions, for both the seeded lists below and the solo games (Math.random) ----
+  // Zetamac arithmetic: one of the chosen operations, from the ranges (the defaults are zetamac's).
+  // Subtraction is addition run backwards, division multiplication run backwards.
+  const ARITH_DEFAULTS = { 'add-a-lo': 2, 'add-a-hi': 100, 'add-b-lo': 2, 'add-b-hi': 100, 'mul-a-lo': 2, 'mul-a-hi': 12, 'mul-b-lo': 2, 'mul-b-hi': 100 };
+  const ALL_OPS = ['add', 'sub', 'mul', 'div'];
+  function arith(r, ops, rand) {
+    const op = ops[rand(0, ops.length - 1)];
+    if (op === 'add' || op === 'sub') {
+      const a = rand(r['add-a-lo'], r['add-a-hi']), b = rand(r['add-b-lo'], r['add-b-hi']);
+      return op === 'add' ? { q: `${a} + ${b}`, a: a + b, o: op } : { q: `${a + b} – ${a}`, a: b, o: op };
+    }
+    let a = rand(r['mul-a-lo'], r['mul-a-hi']);
+    while (op === 'div' && a === 0) a = rand(r['mul-a-lo'], r['mul-a-hi']);
+    const b = rand(r['mul-b-lo'], r['mul-b-hi']);
+    return op === 'mul' ? { q: `${a} × ${b}`, a: a * b, o: op } : { q: `${a * b} ÷ ${a}`, a: b, o: op };
+  }
+  // The combined game's four kinds: (5 + 2) × (15 + 9), (13 – 4) × 23, (7 × 8) + (6 × 14), (84 + 12) ÷ 8.
+  // Each returns [text, answer]; the multiplying ones use zetamac's sizes (2–12 by 2–100).
+  const MIXED_KINDS = ['both', 'one', 'prod', 'div'];
+  function mixedKinds(rand, coin) {
+    // v written as a bracket: a sum (7 → 5 + 2) or a difference (7 → 15 – 8), both parts at least 1
+    // and a sum's parts under 100 where v allows.
+    const bracket = v => {
+      if (v >= 2 && coin()) { const a = rand(Math.max(1, v - 99), v - 1); return `(${a} + ${v - a})`; }
+      const b = v < 13 ? rand(2, 9) : rand(2, 30);
+      return `(${v + b} – ${b})`;
+    };
+    return {
+      both: () => { const m = rand(2, 12), n = rand(2, 100); const [l, r] = coin() ? [m, n] : [n, m]; return [`${bracket(l)} × ${bracket(r)}`, m * n]; },
+      one: () => { const m = rand(2, 12), n = rand(2, 100); const [shown, hidden] = coin() ? [n, m] : [m, n];
+                   return [coin() ? `${bracket(hidden)} × ${shown}` : `${shown} × ${bracket(hidden)}`, m * n]; },
+      // bigger product first when taking away, so the answer stays positive
+      prod: () => { let p = [rand(2, 12), rand(2, 20)], q = [rand(2, 12), rand(2, 20)]; const add = coin();
+                    if (!add) { while (p[0] * p[1] === q[0] * q[1]) q = [rand(2, 12), rand(2, 20)]; if (p[0] * p[1] < q[0] * q[1]) [p, q] = [q, p]; }
+                    const side = ([a, b]) => (coin() ? `(${a} × ${b})` : `(${b} × ${a})`);
+                    return [`${side(p)} ${add ? '+' : '–'} ${side(q)}`, add ? p[0] * p[1] + q[0] * q[1] : p[0] * p[1] - q[0] * q[1]]; },
+      div: () => { const d = rand(2, 12), n = rand(2, 50); return [`${bracket(d * n)} ÷ ${d}`, n]; },
+    };
+  }
+  // The squares games' numbers. sq99h and sq999h leave out numbers ending in 0 or 5 (both are tricks)
+  // and, for two-digit squares, 1 to 20; sq99 and sq999 are older games with every number.
+  function squarePool(game) {
+    const m = /^sq(99|999)(h?)$/.exec(game);
+    if (!m) return null;
+    const [lo, hi] = m[1] === '99' ? [1, 99] : [100, 999], hard = !!m[2], pool = [];
+    for (let n = lo; n <= hi; n++) if (!(hard && (n % 5 === 0 || (m[1] === '99' && n <= 20)))) pool.push(n);
+    return pool;
+  }
+  const square = n => ({ q: `${n}²`, a: n * n, o: 'sq' });
+
   function maker(game, rnd) {
     const { rand, coin } = helpers(rnd);
-    if (game === 'standard' || game === 'daily') return () => {
-      const op = ['add', 'sub', 'mul', 'div'][rand(0, 3)];
-      if (op === 'add' || op === 'sub') {
-        const a = rand(2, 100), b = rand(2, 100);
-        return op === 'add' ? { q: `${a} + ${b}`, a: a + b, o: op } : { q: `${a + b} – ${a}`, a: b, o: op };
-      }
-      const a = rand(2, 12), b = rand(2, 100);
-      return op === 'mul' ? { q: `${a} × ${b}`, a: a * b, o: op } : { q: `${a * b} ÷ ${a}`, a: b, o: op };
-    };
+    if (game === 'standard' || game === 'daily') return () => arith(ARITH_DEFAULTS, ALL_OPS, rand);
     if (TEST_KINDS[game]) return () => testQuestion(game, rnd);
     if (game === 'mixed') {
-      const bracket = v => {
-        if (v >= 2 && coin()) { const a = rand(Math.max(1, v - 99), v - 1); return `(${a} + ${v - a})`; }
-        const b = v < 13 ? rand(2, 9) : rand(2, 30);
-        return `(${v + b} – ${b})`;
-      };
-      const kinds = [
-        () => { const m = rand(2, 12), n = rand(2, 100); const [l, r] = coin() ? [m, n] : [n, m]; return [`${bracket(l)} × ${bracket(r)}`, m * n]; },
-        () => { const m = rand(2, 12), n = rand(2, 100); const [shown, hidden] = coin() ? [n, m] : [m, n];
-                return [coin() ? `${bracket(hidden)} × ${shown}` : `${shown} × ${bracket(hidden)}`, m * n]; },
-        () => { let p = [rand(2, 12), rand(2, 20)], q = [rand(2, 12), rand(2, 20)]; const add = coin();
-                if (!add) { while (p[0] * p[1] === q[0] * q[1]) q = [rand(2, 12), rand(2, 20)]; if (p[0] * p[1] < q[0] * q[1]) [p, q] = [q, p]; }
-                const side = ([a, b]) => (coin() ? `(${a} × ${b})` : `(${b} × ${a})`);
-                return [`${side(p)} ${add ? '+' : '–'} ${side(q)}`, add ? p[0] * p[1] + q[0] * q[1] : p[0] * p[1] - q[0] * q[1]]; },
-        () => { const d = rand(2, 12), n = rand(2, 50); return [`${bracket(d * n)} ÷ ${d}`, n]; },
-      ];
-      return () => { const [q, a] = kinds[rand(0, 3)](); return { q, a, o: 'mix' }; };
+      const make = mixedKinds(rand, coin);
+      return () => { const [q, a] = make[MIXED_KINDS[rand(0, 3)]](); return { q, a, o: 'mix' }; };
     }
-    const m = /^sq(99|999)(h?)$/.exec(game);
-    if (m) {
-      const [lo, hi] = m[1] === '99' ? [1, 99] : [100, 999], hard = !!m[2], pool = [];
-      for (let n = lo; n <= hi; n++) if (!(hard && (n % 5 === 0 || (m[1] === '99' && n <= 20)))) pool.push(n);
-      return () => { const n = pool[rand(0, pool.length - 1)]; return { q: `${n}²`, a: n * n, o: 'sq' }; };
-    }
+    const pool = squarePool(game);
+    if (pool) return () => square(pool[rand(0, pool.length - 1)]);
     throw new Error('Unknown game.');
   }
+  // The same, at random, for the solo games.
+  const random = helpers(Math.random);
 
   // n questions for this game and seed, never the same one twice in a row.
   function list(game, seed, n) {
@@ -198,5 +224,8 @@ window.ZM_PROBLEMS = (() => {
   }
 
   const NAMES = { any: 'Any problems', standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
-  return { list, NAMES, TESTS, daySeed, isRight, one, fmt, factOf, ofFact };
+  return { list, NAMES, TESTS, daySeed, isRight, one, fmt, factOf, ofFact,
+    ARITH_DEFAULTS, ALL_OPS, MIXED_KINDS, squarePool, square,
+    arith: (r = ARITH_DEFAULTS, ops = ALL_OPS) => arith(r, ops, random.rand),
+    mixed: kinds => { const make = mixedKinds(random.rand, random.coin); const [q, a] = make[kinds[random.rand(0, kinds.length - 1)]](); return { q, a, o: 'mix' }; } };
 })();

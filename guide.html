@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co wss://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
@@ -12,6 +12,16 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Guide · Zetamach</title>
+<meta name="description" content="How to solve zetamac problems faster: addition, subtraction, multiplication, division and the times table.">
+<meta property="og:site_name" content="Zetamach">
+<meta property="og:title" content="Guide · Zetamach">
+<meta property="og:description" content="How to solve zetamac problems faster: addition, subtraction, multiplication, division and the times table.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://matthewc141.github.io/zetamac-tracker/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zetamach: 47 + 38 = 85. Mental math, timed.">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 
   /* Each operation gets its own color. */
@@ -118,7 +128,7 @@
   .seg button:disabled { color: var(--dim); cursor: default; }
   .btn { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); background: var(--raise); border: 1px solid var(--line); border-radius: 3px; padding: 12px 14px; cursor: pointer; }
   .btn:hover { border-color: var(--line-hi); background: #22232d; }
-  .btn:disabled { color: var(--dim); background: none; cursor: default; border-color: var(--line); }
+  .btn:disabled { background: none; cursor: default; border-color: var(--line); }
   .btn.go { background: var(--ink); color: var(--bg); border-color: var(--ink); }
   .btn.go:hover { background: #fff; }
 
@@ -160,7 +170,7 @@
 
   /* ---- times table ---- */
   .tt-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin: 18px 0 14px; font-size: 14px; color: var(--muted); }
-  .switch-label { display: inline-flex; align-items: center; gap: 10px; font: 700 12px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); cursor: pointer; }
+  .switch-label { display: inline-flex; align-items: center; gap: 10px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
   input.switch { appearance: none; margin: 0; width: 44px; height: 24px; border-radius: 3px; background: var(--line); position: relative; cursor: pointer; flex: none; transition: background-color .25s var(--ease); }
   input.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 2px; background: var(--muted); transition: transform .3s var(--ease), background-color .25s var(--ease); }
   input.switch:checked { background: var(--ink); }
@@ -173,9 +183,7 @@
   .tt-wrap { padding-bottom: 30px; }
   .tt { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
   .tt th, .tt td { padding: 0; text-align: center; }
-  .tt thead th { font: 700 13px/1 var(--figure); color: var(--muted); height: 28px; }
-  .tt thead th.corner { font-family: var(--label); color: var(--dim); }
-  .tt thead th.x { color: var(--ink); }
+  .tt thead th { height: 28px; }
   .tt .rowh { width: 100%; height: 38px; border: 0; border-radius: 2px; background: none; font: 700 15px/1 var(--figure); color: var(--muted); cursor: pointer; }
   .tt .rowh:hover { color: var(--ink); background: var(--raise); }
   .tt tr.x .rowh { color: var(--ink); }
@@ -259,7 +267,7 @@
     .steps .n { font-size: 22px; }
     .tt { border-spacing: 1px; }
     .tt .rowh, .cell { height: 30px; font-size: 13px; }
-    .tt thead th { font-size: 12px; height: 24px; }
+    .tt thead th { height: 24px; }
     .drill-q { font-size: 44px; }
   }
   @media (pointer: coarse) {

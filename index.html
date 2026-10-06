@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co wss://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0c10%27/%3E%3Cpath d=%27M9 9.5h14L9 22.5h14%27 fill=%27none%27 stroke=%27%23f2f3f5%27 stroke-width=%273.6%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
@@ -12,6 +12,16 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="color-scheme" content="dark">
 <title>Zetamach</title>
+<meta name="description" content="Mental math, timed. Zetamac-style speed drills with every question timed, your progress charted, quant interview tests, duels and a leaderboard.">
+<meta property="og:site_name" content="Zetamach">
+<meta property="og:title" content="Zetamach">
+<meta property="og:description" content="Mental math, timed. Zetamac-style speed drills with every question timed, your progress charted, quant interview tests, duels and a leaderboard.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://matthewc141.github.io/zetamac-tracker/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zetamach: 47 + 38 = 85. Mental math, timed.">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 
   /* Live-timing world: near-black ground, flat panels, white tabular figures. Sector colors are
@@ -173,7 +183,6 @@
 
   /* ---- stats readout strip (follows the series selector) ---- */
   .game-pick { display: flex; align-items: center; gap: 10px; }
-  .game-pick label { font: 600 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .readout { display: flex; flex-wrap: wrap; gap: 6px 26px; margin: -4px 0 14px; padding-bottom: 12px; border-bottom: 1px solid var(--grid); font-size: 14px; color: var(--muted); }
   .readout b { font: 700 17px/1 var(--figure); color: var(--ink); margin-right: 4px; }
   .readout .up { color: var(--green); }
@@ -350,7 +359,6 @@
   .t-line { display: grid; grid-template-columns: minmax(110px, auto) auto auto 1fr auto; align-items: baseline; gap: 4px 16px; }
   .o80-line .lbl { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
   .o80-line .lbl::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--team, var(--purple)); }
-  .t-o80 { --team: var(--purple); } .t-seq { --team: #2fd0f5; } .t-frac { --team: #8fb3ff; } .t-est { --team: #ff62b8; }
   .o80-line b { color: var(--ink); font: 700 20px/1 var(--figure); margin-right: 4px; }
   .o80-line a { font: 700 12px/1 var(--label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   @media (max-width: 640px) { .t-line { grid-template-columns: 1fr auto; } .t-line > span:nth-child(4) { display: none; } .t-line > span:nth-child(3) { grid-column: 1; } }
@@ -392,7 +400,7 @@
     .stack td.lead { grid-column: 1 / -1; font-weight: 700; font-size: 16px; }
     .tower.facts li { grid-template-columns: 20px 4px 104px minmax(0, 1fr) 56px 44px; }
     #recent td:first-child, #recent td:nth-child(2) { white-space: nowrap; }
-    #recent td.num .len { display: block; margin: 0 0 4px auto; width: auto; max-width: 15ch; white-space: normal; text-align: right; line-height: 1.25; }
+    #recent td.num .len { display: block; margin: 0 0 4px auto; width: auto; max-width: 15ch; white-space: normal; text-align: right; }
     .tower li { grid-template-columns: 20px 4px 44px minmax(0, 1fr) 62px 50px; gap: 0 8px; padding: 0 4px 0 0; }
     .sb-fig.main > b { font-size: 84px; }
     .sb-fig.last > b { font-size: 44px; }
@@ -516,14 +524,12 @@
   .w-demo .rail { margin: 0; }
   .w-demo .tower li { height: auto; grid-template-columns: 16px 4px 38px minmax(0, 1fr) 46px; gap: 0 8px; padding: 8px 4px 8px 0; }
   .w-demo .track i { transition: none; }
-  .w-demo .tower .pos { font-size: 14px; }
-  .w-demo .tower .code { font-size: 14px; }
   .w-demo .tower .stripe { height: 18px; }
   .w-demo .tower .time { font-size: 16px; }
   .w-demo .tower .track { height: 6px; }
   .w-foot { display: flex; align-items: center; gap: 10px; padding: 18px 24px 20px; margin-top: 18px; border-top: 1px solid var(--line); }
   .w-foot .count { margin-right: auto; font: 700 11px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .w-foot button, .w-foot a { font: 700 12px/1 var(--label); letter-spacing: .12em; text-transform: uppercase; padding: 12px 18px; border-radius: 3px; cursor: pointer; text-decoration: none; }
+  .w-foot button, .w-foot a { font-weight: 700; font-size: 12px; line-height: 1; font-variant-numeric: normal; letter-spacing: .12em; text-transform: uppercase; padding: 12px 18px; border-radius: 3px; cursor: pointer; text-decoration: none; }
   .w-ghost { background: none; color: var(--muted); border: 1px solid var(--line); }
   .w-ghost:hover { color: var(--ink); border-color: #3d4050; }
   .w-go { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
@@ -867,6 +873,13 @@
   </div>
 </dialog>
 <script src="problems.js"></script>
+<script src="dash-core.js"></script>
+<script src="dash-chart.js"></script>
+<script src="dash-weak.js"></script>
+<script src="dash-score.js"></script>
+<script src="dash-games.js"></script>
+<script src="dash-transfer.js"></script>
+<script src="dash-replay.js"></script>
 <script src="dashboard.js"></script>
 </body>
 </html>

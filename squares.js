@@ -1,21 +1,8 @@
 // The squares game (squares.html): its settings and questions; the game loop is game.js. Kept out of the page so the page's security policy can refuse inline scripts.
 const $ = s => document.querySelector(s);
-// The game uses the harder number sets (saved as sq99h and sq999h); sq99 and sq999 are older
-// games from before, when every number could come up.
+// The game uses the harder number sets (saved as sq99h and sq999h; problems.js has the pools).
 const MODE_NAMES = { sq99h: 'Two-digit squares', sq999h: 'Three-digit squares' };
 let pool = [], last = 0;
-
-// Numbers that can come up: none ending in 0 or 5 (both are tricks) and, for two-digit squares,
-// nothing from 1 to 20, which most people already know by heart.
-function buildPool(range) {
-  const [lo, hi] = range === '99' ? [21, 99] : [100, 999];
-  const out = [];
-  for (let n = lo; n <= hi; n++) {
-    if (n % 5 === 0) continue;
-    out.push(n);
-  }
-  return out;
-}
 
 function readSettings() {
   const range = document.querySelector('input[name=range]:checked').value;
@@ -32,12 +19,12 @@ document.querySelectorAll('#settings input, #settings select').forEach(el => el.
 
 // What the shared game loop (game.js) needs from this game.
 const GAME = {
-  begin(cfg) { pool = buildPool(cfg.range); },
+  begin(cfg) { pool = window.ZM_PROBLEMS.squarePool(cfg.mode); },
   next() {
     let n;
     do n = pool[Math.floor(Math.random() * pool.length)]; while (n === last && pool.length > 1);
     last = n;
-    return { q: `${n}²`, a: n * n, o: 'sq' };
+    return window.ZM_PROBLEMS.square(n);
   },
   untracked: 'Only 120-second, 30-second and endless games save to your tracker.',
   label: cfg => `${MODE_NAMES[cfg.mode]}${cfg.duration === 30 ? ', 30 s' : cfg.duration === 0 ? ', endless' : ''}`,

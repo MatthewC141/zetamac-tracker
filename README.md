@@ -37,3 +37,21 @@ Scores are saved to `scores.csv` next to the binary (set `ZETAMAC_HOME` to chang
 The same HTML/JS runs as a static site on GitHub Pages. With no server, scores are kept in localStorage, and you can export them from the local version and import them on the site.
 
 Accounts are optional. To turn them on, create a Supabase project, disable email confirmation, run `schema.sql`, and put the project URL and anon key in `cloud.js`.
+
+Errors in the site's scripts are reported to a `client_errors` table (read it in Supabase's table editor).
+
+## Tests
+
+```sh
+cd tests && npm install
+npm test              # everything, about 3 minutes
+npm run test:db       # the database: schema.sql on an in-process Postgres (PGlite)
+npm run test:browser  # the website in headless Chrome, against a stand-in Supabase
+node run.mjs browser duel   # one file
+```
+
+The browser tests need Google Chrome (or set `CHROME` to its path). They run on a fresh stand-in database, a test copy of the site and a scratch local tracker, so they never touch your `scores.csv`. Set `ZM_SHOTS=1` to save screenshots to `tests/shots/`.
+
+## Using your own domain
+
+GitHub Pages can serve the site on a domain you own: add it under the repository's Settings → Pages (this adds a `CNAME` file) and point the domain's DNS at GitHub as that page explains. Then change the address in two places: `ZM_SITE` in `cloud.js` (the links from the local tracker to the website) and the `og:image` address in each page's head (the picture shown when a link is shared). Supabase needs nothing changed.

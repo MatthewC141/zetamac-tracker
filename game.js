@@ -1,5 +1,5 @@
 // The game loop the solo games share (arithmetic, squares, combined, practice): the clock, taking
-// an answer the moment it's right, the end screen and saving. Loaded after the game's own script,
+// an answer the moment it's right, the end screen and saving (save.js). Loaded after the game's own script,
 // which supplies readSettings(), updateNote() and GAME:
 //   GAME.next(cfg)             the next question: { q, a, o } (text, answer, kind)
 //   GAME.untracked             what the end screen says when the settings don't save
@@ -19,6 +19,7 @@ function nextProblem() {
   input.value = '';
   prevLen = 0;
   current = { q: p.q, a: p.a, o: p.o, c: 0, shownAt: performance.now(), review: p.review };
+  zmSay.question(p.q);
 }
 
 function tick() {
@@ -28,6 +29,7 @@ function tick() {
   }
   const left = Math.max(0, Math.ceil((endAt - performance.now()) / 1000));
   $('#secs').textContent = left;
+  zmSay.clock(left);
   if (left === 0) finish();
 }
 
@@ -35,6 +37,7 @@ function start(s = readSettings()) {
   if (s.error) { updateNote(); return; }
   cfg = s;
   GAME.begin?.(cfg);
+  zmSay.reset();
   score = 0;
   log = [];
   $('#score').textContent = 0;
@@ -84,28 +87,9 @@ async function save(final, elapsed) {
   saved.className = 'saved';
   if (!cfg.tracked) { saved.textContent = GAME.untracked; return; }
   if (cfg.duration === 0 && final === 0) { saved.textContent = 'Empty run: not saved.'; return; }
-  const same = history.filter(g => g.seconds === cfg.duration && (g.mode || 'standard') === cfg.mode);
-  const prevBest = same.reduce((m, g) => Math.max(m, g.score), 0);
-  saved.textContent = 'Saving…';
-  try {
-    const r = await fetch('api/game', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
-      body: new URLSearchParams({ score: final, elapsed, detail: JSON.stringify(log), seconds: cfg.duration, mode: cfg.mode }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error);
-    if (Array.isArray(data)) history = data;
-    const mine = history[history.length - 1];  // the server appends, so the newest row is this game
-    const line = (GAME.saved || savedLine)(cfg, { final, prevBest, same });
-    if (line.pb) saved.className = 'saved pb';
-    if (line.html) saved.innerHTML = line.html; else saved.textContent = line.text;
-    if (mine?.detail && log.length) saved.insertAdjacentHTML('beforeend', ` · <a href="./#game=${encodeURIComponent(mine.ts)}">See breakdown</a>`);
-    GAME.afterSave?.(cfg);
-  } catch {
-    saved.innerHTML = (window.ZM_WEB ? 'Couldn’t save in this browser.' : 'Couldn’t save — is <code>./zetamac tracker</code> running?') + ' <a href="#" id="retry">Retry</a>';
-    $('#retry').onclick = e => { e.preventDefault(); save(final, elapsed); };
-  }
+  const run = cfg;
+  history = await zmSave(saved, { mode: run.mode, seconds: run.duration, score: final, elapsed, log }, history, r => (GAME.saved || savedLine)(run, r));
+  GAME.afterSave?.(run);
 }
 
 function finish() {
@@ -120,6 +104,7 @@ function finish() {
   $('#play').style.display = 'none';
   $('#final').textContent = score;
   $('#end').style.display = 'block';
+  zmSay(`${cfg.duration === 0 ? 'Done' : 'Time'}. You scored ${score}.`);
   save(score, elapsed);
   // Short pause so keys mashed at the buzzer don't trigger "Try again".
   setTimeout(() => $('#again').focus(), 700);

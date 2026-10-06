@@ -155,8 +155,7 @@ begin
   insert into public.daily_starts as d (user_id, day) values (auth.uid(), p_date)
     on conflict (user_id, day) do update set tries = d.tries + 1
     returning started_at, tries into t, n;
-  return jsonb_build_object('started', t, 'tries', n,
-    'seed', (select ('x' || substr(md5(salt || p_date::text), 1, 8))::bit(32)::int from public.daily_salt));
+  return jsonb_build_object('started', t, 'tries', n, 'seed', private.daily_seed(p_date));
 end $$;
 revoke execute on function public.daily_start(date) from public, anon;
 grant execute on function public.daily_start(date) to authenticated;
@@ -170,6 +169,139 @@ $$;
 revoke execute on function public.daily_started(uuid, date) from public, anon;
 grant execute on function public.daily_started(uuid, date) to authenticated;
 
+-- ---- checking the answers in a game's log ---------------------------------------------------
+-- These live in their own schema, which the site's API doesn't serve: the score check below calls
+-- them while saving a game, and nothing else can.
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated;
+-- A question as the games write it ("54 + 87", "(13 – 4) × 23", "12% of 850", "Quarters in 0.75",
+-- "√5,476", …) worked out here, or null if it isn't one. Only digits, operators, brackets and
+-- sqrt reach the calculation, so nothing else can run.
+create or replace function private.zm_eval(p_q text) returns numeric
+language plpgsql immutable set search_path = '' as $$
+declare s text := btrim(coalesce(p_q, '')); m text[]; r numeric; prev text;
+begin
+  if length(s) = 0 or length(s) > 40 then return null; end if;
+  s := replace(replace(replace(replace(s, '×', '*'), '÷', '/'), '–', '-'), '−', '-');
+  loop prev := s; s := regexp_replace(s, '(\d),(\d{3})', '\1\2', 'g'); exit when s = prev; end loop;  -- 98,000
+  m := regexp_match(s, '^(\S+)% of (\S+)$');
+  if m is not null then s := format('(%s) / 100 * (%s)', m[1], m[2]); end if;
+  m := regexp_match(s, '^(\d+)/(\d+) in %$');
+  if m is not null then s := format('%s / %s * 100', m[1], m[2]); end if;
+  m := regexp_match(s, '^([A-Za-z-]+) in (\S+)$');
+  if m is not null then
+    s := format('(%s) * %s', m[2], case m[1] when 'Halves' then 2 when 'Quarters' then 4 when 'Fifths' then 5 when 'Eighths' then 8 when 'Tenths' then 10
+      when 'Sixteenths' then 16 when 'Twentieths' then 20 when 'Twenty-fifths' then 25 when 'Fortieths' then 40 end);
+  end if;
+  m := regexp_match(s, '^(\d+) (\d+)/(\d+)$');  -- a mixed number: 2 3/8
+  if m is not null then s := format('(%s + %s / %s)', m[1], m[2], m[3]); end if;
+  s := regexp_replace(s, '√(\d+)', 'sqrt(\1)', 'g');
+  s := regexp_replace(s, '(\d+)²', '(\1 * \1)', 'g');
+  if regexp_replace(s, 'sqrt', '', 'g') !~ '^[0-9. +*/()-]+$' then return null; end if;
+  execute 'select (' || regexp_replace(s, '(\d+(\.\d+)?)', '\1::numeric', 'g') || ')::numeric' into r;
+  return r;
+exception when others then return null;
+end $$;
+
+-- A typed answer read the way the quant tests read it: "1,037", "8,5" (a decimal comma), "40%".
+create or replace function private.zm_num(p_g text) returns numeric
+language sql immutable set search_path = '' as $$
+  select case when s ~ '^-?(\d+\.?\d*|\.\d+)$' then s::numeric end
+  from (select case when t ~ '^-?\d{1,3}(,\d{3})+(\.\d+)?$' then replace(t, ',', '') else regexp_replace(t, ',', '.') end s
+        from (select regexp_replace(replace(regexp_replace(coalesce(p_g, ''), '\s+', '', 'g'), '−', '-'), '%$', '') t) a) b;
+$$;
+
+-- The daily challenge's questions, built from the day's seed exactly as problems.js builds them
+-- (its small seeded generator, mulberry32, in 32-bit steps), so a daily's log can be checked
+-- question by question against the day's set.
+create or replace function private.zm_daily_list(p_seed int, p_n int) returns text[]
+language plpgsql immutable set search_path = '' as $$
+declare
+  m32 constant bigint := 4294967295; s bigint := p_seed::bigint & 4294967295; t bigint; u bigint;
+  out text[] := '{}'; q text; op int; a int; b int;
+begin
+  while coalesce(array_length(out, 1), 0) < least(p_n, 600) loop
+    -- op, then the two numbers; each draw is one step of the generator
+    for i in 1..3 loop
+      s := (s + 1831565813) & m32;
+      t := ((((s # (s >> 15))::numeric * ((1 | s))::numeric) % 4294967296)::bigint);
+      t := ((t + ((((t # (t >> 7))::numeric * ((61 | t))::numeric) % 4294967296)::bigint)) & m32) # t;
+      u := (t # (t >> 14)) & m32;
+      if i = 1 then op := ((u * 4) >> 32)::int;
+      elsif i = 2 then a := case when op < 2 then 2 + ((u * 99) >> 32)::int else 2 + ((u * 11) >> 32)::int end;
+      else b := 2 + ((u * 99) >> 32)::int; end if;
+    end loop;
+    q := case op when 0 then a || ' + ' || b when 1 then (a + b) || ' – ' || a when 2 then a || ' × ' || b else (a * b) || ' ÷ ' || a end;
+    if coalesce(array_length(out, 1), 0) = 0 or out[array_length(out, 1)] <> q then out := out || q; end if;
+  end loop;
+  return out;
+end $$;
+
+-- Whether every answer in a game's log holds up: each question worked out to the logged answer and
+-- in the game's own number ranges (zetamac's defaults, the squares sets), the daily challenge's
+-- questions the day's own in order, and on the quant tests each mark (right, wrong or skipped)
+-- matching what was typed. The drills, which mix kinds and never reach the board, aren't checked.
+create or replace function private.answers_hold(p_mode text, p_detail jsonb, p_seed int) returns boolean
+language plpgsql stable set search_path = '' as $$
+declare q jsonb; m text[]; x int; y int; truth numeric; g numeric; shown numeric; i int := 0; day text[];
+begin
+  if p_mode = 'drill' or p_mode = 'guided' then return true; end if;
+  if p_mode = 'daily' then day := private.zm_daily_list(p_seed, jsonb_array_length(p_detail)); end if;
+  for q in select value from jsonb_array_elements(p_detail) loop
+    i := i + 1;
+    if p_mode in ('o80', 'seq', 'frac', 'est') then
+      if coalesce(q ->> 'r', '') not in ('y', 'n', 's') then return false; end if;
+      if q ->> 'r' = 's' then continue; end if;
+      shown := private.zm_num(q ->> 'a');
+      truth := case when p_mode = 'seq' then shown else private.zm_eval(q ->> 'q') end;
+      g := private.zm_num(q ->> 'g');
+      if truth is null or shown is null or truth <= 0 then return false; end if;
+      if p_mode = 'est' then
+        if abs(shown - truth) > 0.005 * truth then return false; end if;
+        if (q ->> 'r' = 'y') <> (g is not null and abs(g - truth) <= 0.05 * truth) then return false; end if;
+      else
+        if round(truth, 4) <> shown then return false; end if;
+        if (q ->> 'r' = 'y') <> (g is not null and abs(g - round(truth, 4)) < 0.000000001) then return false; end if;
+      end if;
+      continue;
+    end if;
+    if p_mode = 'daily' and (day[i] is null or q ->> 'q' <> day[i]) then return false; end if;
+    truth := private.zm_eval(q ->> 'q');
+    if truth is null or jsonb_typeof(q -> 'a') not in ('number', 'string') or truth <> (q ->> 'a')::numeric then return false; end if;
+    if p_mode in ('standard', 'daily', 'sub-borrow', 'sub-easy') then
+      m := regexp_match(q ->> 'q', '^(\d+) ([+–×÷]) (\d+)$');
+      if m is null then return false; end if;
+      x := m[1]::int; y := m[3]::int;
+      if not (case m[2]
+          when '+' then p_mode in ('standard', 'daily') and x between 2 and 100 and y between 2 and 100
+          when '–' then y between 2 and 100 and x - y between 2 and 100
+            and (p_mode in ('standard', 'daily') or (p_mode = 'sub-borrow') = (y % 10 > x % 10))
+          when '×' then p_mode in ('standard', 'daily') and x between 2 and 12 and y between 2 and 100
+          else p_mode in ('standard', 'daily') and y between 2 and 12 and x % y = 0 and x / y between 2 and 100 end) then
+        return false;
+      end if;
+    elsif p_mode in ('sq99', 'sq99h', 'sq999', 'sq999h') then
+      m := regexp_match(q ->> 'q', '^(\d+)²$');
+      if m is null then return false; end if;
+      x := m[1]::int;
+      if not (case when p_mode like 'sq99%' and p_mode not like 'sq999%' then x between 1 and 99 else x between 100 and 999 end)
+         or (p_mode in ('sq99h', 'sq999h') and (x % 5 = 0 or (p_mode = 'sq99h' and x <= 20))) then
+        return false;
+      end if;
+    end if;
+  end loop;
+  return true;
+exception when others then return false;
+end $$;
+-- The day's seed (the secret salt is out of players' reach, so the score check asks this).
+create or replace function private.daily_seed(p_date date) returns int
+language sql stable security definer set search_path = '' as $$
+  select ('x' || substr(md5(salt || p_date::text), 1, 8))::bit(32)::int from public.daily_salt;
+$$;
+revoke execute on all functions in schema private from public, anon;
+grant execute on all functions in schema private to authenticated;
+
 -- Each save is checked here. First, limits that keep one account from filling the database: 20,000
 -- games and 50 MB of question logs in all, and 1,000 saves or 25 MB of logs an hour (plenty for
 -- importing years of history). Then whether the
@@ -178,7 +310,8 @@ grant execute on function public.daily_started(uuid, date) to authenticated;
 -- and the times adding up to no more than the game's length (the run's length for endless).
 -- The quant tests are marked right minus wrong, so their logs hold every question answered or
 -- skipped (at most the test's count, each marked r = y, n or s) and the score must be rights
--- minus wrongs. Hand-logged scores never count.
+-- minus wrongs. Every answer must hold up too (private.answers_hold: right, in the game's ranges,
+-- and for the daily challenge the day's own questions). Hand-logged scores never count.
 -- The daily challenge is played once a day: a second one for the same day is dropped without an
 -- error (so a batch of imported games still saves the rest), and it counts only on a date within
 -- a day of the database's own (time zones).
@@ -219,7 +352,8 @@ begin
            coalesce(sum((q ->> 't')::numeric), 0), coalesce(min((q ->> 't')::numeric) filter (where q ->> 'r' <> 's'), 150)
       into rights, wrongs, total, fastest from jsonb_array_elements(new.detail) q;
     new.verified := new.score = greatest(0, rights - wrongs) and fastest >= 150
-      and new.elapsed between 1 and new.seconds and total <= new.elapsed * 1000 + 2000;
+      and new.elapsed between 1 and new.seconds and total <= new.elapsed * 1000 + 2000
+      and private.answers_hold(new.mode, new.detail, null);
     return new;
   end if;
   if new.score = 0 or n <> new.score or bad > 0 then return new; end if;
@@ -227,7 +361,8 @@ begin
     into total, fastest from jsonb_array_elements(new.detail) q;
   new.verified := fastest >= 150 and case
     when new.seconds > 0 then total <= new.seconds * 1000 + 2000
-    else new.elapsed > 0 and total <= new.elapsed * 1000 + 2000 end;
+    else new.elapsed > 0 and total <= new.elapsed * 1000 + 2000 end
+    and private.answers_hold(new.mode, new.detail, case when new.mode = 'daily' then private.daily_seed(new.date) end);
   return new;
 end $$;
 drop trigger if exists scores_check on public.scores;
@@ -265,6 +400,63 @@ create or replace view public.daily_board with (security_invoker = false) as
   where s.mode = 'daily' and s.verified and not p.private;
 revoke all on public.leaderboard, public.leaderboard_week, public.daily_board from public;
 grant select on public.leaderboard, public.leaderboard_week, public.daily_board to anon, authenticated;
+
+-- The boards in order, worked out here so a page fetches only what it shows. Places follow the
+-- leaderboard's rules: best score, then on endless the faster run, on the quant tests fewer wrong
+-- answers and then the faster finish; players level on all of that share a place.
+create or replace function private.board_rows(p_week boolean, p_mode text default null, p_seconds int default null)
+returns table (username text, mode text, seconds int, score int, elapsed int, date date, wrongs int, place bigint, pos bigint, total bigint)
+language sql stable set search_path = '' as $$
+  select l.*,
+    rank() over (partition by l.mode, l.seconds order by l.score desc, case when l.seconds = 0 then l.elapsed end, l.wrongs nulls last,
+                 case when l.mode in ('o80', 'seq', 'frac', 'est') then nullif(l.elapsed, 0) end nulls last),
+    row_number() over (partition by l.mode, l.seconds order by l.score desc, case when l.seconds = 0 then l.elapsed end, l.wrongs nulls last,
+                 case when l.mode in ('o80', 'seq', 'frac', 'est') then nullif(l.elapsed, 0) end nulls last, l.date, l.username),
+    count(*) over (partition by l.mode, l.seconds)
+  from (select * from public.leaderboard where not coalesce(p_week, false)
+        union all select * from public.leaderboard_week where coalesce(p_week, false)) l
+  where (p_mode is null or l.mode = p_mode) and (p_seconds is null or l.seconds = p_seconds);
+$$;
+revoke execute on function private.board_rows(boolean, text, int) from public, anon, authenticated;  -- only through the functions below
+
+-- One board: its first rows (100 at most), how many are on it, and the named player's row with the
+-- players either side of it when it's further down.
+create or replace function public.board(p_mode text, p_seconds int, p_week boolean default false, p_name text default null, p_limit int default 100)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  with b as (select * from private.board_rows(p_week, p_mode, p_seconds)),
+       me as (select pos from b where lower(username) = lower(coalesce(p_name, '')) limit 1)
+  select jsonb_build_object(
+    'total', coalesce((select max(total) from b), 0),
+    'rows', coalesce((select jsonb_agg(to_jsonb(b) - 'mode' - 'seconds' - 'total' order by pos) from b where pos <= least(greatest(coalesce(p_limit, 100), 1), 200)), '[]'::jsonb),
+    'around', coalesce((select jsonb_agg(to_jsonb(b) - 'mode' - 'seconds' - 'total' order by b.pos) from b, me
+                        where b.pos between me.pos - 2 and me.pos + 2 and b.pos > least(greatest(coalesce(p_limit, 100), 1), 200)), '[]'::jsonb));
+$$;
+
+-- Every board at a glance: how many are on it, its leader, and the named player's place with the
+-- nearest player ahead (for "3 to pass bea").
+create or replace function public.boards(p_week boolean default false, p_name text default null)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  with b as (select * from private.board_rows(p_week)),
+       me as (select * from b where lower(username) = lower(coalesce(p_name, '')))
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'mode', k.mode, 'seconds', k.seconds, 'total', k.total,
+    'leader', (select jsonb_build_object('username', username, 'score', score) from b where b.mode = k.mode and b.seconds = k.seconds and pos = 1),
+    'me', (select jsonb_build_object('place', me.place, 'score', me.score, 'elapsed', me.elapsed, 'wrongs', me.wrongs, 'ahead',
+             (select jsonb_build_object('username', a.username, 'score', a.score) from b a
+              where a.mode = me.mode and a.seconds = me.seconds and a.score > me.score order by a.score, a.pos desc limit 1))
+           from me where me.mode = k.mode and me.seconds = k.seconds))), '[]'::jsonb)
+  from (select distinct mode, seconds, total from b) k;
+$$;
+
+-- Where a score stands on a board: how many other players' bests it beats, out of how many (the
+-- named player left out). Null with fewer than 5 others, when a percentage would mean little.
+create or replace function public.standing(p_mode text, p_seconds int, p_score int, p_name text default null)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select case when count(*) >= 5 then jsonb_build_object('beats', count(*) filter (where score < p_score), 'of', count(*)) end
+  from public.leaderboard where mode = p_mode and seconds = p_seconds and lower(username) <> lower(coalesce(p_name, ''));
+$$;
+revoke execute on function public.board(text, int, boolean, text, int), public.boards(boolean, text), public.standing(text, int, int, text) from public;
+grant execute on function public.board(text, int, boolean, text, int), public.boards(boolean, text), public.standing(text, int, int, text) to anon, authenticated;
 
 -- ---- deleting an account -------------------------------------------------------------------
 -- Removes the signed-in player's login, profile and every score.
@@ -756,8 +948,8 @@ revoke execute on function public.mm_say(uuid, text) from public, anon;
 grant execute on function public.mm_say(uuid, text) to authenticated;
 
 -- ---- public profiles -----------------------------------------------------------------------
--- profile.html#name: a player's bests on each board, duel rating and past seasons, and how many
--- games they played each day of the last 13 weeks. Private accounts have no profile.
+-- profile.html#name: a player's bests on each board (with where each stands), duel rating and past
+-- seasons, and how many games they played each day of the last 13 weeks. Private accounts have no profile.
 create or replace function public.profile(p_name text) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_id uuid; v_name text; v_joined timestamptz;
@@ -767,7 +959,8 @@ begin
   if not found then return null; end if;
   return jsonb_build_object(
     'username', v_name, 'joined', v_joined::date,
-    'bests', coalesce((select jsonb_agg(jsonb_build_object('mode', mode, 'seconds', seconds, 'score', score, 'elapsed', elapsed, 'wrongs', wrongs, 'date', date))
+    'bests', coalesce((select jsonb_agg(jsonb_build_object('mode', mode, 'seconds', seconds, 'score', score, 'elapsed', elapsed, 'wrongs', wrongs, 'date', date,
+                                                         'standing', public.standing(mode, seconds, score, v_name)))
                        from public.leaderboard where username = v_name), '[]'::jsonb),
     'rating', (select jsonb_build_object('elo', elo, 'games', games, 'wins', wins, 'losses', losses, 'draws', draws, 'peak', peak)
                from public.ladder where username = v_name),
@@ -778,3 +971,30 @@ begin
 end $$;
 revoke execute on function public.profile(text) from public;
 grant execute on function public.profile(text) to anon, authenticated;
+
+-- ---- errors from the site ------------------------------------------------------------------
+-- When a page hits an error, it reports it here (log_error), so problems show up without anyone
+-- having to write in. Read them in the Supabase table editor (client_errors); nobody else can.
+-- Kept small: short fields, at most 60 reports a minute from everyone together, the newest 5,000.
+create table if not exists public.client_errors (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  page text not null,
+  message text not null,
+  detail text,
+  agent text,
+  user_id uuid references auth.users on delete set null
+);
+alter table public.client_errors enable row level security;
+revoke all on public.client_errors from anon, authenticated;
+create or replace function public.log_error(p_page text, p_message text, p_detail text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if (select count(*) from public.client_errors where at > now() - interval '1 minute') >= 60 then return; end if;
+  insert into public.client_errors (page, message, detail, agent, user_id)
+    values (left(coalesce(p_page, ''), 200), left(coalesce(nullif(btrim(p_message), ''), 'unknown'), 500), left(p_detail, 2000),
+            left(nullif(current_setting('request.headers', true), '')::json ->> 'user-agent', 300), auth.uid());
+  delete from public.client_errors where id <= (select id from public.client_errors order by id desc offset 5000 limit 1);
+end $$;
+revoke execute on function public.log_error(text, text, text) from public;
+grant execute on function public.log_error(text, text, text) to anon, authenticated;

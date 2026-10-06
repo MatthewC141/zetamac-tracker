@@ -15,6 +15,25 @@
   if (['127.0.0.1', 'localhost'].includes(location.hostname)) return;
   window.ZM_WEB = true;
 
+  // Errors in the site's own scripts are reported (cloud.js → logError), so problems show up
+  // without anyone writing in: at most 3 a page, each once.
+  const reported = new Set();
+  const report = (message, detail) => {
+    const key = String(message).slice(0, 200);
+    if (reported.size >= 3 || reported.has(key) || !window.ZM_CLOUD?.ready) return;
+    reported.add(key);
+    window.ZM_CLOUD.logError(location.pathname.split('/').pop() || 'index.html', key, String(detail || '').slice(0, 2000));
+  };
+  addEventListener('error', e => {
+    if (!e.filename || !e.filename.startsWith(location.origin)) return;  // not ours (an extension, say)
+    report(e.message, `${e.filename.split('/').pop()}:${e.lineno}:${e.colno}\n${e.error?.stack || ''}`);
+  });
+  addEventListener('unhandledrejection', e => {
+    const err = e.reason;
+    if (!err?.stack || !err.stack.includes(location.origin)) return;
+    report(err.message || String(err), err.stack);
+  });
+
   const SCORES = 'zm-web-scores';
   const DETAIL = 'zm-web-detail:';  // + timestamp → that game's question log (JSON text)
   const MODES = new Set(['standard', 'daily', 'sq99', 'sq99h', 'sq999', 'sq999h', 'sub-borrow', 'sub-easy', 'drill', 'guided', 'mixed', 'o80', 'seq', 'frac', 'est']);
@@ -105,6 +124,8 @@
     });
   }
   const sameKey = e => `${e.ts}|${e.score}|${e.seconds}|${e.mode}|${e.source}`;
+  // api/details?ts=a,b,c: the games asked for (well-formed timestamps only, 500 at most).
+  const tsList = url => [...new Set((url.searchParams.get('ts') || '').split(',').filter(ts => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(ts)))].slice(0, 500);
 
   // ---- this browser (signed out) ----
   const load = () => {
@@ -126,6 +147,13 @@
       let questions = [];
       try { questions = JSON.parse(raw); } catch {}
       return reply(200, { ts, questions });
+    }
+    if (method === 'GET' && route === 'details') {  // several games' logs at once: { details: { ts: questions } }
+      const details = {};
+      for (const ts of tsList(url)) {
+        try { const raw = localStorage.getItem(DETAIL + ts); if (raw !== null) details[ts] = JSON.parse(raw); } catch {}
+      }
+      return reply(200, { details });
     }
     if (method !== 'POST') return fail(404, 'not found');
     const list = load();
@@ -227,6 +255,15 @@
       if (!row) return fail(404, 'No question-by-question data for this game.');
       return reply(200, { ts, questions: Array.isArray(row.detail) ? row.detail : [] });
     }
+    if (method === 'GET' && route === 'details') {
+      const want = tsList(url), details = {};
+      for (let k = 0; k < want.length; k += 50) {  // 50 games a request
+        const part = want.slice(k, k + 50).map(ts => `"${ts}"`).join(',');
+        const rows = await c.rest(`scores?select=ts,detail&ts=in.(${encodeURIComponent(part)})&source=eq.game&has_detail=is.true`);
+        for (const r of rows) if (Array.isArray(r.detail)) details[r.ts] = r.detail;
+      }
+      return reply(200, { details });
+    }
     if (method !== 'POST') return fail(404, 'not found');
     if (route === 'scores' || route === 'game') {
       const row = newScore(route, new URLSearchParams(body || ''));
@@ -297,30 +334,39 @@
     addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
-  // A challenge waiting for you marks the Duel tab on every page (it only waits while the
-  // challenger keeps their page open, so this looks every few seconds while the tab is showing).
-  // ponytail: polling; a database push channel if the request count ever matters.
+  // A challenge waiting for you marks the Duel tab on every page. The challenger's page nudges you
+  // over Realtime (cloud.js), so this asks the database when nudged, when the tab comes back into
+  // view, and once a minute in case a nudge was missed. While a challenge shows, it looks every few
+  // seconds, since one goes away when the challenger leaves. The Duel page hears about it too.
   addEventListener('DOMContentLoaded', () => {
     const tab = document.querySelector('.zh-nav a[href="duel.html"]');
-    if (!tab) return;
+    const c0 = cloud();
+    if (!tab || !c0) return;
+    let waiting = 0, soon = 0;
     const look = async () => {
       const c = cloud(), game = document.querySelector('#game');
+      clearTimeout(soon);
       if (!c || document.hidden || game?.style.display === 'block') return;
       try {
         const list = await c.rest('rpc/mm_invites', { method: 'POST', body: {} });
         const n = Array.isArray(list) ? list.length : 0;
         tab.toggleAttribute('data-invites', n > 0);
         tab.title = n ? `${list[0].from} challenged you` : '';
+        if (n !== waiting) dispatchEvent(new CustomEvent('zm-invites', { detail: list }));
+        waiting = n;
+        if (n) soon = setTimeout(look, 4000);
       } catch {}
     };
+    c0.listen(c0.inviteTopic(c0.user().name), look);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) look(); });
+    setInterval(look, 60000);
     look();
-    setInterval(look, 5000);
   });
 
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url, location.href);
-    const m = url.origin === location.origin && url.pathname.match(/\/api\/(scores|game|delete|detail|import)$/);
+    const m = url.origin === location.origin && url.pathname.match(/\/api\/(scores|game|delete|detail|details|import)$/);
     if (!m) return realFetch(input, init);
     const method = (init.method || 'GET').toUpperCase(), c = cloud();
     try {

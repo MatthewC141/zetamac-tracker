@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co wss://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="stylesheet" href="launch.css">
@@ -12,6 +12,16 @@
 <meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Squares · Zetamach</title>
+<meta name="description" content="Two- and three-digit squares against the clock, every question timed.">
+<meta property="og:site_name" content="Zetamach">
+<meta property="og:title" content="Squares · Zetamach">
+<meta property="og:description" content="Two- and three-digit squares against the clock, every question timed.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://matthewc141.github.io/zetamac-tracker/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zetamach: 47 + 38 = 85. Mental math, timed.">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   /* Same look as play.html (the zetamac clone). */
   :root {
@@ -136,12 +146,15 @@
       <div class="score">Score: <span id="final"></span></div>
       <div class="pace" id="pace"></div>
       <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="./">View progress</a></div>
-      <div class="saved" id="saved"></div>
+      <div class="saved" id="saved" aria-live="polite"></div>
     </div>
   </div>
 </div>
 
+<script src="problems.js"></script>
 <script src="squares.js"></script>
+<script src="save.js"></script>
+<script src="say.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

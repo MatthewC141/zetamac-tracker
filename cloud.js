@@ -5,6 +5,10 @@
   const SUPABASE_URL = 'https://ktjcczwwpzzigwfbsynq.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_3iaOg9pYNOgsEnqM8CIQrg_tEBQf_n1';
 
+  // The website's address, for the links from the tracker on your computer to the website version.
+  // (With your own domain: change it here, and og:image in each page's head.)
+  window.ZM_SITE = 'https://matthewc141.github.io/zetamac-tracker/';
+
   const SESSION = 'zm-session';
   const nameOk = s => /^[A-Za-z0-9_]{3,20}$/.test(s);
   // No email: each name signs in with an address that can never receive mail.
@@ -64,7 +68,30 @@
     return renewing;
   }
 
-  let board = null;  // the all-time leaderboard, fetched once for standing()
+  // The Realtime connection behind listen() (Phoenix's websocket protocol, as Supabase speaks it).
+  const listeners = new Map();  // topic → set of callbacks
+  let socket = null, beat = 0, ref = 0, retry = 1000;
+  const send = (topic, event, payload) => socket?.readyState === 1 && socket.send(JSON.stringify({ topic, event, payload, ref: String(++ref) }));
+  const join = topic => send(`realtime:${topic}`, 'phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: [], private: false }, access_token: SUPABASE_KEY });
+  function connect() {
+    if (socket || !SUPABASE_URL || typeof WebSocket === 'undefined') return;
+    socket = new WebSocket(`${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPABASE_KEY)}&vsn=1.0.0`);
+    socket.onopen = () => {
+      retry = 1000;
+      for (const topic of listeners.keys()) join(topic);
+      beat = setInterval(() => send('phoenix', 'heartbeat', {}), 25000);
+    };
+    socket.onmessage = e => {
+      let m;
+      try { m = JSON.parse(e.data); } catch { return; }
+      if (m.event !== 'broadcast') return;
+      for (const fn of listeners.get(String(m.topic).replace(/^realtime:/, '')) || []) { try { fn(m.payload?.payload); } catch {} }
+    };
+    socket.onclose = () => {
+      clearInterval(beat); socket = null;
+      if ([...listeners.values()].some(set => set.size)) setTimeout(connect, retry = Math.min(retry * 2, 60000));
+    };
+  }
 
   window.ZM_CLOUD = {
     ready: !!(SUPABASE_URL && SUPABASE_KEY),
@@ -107,25 +134,34 @@
         return call(`/rest/v1/${path}`, { ...opts, token: await token(true) });
       }
     },
-    // Public: every player's best verified game per board, all time or this week (from Monday).
-    // Fetched 1,000 rows at a time (the most the database sends at once) in a fixed order.
-    async leaderboard(week = false) {
-      const rows = [];
-      for (let from = 0; ; from += 1000) {
-        const page = await call(`/rest/v1/${week ? 'leaderboard_week' : 'leaderboard'}?select=username,mode,seconds,score,elapsed,date,wrongs&order=mode,seconds,username&offset=${from}&limit=1000`);
-        rows.push(...(page || []));
-        if (!page || page.length < 1000) return rows;
-      }
+    // Public: the leaderboard, worked out by the database (schema.sql) so a page fetches only
+    // what it shows. boards(): every board's size, leader, and the named player's place with the
+    // player just ahead. board(): one board's first rows, and the rows around the named player
+    // when they're further down. Both all time, or this week (from Monday).
+    boards: (week = false, name = null) => call('/rest/v1/rpc/boards', { method: 'POST', body: { p_week: week, p_name: name } }),
+    board: (mode, seconds, week = false, name = null, limit = 100) =>
+      call('/rest/v1/rpc/board', { method: 'POST', body: { p_mode: mode, p_seconds: seconds, p_week: week, p_name: name, p_limit: limit } }),
+    // Public: where a score stands on a board, as { beats, of }: how many other players' bests it's
+    // higher than, out of how many (the named player left out). Null with fewer than 5 others.
+    standing: (mode, seconds, score, name = null) =>
+      call('/rest/v1/rpc/standing', { method: 'POST', body: { p_mode: mode, p_seconds: seconds, p_score: score, p_name: name } }),
+    // Realtime (Supabase's broadcast channels): a nudge from one page to another, used to tell a
+    // player a challenge is waiting. Nudges carry nothing and anyone can send one, so a page that
+    // gets one only re-asks the database (mm_invites), which has the truth. listen() keeps one
+    // connection per page (heartbeat, reconnect), and calls `fn` for each nudge on that topic.
+    listen(topic, fn) {
+      (listeners.get(topic) || listeners.set(topic, new Set()).get(topic)).add(fn);
+      connect();
+      if (socket?.readyState === 1) join(topic);
+      return () => listeners.get(topic)?.delete(fn);
     },
-    // Public: where a score stands on a board's all-time leaderboard, as { beats, of }: how many
-    // other players' bests it is higher than, out of how many (the named player's own row left out).
-    // Null when fewer than 5 other players are on the board. The board is fetched once a page.
-    async standing(mode, seconds, score, me = '') {
-      board ||= this.leaderboard().catch(err => { board = null; throw err; });
-      const name = me.toLowerCase();
-      const others = (await board).filter(r => r.mode === mode && r.seconds === seconds && r.username.toLowerCase() !== name);
-      return others.length < 5 ? null : { beats: others.filter(r => r.score < score).length, of: others.length };
-    },
+    ping: topic => fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+      method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ topic, event: 'ping', payload: {} }] }),
+    }).catch(() => {}),
+    inviteTopic: name => `invites:${String(name).toLowerCase()}`,
+    // An error on a page, reported to the database's error log (schema.sql: log_error).
+    logError: (page, message, detail) => call('/rest/v1/rpc/log_error', { method: 'POST', body: { p_page: page, p_message: message, p_detail: detail } }).catch(() => {}),
     // "Better than 84% of 52 players", or the top of the board.
     standingText: s => s.beats === s.of ? `Higher than all ${s.of} other players`
       : `Better than ${Math.floor(100 * s.beats / s.of)}% of ${s.of} players`,

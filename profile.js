@@ -12,14 +12,7 @@
   const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseDate = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
   const dateText = s => { const d = parseDate(s); return (d.getFullYear() === new Date().getFullYear() ? day : dayYear)(d); };
-  // The same boards as the leaderboard, in its order.
-  const BOARDS = [
-    ['standard|120', 'Arithmetic', '2:00', 't-arith'], ['standard|30', 'Arithmetic', '0:30', 't-arith'],
-    ['mixed|120', 'Combined operations', '2:00', 't-mix'], ['o80|480', '80 in 8', '8:00', 't-o80'],
-    ['seq|240', 'Sequences', '4:00', 't-seq'], ['frac|240', 'Fractions', '4:00', 't-frac'], ['est|240', 'Estimation', '4:00', 't-est'],
-    ['sq99h|120', 'Two-digit squares', '2:00', 't-sq'], ['sq999h|120', 'Three-digit squares', '2:00', 't-sq'],
-    ['standard|0', 'Arithmetic', 'Endless', 't-end'],
-  ];
+  const BOARDS = window.ZM_BOARDS.saved;  // the same boards as the leaderboard, in its order
   const state = (text, html = false) => { $('#pf').hidden = true; $('#state').hidden = false; $('#state')[html ? 'innerHTML' : 'textContent'] = text; };
 
   $('#find').addEventListener('submit', e => {
@@ -71,29 +64,17 @@
     }).join('');
     $('#p-seasons').hidden = !(p.seasons || []).length;
 
-    // Bests, in the leaderboard's order.
+    // Bests, in the leaderboard's order, each with where it stands among the board's other players.
     const best = new Map((p.bests || []).map(b => [`${b.mode}|${b.seconds}`, b]));
-    $('#bests').innerHTML = BOARDS.filter(([k]) => best.has(k)).map(([k, name, len, team]) => {
-      const b = best.get(k);
-      const small = k === 'standard|0' ? `in ${clock(b.elapsed)}` : Number.isInteger(b.wrongs) ? `${b.wrongs} wrong` : '';
-      return `<li class="${team}"><span class="stripe"></span><span class="who">${name}<small>${len}</small></span>` +
+    $('#bests').innerHTML = BOARDS.filter(b => best.has(b.key)).map(({ key, name, len, team }) => {
+      const b = best.get(key), s = b.standing;
+      const small = key === 'standard|0' ? `in ${clock(b.elapsed)}` : Number.isInteger(b.wrongs) ? `${b.wrongs} wrong` : '';
+      const pct = s && Number.isInteger(s.beats) && Number.isInteger(s.of) ? `<span class="pct">${esc(cloud.standingText(s))}</span>` : '';
+      return `<li class="${team}"><span class="stripe"></span><span class="who">${name}<small>${len}</small>${pct}</span>` +
         `<span class="figure">${b.score}${small ? `<small>${small}</small>` : ''}</span><span class="date">${dateText(b.date)}</span></li>`;
     }).join('') || '<li style="display:block;border:0"><p class="msg">No leaderboard games yet.</p></li>';
 
     heat(p.days || {});
-    standings(p.username, BOARDS.filter(([k]) => best.has(k)).map(([k]) => [k, best.get(k)]));
-  }
-
-  // Under each best, how it stands among the board's other players (once a board has enough).
-  async function standings(name, rows) {
-    const items = $('#bests').children;
-    await Promise.all(rows.map(async ([k, b], i) => {
-      let s;
-      try { s = await cloud.standing(b.mode, b.seconds, b.score, name); } catch { return; }
-      const who = items[i]?.querySelector('.who');
-      if (!s || !who || $('#p-name').textContent !== name) return;
-      who.insertAdjacentHTML('beforeend', `<span class="pct">${esc(cloud.standingText(s))}</span>`);
-    }));
   }
 
   // 13 weeks of squares, one a day, shaded by how many games were played.

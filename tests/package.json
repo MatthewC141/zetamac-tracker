@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Tests for the tracker: the database (schema.sql on an in-process Postgres) and the website in headless Chrome.",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:db": "node run.mjs db",
+    "test:browser": "node run.mjs browser"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://ktjcczwwpzzigwfbsynq.supabase.co wss://ktjcczwwpzzigwfbsynq.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <script src="cloud.js"></script>
 <script src="store.js"></script>
 <link rel="stylesheet" href="launch.css">
@@ -12,6 +12,16 @@
 <meta name="theme-color" content="#050506">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Duel · Zetamach</title>
+<meta name="description" content="Race another player on the same questions: ranked duels, challenges and rematches.">
+<meta property="og:site_name" content="Zetamach">
+<meta property="og:title" content="Duel · Zetamach">
+<meta property="og:description" content="Race another player on the same questions: ranked duels, challenges and rematches.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://matthewc141.github.io/zetamac-tracker/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zetamach: 47 + 38 = 85. Mental math, timed.">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   /* The match itself keeps zetamac's white look, like the other games. */
   :root { --bg: #ffffff; --ink: #000000; --box: #dddddd; --link: #0000ee; --muted: #555555; --good: #1a7f37; --bad: #b3261e; }
@@ -31,7 +41,7 @@
   .d-btn:hover { background: #22232d; border-color: var(--lt-muted); }
   .d-btn:disabled { opacity: .5; cursor: default; }
   .d-btn.quiet { background: none; color: var(--lt-muted); border-color: var(--lt-line); }
-  .d-btn.quiet:hover { color: var(--lt-ink); border-color: var(--lt-line-hi); }
+  .d-btn.quiet:hover { border-color: var(--lt-line-hi); }
   .d-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .d-row .d-btn.grow { flex: 1; }
   #rule-seg { grid-template-columns: repeat(2, 1fr); }
@@ -437,6 +447,7 @@
 <script src="problems.js"></script>
 <script src="matches.js"></script>
 <script src="duel-history.js"></script>
+<script src="say.js"></script>
 <script src="duel.js"></script>
 </body>
 </html>
