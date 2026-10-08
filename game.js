@@ -110,18 +110,31 @@ function finish() {
   setTimeout(() => $('#again').focus(), 700);
 }
 
-$('#start').addEventListener('click', () => start());
-$('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && running && cfg.duration === 0) finish();
-});
-$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
-$('#change').addEventListener('click', e => {
-  e.preventDefault();
+// Back to the start screen (the game's settings). Mid-game this quits: nothing is saved.
+function backToStart() {
+  clearInterval(timer);
+  if (running) zmSay('Game stopped. Nothing saved.');
+  running = false;
+  input.disabled = true;
   $('#game').style.display = 'none';
   $('#settings').style.display = 'block';
   $('#start').focus();
+}
+
+$('#start').addEventListener('click', () => start());
+$('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
+// Esc goes back to the start screen: it quits a timed game, and leaves the end screen. An endless
+// run has no clock, so Esc ends it (and saves it) as before; a second Esc goes back. The daily
+// challenge is one try a day, already counted when it starts, so Esc doesn't throw it away.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || $('#game').style.display !== 'block') return;
+  if (running && cfg.daily) return;
+  e.preventDefault();
+  if (running && cfg.duration === 0) finish();
+  else backToStart();
 });
+$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
+$('#change').addEventListener('click', e => { e.preventDefault(); backToStart(); });
 
 fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; }).catch(() => {}).then(() => GAME.loaded?.());
 updateNote();

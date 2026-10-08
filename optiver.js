@@ -158,11 +158,22 @@ async function save(score, elapsed) {
 
 $('#start').addEventListener('click', start);
 $('#again').addEventListener('click', e => { e.preventDefault(); start(); });
-$('#change').addEventListener('click', e => {
-  e.preventDefault();
+// Back to the start screen. Mid-test this quits: nothing is saved.
+function backToStart() {
+  clearInterval(timer);
+  if (running) zmSay('Test stopped. Nothing saved.');
+  running = false;
+  input.disabled = true;
   $('#game').style.display = 'none';
   $('#settings').style.display = 'block';
   $('#start').focus();
+}
+$('#change').addEventListener('click', e => { e.preventDefault(); backToStart(); });
+// Esc goes back to the start screen, from the test or its end screen.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || $('#game').style.display !== 'block') return;
+  e.preventDefault();
+  backToStart();
 });
 
 fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; }).catch(() => {});
