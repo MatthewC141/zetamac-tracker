@@ -1,4 +1,4 @@
-// The progress dashboard, part 5 of 8: the results table, each game's question-by-question
+// The progress dashboard, part 5 of 9: the results table, each game's question-by-question
 // breakdown, logging a score by hand, deleting, and opening a game from a link.
 // ---------- recent games ----------
 function renderRecent() {
@@ -21,10 +21,10 @@ function renderRecent() {
   $('#r-count').textContent = `${plural(shown.length, 'game')}${shown.length > 100 ? ', showing 100' : ''} · open a game with an arrow to see every question's time`;
   const rows = shown.slice(0, 100).map(g => {
     const d = parseDate(g.date);
-    const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
+    const time = g.source !== 'manual' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
     return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
-      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${isTest(g.mode) ? `<span class="len o8">${TESTS[g.mode][0]}</span>` : ''}${g.daily ? '<span class="len dy">Daily</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
+      `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${isTest(g.mode) ? `<span class="len o8">${TESTS[g.mode][0]}</span>` : ''}${g.daily ? '<span class="len dy">Daily</span>' : ''}${g.source === 'zetamac' ? '<span class="len zm" title="Played on arithmetic.zetamac.com">zetamac</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
   $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
@@ -82,7 +82,33 @@ async function getDetails(list) {
   return list.map(ts => detailCache.get(ts) || []);
 }
 
-function breakdownHTML(qs, sortSlow) {
+// Pacing in a 2-minute game: right answers in each 30-second quarter, placed by when each was
+// answered (the running total of question times). Shows whether you fade: 19 · 18 · 17 · 14.
+const PACE_SECONDS = 120;
+function paceOf(qs) {
+  const quarter = PACE_SECONDS * 1000 / 4, counts = [0, 0, 0, 0];
+  let at = 0;
+  for (const q of qs) {
+    at += q.t;
+    if (q.r !== 'n' && q.r !== 's') counts[Math.min(3, Math.floor(at / quarter))]++;  // wrong or skipped (the tests) don't count
+  }
+  return counts;
+}
+// How the last quarter compares with the first, in words; a difference under 10% is even.
+function paceTrend(counts) {
+  const first = counts[0], last = counts[3];
+  if (!first) return '';
+  const change = Math.round((last - first) / first * 100);
+  return Math.abs(change) < 10 ? 'an even pace'
+    : change < 0 ? `you fade: the last 30 s is ${-change}% below the first` : `you speed up: the last 30 s is ${change}% above the first`;
+}
+const paceFigures = (counts, places = 0) => counts.map(n => `<b>${n.toFixed(places)}</b>`).join(' · ');
+const paced = game => game && game.seconds === PACE_SECONDS && !isTest(game.mode);
+// A log that covers under 90 of the 120 seconds is incomplete (an old or imported game), so its
+// quarters would mislead.
+const paceable = qs => qs.reduce((t, q) => t + q.t, 0) >= PACE_SECONDS * 750;
+
+function breakdownHTML(qs, sortSlow, game) {
   // Timings count answered questions; a skip (80 in 8) is listed but isn't a time to answer.
   const answered = qs.filter(q => q.r !== 's');
   const times = (answered.length ? answered : qs).map(q => q.t);
@@ -129,6 +155,7 @@ function breakdownHTML(qs, sortSlow) {
     `<div class="bd-ops">${ops.map(([o, avg, n]) => `<span><i class="op-${esc(o)}"></i>${(has(OP_NAMES, o) ? OP_NAMES[o] : esc(o))} <b>${secs(avg)} s</b> avg · ${n}</span>`).join('')}` +
     `<span>${plural(corrections, 'correction')}</span>` +
     (qs.some(q => q.r !== 'y') ? `<span>${qs.filter(q => q.r === 'y').length} right · ${qs.filter(q => q.r === 'n').length} wrong · ${qs.filter(q => q.r === 's').length} skipped</span>` : '') + `</div>` +
+    (paced(game) && paceable(qs) ? `<p class="bd-pace">Answers per 30 s: ${paceFigures(paceOf(qs))}${paceTrend(paceOf(qs)) ? ` · ${paceTrend(paceOf(qs))}` : ''}</p>` : '') +
     `<svg class="bd-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Seconds per question, in order">${svg}</svg>` +
     `<div class="bd-list-head"><span>Every question · red = over 2× your median, green = quick</span><span><button class="bd-replay" type="button">Replay</button> <button class="bd-sort" data-slow="${sortSlow ? 1 : 0}">${sortSlow ? 'Show in order' : 'Sort slowest first'}</button></span></div>` +
     `<div class="bd-list"><table><tbody>${list}</tbody></table></div>`;
@@ -148,7 +175,7 @@ async function expandGame(tr, sortSlow = false) {
   openGames.add(ts);
   try {
     const qs = await getDetail(ts);
-    row.firstElementChild.innerHTML = qs.length ? breakdownHTML(qs, sortSlow) : '<span class="src">No questions were answered in this game.</span>';
+    row.firstElementChild.innerHTML = qs.length ? breakdownHTML(qs, sortSlow, allGames.find(g => g.ts === ts && g.detail)) : '<span class="src">No questions were answered in this game.</span>';
   } catch (err) {
     row.firstElementChild.innerHTML = `<span class="src">${esc(err.message)}</span>`;
   }

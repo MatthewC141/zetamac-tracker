@@ -91,6 +91,7 @@ function answer(result, given = '') {
 }
 input.addEventListener('keydown', e => {
   if (!running) return;
+  if (e.key === 'Escape') { e.preventDefault(); quit(); return; }
   if (e.key === 'Tab') { e.preventDefault(); answer('s'); return; }
   if (e.key !== 'Enter') return;
   e.preventDefault();
@@ -156,14 +157,24 @@ async function save(score, elapsed) {
     : { text: same.length ? `Saved · personal best ${Math.max(prevBest, final)}` : `Saved: your first ${name} test.` });
 }
 
-$('#start').addEventListener('click', start);
-$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
-$('#change').addEventListener('click', e => {
-  e.preventDefault();
+function showSettings() {
   $('#game').style.display = 'none';
   $('#settings').style.display = 'block';
   $('#start').focus();
-});
+}
+
+// Esc during a test throws it away, unsaved, and goes back to the settings.
+function quit() {
+  running = false;
+  clearInterval(timer);
+  input.disabled = true;
+  zmSay('Test stopped, not saved.');
+  showSettings();
+}
+
+$('#start').addEventListener('click', start);
+$('#again').addEventListener('click', e => { e.preventDefault(); start(); });
+$('#change').addEventListener('click', e => { e.preventDefault(); showSettings(); });
 
 fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; }).catch(() => {});
 $('#start').focus();

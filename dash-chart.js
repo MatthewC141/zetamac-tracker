@@ -1,4 +1,4 @@
-// The progress dashboard, part 2 of 8: the stat tiles, the score chart, the practice and endless
+// The progress dashboard, part 2 of 9: the stat tiles, the score chart, the practice and endless
 // tables, and the year of games played (the heatmap).
 // ---------- stats ----------
 function renderStats() {

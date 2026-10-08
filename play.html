@@ -48,6 +48,9 @@
   #end .score { font-size: 37px; }
   #end .pace { font-size: 16px; color: var(--muted); margin-top: 4px; }
   #end .pace:empty { display: none; }
+  #end .summary { max-width: 34em; margin: 8px auto 0; font-size: 15px; line-height: 1.45; color: var(--muted); }
+  #end .summary:empty { display: none; }
+  #end .summary p { margin: 2px 0; }
   #end .links { font-size: 18px; margin-top: 6px; }
   #end .links a { margin: 0 8px; }
   #end .saved { font-size: 15px; color: var(--muted); margin-top: 8px; }
@@ -171,6 +174,7 @@
     <div id="end">
       <div class="score">Score: <span id="final"></span></div>
       <div class="pace" id="pace"></div>
+      <div class="summary" id="summary"></div>
       <div class="links"><a href="#" id="again">Try again</a> <a href="#" id="change">Change settings</a> <a href="./">View progress</a></div>
       <div class="saved" id="saved" aria-live="polite"></div>
     </div>
@@ -178,6 +182,7 @@
 </div>
 
 <script src="problems.js"></script>
+<script src="summary.js"></script>
 <script src="play.js"></script>
 <script src="save.js"></script>
 <script src="say.js"></script>
