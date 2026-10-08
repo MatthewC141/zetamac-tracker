@@ -36,7 +36,7 @@ check('a board comes with its total and first rows, best first', bd.total === 9 
 check('players level on a board share a place', bd.rows[1].place === 2 && bd.rows[2].place === 2 && bd.rows[2].pos === 3);
 const far = await rpc(null, 'board', { p_mode: 'standard', p_seconds: 120, p_name: 'p1xx', p_limit: 3 });
 check('…and a player further down gets the rows around them', far.around.map(r => r.username).join() === 'p3xx,p2xx,p1xx,p0xx', far.around);
-check('the board shows names and figures only', Object.keys(bd.rows[0]).sort().join() === 'date,elapsed,place,pos,score,username,wrongs', Object.keys(bd.rows[0]));
+check('the board shows names, figures and where each game was played', Object.keys(bd.rows[0]).sort().join() === 'date,elapsed,place,pos,score,source,username,wrongs', Object.keys(bd.rows[0]));
 const every = await rpc(null, 'boards', { p_name: 'p3xx' });
 const arith = every.find(x => x.mode === 'standard' && x.seconds === 120);
 check('every board at a glance: total, leader, your place and who is next ahead', arith.total === 9 && arith.leader.username === 'cal' && arith.me.place === 6 && arith.me.ahead.username === 'p4xx', arith);

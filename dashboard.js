@@ -1,16 +1,19 @@
-// The progress dashboard, part 8 of 8 (index.html loads dash-*.js first): drawing everything, loading
+// The progress dashboard, part 9 of 9 (index.html loads dash-*.js first): drawing everything, loading
 // the games, the page's controls, the collapsible sections, the dropdowns and the first-visit
 // welcome. Kept out of the page so the page's security policy can refuse inline scripts.
 function render() {
   renderWeak(); renderScore(); renderO80Line();
-  renderStats(); renderChart(); renderPractice(); renderEndless(); renderHeatmap(); renderRecent();
+  renderStats(); renderChart(); renderPractice(); renderEndless(); renderHeatmap(); renderRecent(); renderBest();
   syncAccount();
+  $('#start-here').hidden = !loaded || allGames.length > 0;
 }
 
+let loaded = false;  // whether the games could be read at all
 async function load() {
   try {
     setGames(await api('api/scores'));
     $('#banner').style.display = 'none';
+    loaded = true;
   } catch {
     $('#banner').style.display = 'block';
   }
@@ -250,6 +253,7 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'ArrowLeft') show(at - 1, -1);
   });
   $('#help-open').addEventListener('click', open);
+  $('#start-help').addEventListener('click', e => { e.preventDefault(); open(); });
 
   // The example round on step one: a problem is typed out and taken the moment it's right.
   const demo = (() => {

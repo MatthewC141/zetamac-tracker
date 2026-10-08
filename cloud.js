@@ -172,4 +172,12 @@
     // Public: ranked duel ratings of everyone past their placement matches.
     ladder: () => call('/rest/v1/ladder?select=username,elo,games,wins,losses,draws&order=elo.desc&limit=1000'),
   };
+
+  // The header's account link, the same on every page: the signed-in name, or an offer to sign up.
+  // (Website only: the tracker on your computer has no accounts.)
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!window.ZM_WEB || !window.ZM_CLOUD.ready) return;
+    const u = window.ZM_CLOUD.user();
+    for (const a of document.querySelectorAll('a.zh-acct')) a.textContent = u ? u.name : 'Sign up';
+  });
 })();

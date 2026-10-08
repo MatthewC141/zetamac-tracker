@@ -1,6 +1,26 @@
-// The progress dashboard, part 4 of 8: the 2-minute score panel, where your best stands on the
+// The progress dashboard, part 4 of 9: the 2-minute score panel, where your best stands on the
 // leaderboard, and the quant tests' line.
 // ---------- first viewport: 2-minute score against the target ----------
+// Interview readiness: an interview is one try, so what counts is the score you reach on an
+// ordinary day, not your best. "Ready at R" means R or more in at least 80% of your last 10
+// games; it's compared with the same figure for the 10 games before those. Scores oldest first.
+const READY_WINDOW = 10, READY_MIN = 5, READY_SHARE = 0.8;
+function readiness(scores) {
+  const floorOf = list => {
+    const needed = Math.ceil(READY_SHARE * list.length);
+    return { score: [...list].sort((a, b) => b - a)[needed - 1], needed, of: list.length };
+  };
+  const recent = scores.slice(-READY_WINDOW), before = scores.slice(-2 * READY_WINDOW, -READY_WINDOW);
+  if (recent.length < READY_MIN) return { short: READY_MIN - recent.length };
+  const now = floorOf(recent);
+  return { ...now, change: before.length >= READY_MIN ? now.score - floorOf(before).score : null };
+}
+function readinessLine(r) {
+  if (r.short) return `Play ${plural(r.short, 'more 2-minute game')} to see the score you’d be ready to make in an interview.`;
+  const change = r.change === null ? '' : r.change > 0 ? ` · up ${r.change} on the ${READY_WINDOW} before` : r.change < 0 ? ` · down ${-r.change} on the ${READY_WINDOW} before` : ` · same as the ${READY_WINDOW} before`;
+  return `<b>Interview-ready at ${r.score}:</b> ${r.score} or more in ${r.needed} of your last ${r.of} games${change}`;
+}
+
 function renderScore() {
   const el = $('#score');
   const full = allGames.filter(g => (g.mode || 'standard') === 'standard' && g.seconds === 120)
@@ -33,8 +53,9 @@ function renderScore() {
         `<small>${esc(shortDate(parseDate(last.date)))} · ${lastNote}</small>` +
         `<span class="sb-avg"><b>${round1(avg)}</b> average of your last ${last10.length}</span></div>` +
     `</div>` +
+    `<p class="sb-ready" title="An interview is one try: this is the score you reach in at least 8 of every 10 games, not your best">${readinessLine(readiness(full.map(g => g.score)))}</p>` +
     `<p class="sb-pct" hidden></p>` +
-    `<div class="sb-laps-head"><h3>Last ${recent.length} games</h3>` +
+    `<div class="sb-laps-head"><h3>${recent.length === 1 ? 'Last game' : `Last ${recent.length} games`}</h3>` +
       `<span class="key">${SECTORS.map(([cls, label]) => `<span class="${cls}">${label}</span>`).join('')}</span></div>` +
     `<ol class="laps">${recent.map(r => `<li class="${r.cls}" title="${longDate(parseDate(r.g.date))}">${r.g.score}<small>${esc(shortDate(parseDate(r.g.date)))}</small></li>`).join('')}</ol>`;
   renderStanding(pb);

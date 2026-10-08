@@ -368,6 +368,15 @@
     if (benches[bay]) benches[bay].play();
   }
   tabs.forEach(t => t.addEventListener('click', () => select(t.dataset.bay)));
+  // Your two slowest operations, as the progress page last worked them out, get a small tag.
+  let slow = [];
+  try { slow = JSON.parse(saved.get('zm-slow-ops') || '[]'); } catch {}
+  if (Array.isArray(slow)) for (const t of tabs) if (slow.includes(t.dataset.bay)) {
+    const flag = document.createElement('span');
+    flag.className = 'bay-flag';
+    flag.textContent = 'Slow for you';
+    t.querySelector('.bay-name').after(flag);
+  }
   $('.bays').addEventListener('keydown', e => {
     const i = BAYS.indexOf(current);
     const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: BAYS.length - 1 }[e.key];

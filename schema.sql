@@ -65,7 +65,7 @@ create table if not exists public.scores (
   date date not null,
   score int not null check (score between 0 and 999999),
   seconds int not null,
-  source text not null check (source in ('game', 'manual')),
+  source text not null,
   mode text not null,
   elapsed int not null default 0 check (elapsed between 0 and 999999),
   detail jsonb check (detail is null or (jsonb_typeof(detail) = 'array' and pg_column_size(detail) < 2000000)),
@@ -79,6 +79,13 @@ alter table public.scores drop constraint if exists scores_ts_date;
 alter table public.scores add constraint scores_ts_date check (left(ts, 10) = date::text);
 alter table public.scores drop constraint if exists scores_timed_max;
 alter table public.scores add constraint scores_timed_max check (seconds = 0 or score <= 500);
+-- Where a game was played: on this site ('game'), logged by hand ('manual'), or on the real zetamac
+-- site and recorded by the browser extension ('zetamac'). zetamac's default settings are this
+-- site's Arithmetic game, so its games are Arithmetic games of 30 seconds or 2 minutes.
+alter table public.scores drop constraint if exists scores_source_check;
+alter table public.scores add constraint scores_source_check check (source in ('game', 'manual', 'zetamac'));
+alter table public.scores drop constraint if exists scores_zetamac_game;
+alter table public.scores add constraint scores_zetamac_game check (source <> 'zetamac' or (mode = 'standard' and seconds in (30, 120)));
 -- Games: zetamac arithmetic ('standard'), the daily challenge (arithmetic on everyone's same
 -- questions for the day), squares, practice drills ('sub-borrow', 'sub-easy', and 'drill' for
 -- your weak spots), combined operations, and the quant tests (marked right minus wrong).
@@ -337,7 +344,7 @@ begin
     end if;
   end if;
   new.verified := false;
-  if new.source <> 'game' or new.mode = 'guided' or new.detail is null or new.date > utc + 1
+  if new.source not in ('game', 'zetamac') or new.mode = 'guided' or new.detail is null or new.date > utc + 1
      or (new.mode = 'daily' and (new.date < utc - 1 or not public.daily_started(new.user_id, new.date))) then
     return new;
   end if;
@@ -370,8 +377,8 @@ create trigger scores_check before insert on public.scores
   for each row execute function public.check_score();
 
 -- ---- leaderboard ---------------------------------------------------------------------------
--- Each player's best verified game per board: names and figures only, readable by anyone. On the
--- quant tests' boards a tie on score goes to fewer wrong answers, then the faster finish.
+-- Each player's best verified game per board: names, figures and where it was played (this site
+-- or the real zetamac), readable by anyone. On the quant tests' boards a tie on score goes to fewer wrong answers, then the faster finish.
 -- leaderboard_week is the same for games played this week (from Monday), and daily_board is every
 -- daily challenge result, one a player a day. The squares boards count games from 1 October 2026,
 -- when numbers ending in 0 left the squares game (earlier games were on an easier set).
@@ -381,14 +388,14 @@ language sql immutable set search_path = '' as $$
 $$;
 create or replace view public.leaderboard with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
-    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
+    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs, s.source
   from public.scores s join public.profiles p on p.id = s.user_id
   where s.verified and not p.private and s.mode not in ('daily', 'drill')
     and not (s.mode in ('sq99h', 'sq999h') and s.date < date '2026-10-01')
   order by s.user_id, s.mode, s.seconds, s.score desc, wrongs asc nulls last, s.elapsed asc, s.ts asc;
 create or replace view public.leaderboard_week with (security_invoker = false) as
   select distinct on (s.user_id, s.mode, s.seconds)
-    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs
+    p.username, s.mode, s.seconds, s.score, s.elapsed, s.date, public.wrongs_in(s.mode, s.detail) as wrongs, s.source
   from public.scores s join public.profiles p on p.id = s.user_id
   where s.verified and not p.private and s.mode not in ('daily', 'drill')
     and not (s.mode in ('sq99h', 'sq999h') and s.date < date '2026-10-01')
@@ -404,8 +411,10 @@ grant select on public.leaderboard, public.leaderboard_week, public.daily_board 
 -- The boards in order, worked out here so a page fetches only what it shows. Places follow the
 -- leaderboard's rules: best score, then on endless the faster run, on the quant tests fewer wrong
 -- answers and then the faster finish; players level on all of that share a place.
-create or replace function private.board_rows(p_week boolean, p_mode text default null, p_seconds int default null)
-returns table (username text, mode text, seconds int, score int, elapsed int, date date, wrongs int, place bigint, pos bigint, total bigint)
+-- (Dropped first: its columns grew when the boards began saying where each game was played.)
+drop function if exists private.board_rows(boolean, text, int);
+create function private.board_rows(p_week boolean, p_mode text default null, p_seconds int default null)
+returns table (username text, mode text, seconds int, score int, elapsed int, date date, wrongs int, source text, place bigint, pos bigint, total bigint)
 language sql stable set search_path = '' as $$
   select l.*,
     rank() over (partition by l.mode, l.seconds order by l.score desc, case when l.seconds = 0 then l.elapsed end, l.wrongs nulls last,

@@ -63,7 +63,7 @@
   const validRow = e => e && typeof e === 'object' &&
     typeof e.ts === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(e.ts) && validDate(e.date) &&
     whole(e.score, e.seconds ? 500 : 999999) && [0, 30, 120, 240, 480].includes(e.seconds) && whole(e.elapsed, 999999) &&
-    e.ts.slice(0, 10) === e.date && (e.source === 'game' || e.source === 'manual') && MODES.has(e.mode) &&
+    e.ts.slice(0, 10) === e.date && ['game', 'manual', 'zetamac'].includes(e.source) && MODES.has(e.mode) &&
     (e.seconds === 0 ? !TESTS[e.mode] && e.mode !== 'daily' : lengthFits(e.mode, e.seconds, e.score));
   const fields = ({ ts, date, score, seconds, source, mode, elapsed }) => ({ ts, date, score, seconds, source, mode, elapsed });
 
@@ -119,7 +119,7 @@
     return data.scores.slice(0, 100000).map(raw => {
       const e = raw && fields({ ...raw, elapsed: raw.elapsed ?? 0 });
       if (!validRow(e)) return null;
-      const detail = Array.isArray(raw.detail) && e.source === 'game' ? JSON.stringify(raw.detail) : null;
+      const detail = Array.isArray(raw.detail) && e.source !== 'manual' ? JSON.stringify(raw.detail) : null;
       return { e, detail: detail && detail.length <= 2000000 ? detail : null };
     });
   }
@@ -170,8 +170,8 @@
       const index = parseInt6(form.get('index'));
       if (index === null || index >= list.length) throw new Refused('No such entry.');
       if (form.get('ts') !== list[index].ts) return fail(409, 'Scores changed since the page loaded — refresh and try again.');
-      // Only games have question logs; a hand-logged score with the same timestamp must not take one.
-      if (list[index].source === 'game') localStorage.removeItem(DETAIL + list[index].ts);
+      // Only played games have question logs; a hand-logged score with the same timestamp must not take one.
+      if (list[index].source !== 'manual') localStorage.removeItem(DETAIL + list[index].ts);
       list.splice(index, 1);
       store(list);
       return reply(200, view(list));
@@ -251,7 +251,7 @@
     if (method === 'GET' && route === 'detail') {
       const ts = url.searchParams.get('ts') || '';
       if (!/^[\d:T-]{19}$/.test(ts)) return fail(400, 'Bad game timestamp.');
-      const [row] = await c.rest(`scores?select=detail&ts=eq.${encodeURIComponent(ts)}&source=eq.game&has_detail=is.true&limit=1`);
+      const [row] = await c.rest(`scores?select=detail&ts=eq.${encodeURIComponent(ts)}&source=in.(game,zetamac)&has_detail=is.true&limit=1`);
       if (!row) return fail(404, 'No question-by-question data for this game.');
       return reply(200, { ts, questions: Array.isArray(row.detail) ? row.detail : [] });
     }
@@ -259,7 +259,7 @@
       const want = tsList(url), details = {};
       for (let k = 0; k < want.length; k += 50) {  // 50 games a request
         const part = want.slice(k, k + 50).map(ts => `"${ts}"`).join(',');
-        const rows = await c.rest(`scores?select=ts,detail&ts=in.(${encodeURIComponent(part)})&source=eq.game&has_detail=is.true`);
+        const rows = await c.rest(`scores?select=ts,detail&ts=in.(${encodeURIComponent(part)})&source=in.(game,zetamac)&has_detail=is.true`);
         for (const r of rows) if (Array.isArray(r.detail)) details[r.ts] = r.detail;
       }
       return reply(200, { details });

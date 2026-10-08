@@ -1,4 +1,4 @@
-// The progress dashboard, part 6 of 8: moving scores between copies of the tracker (export, import).
+// The progress dashboard, part 6 of 9: moving scores between copies of the tracker (export, import).
 // ---------- moving scores between copies of the tracker ----------
 // Export: every score with its question log, as one JSON file. Import (website only): merges a file in.
 if (window.ZM_WEB) {

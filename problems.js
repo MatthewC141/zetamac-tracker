@@ -210,6 +210,21 @@ window.ZM_PROBLEMS = (() => {
     if (q.o === 'div') return `÷ ${b}`;
     return null;
   }
+  // Kinds of question you most often corrected (deleted a digit before the right answer), most
+  // first: [{ kind, n, fixed, rate }]. An answer counts once however many digits went. Kinds with
+  // fewer than `min` answers, or never corrected, are left out.
+  function correctedKinds(questions, min = 3) {
+    const by = {};
+    for (const q of questions) {
+      const kind = factOf(q);
+      if (!kind) continue;
+      const k = (by[kind] ||= { kind, n: 0, fixed: 0 });
+      k.n++;
+      if (q.c > 0) k.fixed++;
+    }
+    return Object.values(by).filter(k => k.n >= min && k.fixed > 0).map(k => ({ ...k, rate: k.fixed / k.n }))
+      .sort((a, b) => b.rate - a.rate || b.fixed - a.fixed);
+  }
   // A new question of that kind, from zetamac's ranges: '+ carry', '– borrow', '× 7', '÷ 8', …
   function ofFact(kind, rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1))) {
     const [sign, rest] = kind.split(' ');
@@ -224,7 +239,7 @@ window.ZM_PROBLEMS = (() => {
   }
 
   const NAMES = { any: 'Any problems', standard: 'Arithmetic', mixed: 'Combined', sq99: 'Two-digit squares', sq99h: 'Two-digit squares', sq999: 'Three-digit squares', sq999h: 'Three-digit squares' };
-  return { list, NAMES, TESTS, daySeed, isRight, one, fmt, factOf, ofFact,
+  return { list, NAMES, TESTS, daySeed, isRight, one, fmt, factOf, ofFact, correctedKinds,
     ARITH_DEFAULTS, ALL_OPS, MIXED_KINDS, squarePool, square,
     arith: (r = ARITH_DEFAULTS, ops = ALL_OPS) => arith(r, ops, random.rand),
     mixed: kinds => { const make = mixedKinds(random.rand, random.coin); const [q, a] = make[kinds[random.rand(0, kinds.length - 1)]](); return { q, a, o: 'mix' }; } };

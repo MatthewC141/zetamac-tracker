@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"><title>Arithmetic Game (test copy)</title></head>
+  <body>
+    <div id="game">
+      <span class="left"></span>
+      <span class="correct">Score: 0</span>
+      <div class="banner">
+        <div class="start"><span class="problem"></span> = <input class="answer"></div>
+      </div>
+    </div>
+    <script type="module">
+      import { init } from './zetamac-app.js';
+      init({"add":true,"sub":true,"mul":true,"div":true,"add_left_min":2,"add_left_max":100,"add_right_min":2,"add_right_max":100,"mul_left_min":2,"mul_left_max":12,"mul_right_min":2,"mul_right_max":100,"duration":30});
+    </script>
+  </body>
+</html>

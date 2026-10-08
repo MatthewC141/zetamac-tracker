@@ -16,6 +16,7 @@ A clone of [zetamac](https://arithmetic.zetamac.com) that saves every game, plus
 - Dashboard with score history, daily bests, a calendar heatmap, and slowest question types
 - A guide page with mental math shortcuts for each operation and the quant tests
 - Optional accounts, public profiles and a leaderboard (all time or this week) on Supabase
+- A Chrome extension that records games played on the real [zetamac](https://arithmetic.zetamac.com) to your account, question by question, so they show on the progress page and the leaderboard
 - Installs on a phone and plays offline; games played offline while signed in go up when you're back online
 
 ## Running locally
@@ -39,6 +40,18 @@ The same HTML/JS runs as a static site on GitHub Pages. With no server, scores a
 Accounts are optional. To turn them on, create a Supabase project, disable email confirmation, run `schema.sql`, and put the project URL and anon key in `cloud.js`.
 
 Errors in the site's scripts are reported to a `client_errors` table (read it in Supabase's table editor).
+
+## Recording real zetamac games (Chrome extension)
+
+The `extension/` folder is a Chrome extension (also works in Edge, Brave and Arc). To install it:
+
+1. Open `chrome://extensions` and turn on **Developer mode** (top right).
+2. Click **Load unpacked** and choose the `extension` folder.
+3. Click the Zetamach button in the toolbar (pin it from the puzzle-piece menu) and sign in with your Zetamach name and password.
+
+Then play on [arithmetic.zetamac.com](https://arithmetic.zetamac.com) with the default settings at 30 or 120 seconds. A note in the corner of the game says what's happening, and each game saves to your account when the clock runs out, with every question's time. Games that can't save yet (offline, or signed out) wait and go up later. These games are checked by the database like games played on the site, and are marked "zetamac" on the progress page and the leaderboard.
+
+After changing the extension's files, click the reload arrow on its card in `chrome://extensions`.
 
 ## Tests
 
