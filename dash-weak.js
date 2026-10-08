@@ -90,14 +90,49 @@ function factsHTML(qs) {
 }
 
 // "Last game" also lists that game's five slowest questions, exactly as they came up.
-function slowestHTML(qs) {
-  const slow = [...qs].sort((a, b) => b.t - a.t).slice(0, 5);
+// The last game's slowest questions, each with a × to leave it out: "what if" that question had
+// never come up. On a timed game its time goes to the rest of the game at your average pace there,
+// so the score that would have been = score − questions left out + their time ÷ that average. On
+// an endless run (no clock) it says how much shorter and quicker the run would have been.
+const whatIf = { ts: null, out: new Set(), qs: [], game: null };
+function slowestHTML(qs, game) {
+  const slow = qs.map((q, i) => ({ q, i })).sort((a, b) => b.q.t - a.q.t).slice(0, 5);
   if (!slow.length) return '';
-  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq">${slow.map((q, i) =>
-    `<li class="op-${esc(q.o)}"><span class="pos">${i + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
-    `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / slow[0].t).toFixed(3)})"></i></span>` +
-    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span></li>`).join('')}</ol>`;
+  if (whatIf.ts !== game?.ts) whatIf.out = new Set();  // a new last game starts clear
+  Object.assign(whatIf, { ts: game?.ts, qs, game });
+  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq wi">${slow.map(({ q, i }, n) =>
+    `<li class="op-${esc(q.o)}${whatIf.out.has(i) ? ' out' : ''}" data-i="${i}"><span class="pos">${n + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
+    `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / slow[0].q.t).toFixed(3)})"></i></span>` +
+    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span>` +
+    `<button type="button" class="wi-x" aria-pressed="${whatIf.out.has(i)}" aria-label="Leave out ${esc(q.q)}" title="What if this question never came up?">×</button>` +
+    `</li>`).join('')}</ol><p class="wi-line" aria-live="polite">${whatIfLine()}</p>`;
 }
+function whatIfLine() {
+  const { out, qs, game } = whatIf;
+  if (!out.size) return game?.seconds > 0 ? 'Press × on a question to see what you’d have scored if it never came up.' : 'Press × on a question to see how much quicker your run would have been without it.';
+  const rest = qs.filter((_, i) => !out.has(i));
+  if (!rest.length) return 'Leave at least one question in to work out a pace.';
+  const pace = rest.reduce((t, q) => t + q.t, 0) / rest.length;
+  const freed = [...out].reduce((t, i) => t + qs[i].t, 0);
+  const all = qs.reduce((t, q) => t + q.t, 0) / qs.length;
+  if (!(game.seconds > 0)) {
+    return `Without ${out.size === 1 ? 'that question' : `these ${out.size} questions`}: your run would have been <b>${secs2(freed)} s</b> shorter` +
+      `<small>${secs2(pace)} s a question instead of ${secs2(all)}.</small>`;
+  }
+  const gain = freed / pace - out.size, would = game.score + gain;
+  return `Without ${out.size === 1 ? 'that question' : `these ${out.size} questions`}: about <b>${Math.round(would)}</b> instead of ${game.score} ` +
+    `<span class="${gain >= 0 ? 'up' : 'down'}">(${gain >= 0 ? '+' : '−'}${Math.abs(gain).toFixed(1)})</span>` +
+    `<small>Their ${secs2(freed)} s spent at your pace on the rest of this game, ${secs2(pace)} s a question.</small>`;
+}
+$('#weak').addEventListener('click', e => {
+  const x = e.target.closest('.wi-x');
+  if (!x) return;
+  const li = x.closest('li'), i = Number(li.dataset.i);
+  whatIf.out.has(i) ? whatIf.out.delete(i) : whatIf.out.add(i);
+  li.classList.toggle('out', whatIf.out.has(i));
+  x.setAttribute('aria-pressed', whatIf.out.has(i));
+  $('#weak .wi-line').innerHTML = whatIfLine();
+});
 
 async function renderWeak() {
   const run = ++weakRun;
@@ -138,7 +173,7 @@ async function renderWeak() {
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    DRILL + factsHTML(qs) + (weakWindow === '1' ? slowestHTML(qs) : '');
+    DRILL + factsHTML(qs) + (weakWindow === '1' ? slowestHTML(qs, cur[0]) : '');
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;

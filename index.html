@@ -145,6 +145,22 @@
   .tower.facts li { grid-template-columns: 26px 4px 128px minmax(0, 1fr) 70px 64px; height: 38px; }
   .tower.facts .stripe { height: 20px; }
   .tower.facts.slowq li { grid-template-columns: 26px 4px minmax(150px, max-content) minmax(0, 1fr) 70px 64px; }
+  /* what if a slow question never came up: × leaves it out, the line under the list says the score */
+  .tower.facts.slowq.wi li { grid-template-columns: 26px 4px minmax(150px, max-content) minmax(0, 1fr) 70px 64px 28px; }
+  .wi-x { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 7px; background: none; color: var(--muted); font: 500 17px/1 var(--figure); cursor: pointer; }
+  .wi-x:hover { color: var(--ink); border-color: var(--line); }
+  .wi-x[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+  .slowq li.out .fact-name, .slowq li.out .time { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+  .slowq li.out .track i { opacity: .35; }
+  .wi-line { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .wi-line b { color: var(--ink); font: 700 17px/1 var(--figure); }
+  .wi-line .up { color: var(--green); } .wi-line .down { color: var(--yellow); }
+  .wi-line small { display: block; margin-top: 4px; font-size: 12.5px; color: var(--dim); }
+  @media (pointer: coarse) { .wi-x { width: 36px; height: 36px; } .tower.facts.slowq.wi li { grid-template-columns: 26px 4px minmax(150px, max-content) minmax(0, 1fr) 70px 64px 36px; } }
+  @media (max-width: 640px) {
+    .tower.facts.slowq.wi li { grid-template-columns: 20px 4px minmax(0, 1fr) 56px 44px 36px; }
+    .tower.facts.slowq.wi .track { display: none; }
+  }
   .tower.facts .fact-name { font: 600 16px/1 var(--figure); white-space: nowrap; }
   .tower.facts .time { font-size: 18px; }
   .tower.facts .gap { font-size: 13px; }

@@ -111,6 +111,50 @@ await b.ev(`document.querySelector('#recent .detail-row .bd-replay').click()`);
 await b.until(`document.querySelector('#replay').open`);
 check('a game can be replayed', !!(await b.text('#rp-q')));
 await b.ev(`document.querySelector('#rp-close').click()`);
+// what if the slowest question of the last game had never come up
+const lastGame = `(async () => {
+  const games = await fetch('api/scores').then(r => r.json());
+  const last = games.filter(g => (g.mode === 'standard' || g.mode === 'daily') && g.detail).sort((a, b) => (b.ts > a.ts ? 1 : -1))[0];
+  const qs = (await fetch('api/detail?ts=' + encodeURIComponent(last.ts)).then(r => r.json())).questions;
+  const slowest = Math.max(...qs.map(q => q.t)), rest = qs.filter(q => q.t !== slowest);
+  const pace = rest.reduce((t, q) => t + q.t, 0) / rest.length;
+  return { seconds: last.seconds, score: last.score, would: Math.round(last.score - 1 + slowest / pace), freed: (slowest / 1000).toFixed(2) };
+})()`;
+await b.ev(`document.querySelector('[data-window="1"]').click()`);
+await b.until(`document.querySelector('#weak .wi-x')`);
+let want = await b.ev(lastGame);
+check('the last game here is an endless run', want.seconds === 0);
+await b.ev(`document.querySelector('#weak .slowq li .wi-x').click()`);
+check('an endless run: leaving its slowest question out says how much shorter the run would have been',
+  (await b.text('#weak .wi-line')).startsWith(`Without that question: your run would have been ${want.freed} s shorter`), [await b.text('#weak .wi-line'), want]);
+// a newer 2-minute game, then the same on it
+await b.ev(`fetch('api/game', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Zetamac': '1' },
+  body: new URLSearchParams({ score: 30, seconds: 120, mode: 'standard', elapsed: 0, detail: JSON.stringify(ZM_PROBLEMS.list('standard', 3, 30).map((p, i) => ({ q: p.q, a: p.a, o: p.o, c: 0, t: i === 7 ? 9000 : i === 2 ? 6000 : 2500 }))) }) })`);
+await b.go('', 1800);
+await b.until(`document.querySelector('#weak .wi-x')`);
+want = await b.ev(lastGame);
+check('the last game is now the 2-minute one, and starts with nothing left out', want.seconds === 120 && /^Press ×/.test(await b.text('#weak .wi-line')));
+await b.ev(`document.querySelector('#weak .slowq li .wi-x').click()`);
+const line = await b.text('#weak .wi-line');
+check('leaving out its slowest question (9 s) shows the score at your pace without it: 30 − 1 + 9 ÷ 2.63 ≈ 32',
+  line.startsWith(`Without that question: about ${want.would} instead of 30`) && want.would === 32, [line, want]);
+check('…and marks the row', await b.ev(`document.querySelector('#weak .slowq li').classList.contains('out') && document.querySelector('#weak .slowq li .wi-x').getAttribute('aria-pressed') === 'true'`));
+await b.ev(`document.querySelectorAll('#weak .slowq li .wi-x')[1].click()`);
+check('two left out add up: 30 − 2 + 15 ÷ 2.5 = 34', /^Without these 2 questions: about 34 instead of 30 \(\+4\.0\)/.test(await b.text('#weak .wi-line')), await b.text('#weak .wi-line'));
+await b.ev(`document.querySelector('#weak .wi-line').scrollIntoView({ block: 'end' })`);
+await b.shot('solo-what-if');
+const phone = await browser({ width: 390, height: 844 });
+await phone.go(''); await phone.ev(`localStorage.setItem('zm-welcome-seen', '1'); localStorage.setItem('zm-weak', '1')`);
+await phone.ev(`localStorage.setItem('zm-web-scores', ${JSON.stringify(await b.ev(`localStorage.getItem('zm-web-scores')`))}); Object.entries(${JSON.stringify(await b.ev(`Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith('zm-web-detail:')))`))}).forEach(([k, v]) => localStorage.setItem(k, v))`);
+await phone.go('', 1800);
+await phone.until(`document.querySelector('#weak .wi-x')`);
+await phone.ev(`document.querySelector('#weak .slowq li .wi-x').click(); document.querySelector('#weak .wi-line').scrollIntoView({ block: 'end' })`);
+check('on a phone the rows and the × fit, with no sideways scroll', await phone.noSideScroll() && await phone.ev(`(r => r.right <= innerWidth)(document.querySelector('#weak .slowq li .wi-x').getBoundingClientRect())`));
+await phone.shot('solo-what-if-390');
+phone.close();
+await b.ev(`document.querySelectorAll('#weak .slowq li .wi-x').forEach(x => x.getAttribute('aria-pressed') === 'true' && x.click())`);
+check('putting them back clears it', /^Press ×/.test(await b.text('#weak .wi-line')));
+await b.ev(`document.querySelector('[data-window="10"]').click()`);
 await b.shot('solo-dashboard', true);
 
 // ---- logging a score by hand ----
