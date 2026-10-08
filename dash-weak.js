@@ -6,7 +6,15 @@ const OPS = ['add', 'sub', 'mul', 'div'];
 const OP_CODES = { add: 'ADD', sub: 'SUB', mul: 'MUL', div: 'DIV' };
 let weakWindow = '10';
 try { weakWindow = localStorage.getItem('zm-weak') || weakWindow; } catch {}
-if (!['1', '10', 'all'].includes(weakWindow)) weakWindow = '10';
+if (!['1', '10', 'all', 'picked'].includes(weakWindow)) weakWindow = '10';
+// Games picked in Results (Pick) to show here together, by timestamp; remembered per browser.
+const picked = new Set();
+try { for (const ts of JSON.parse(localStorage.getItem('zm-picked') || '[]')) if (typeof ts === 'string') picked.add(ts); } catch {}
+const savePicked = () => { try { localStorage.setItem('zm-picked', JSON.stringify([...picked])); } catch {} };
+// How many of the slowest questions to list: 5, 10, 20 or all.
+let slowCount = '5';
+try { slowCount = localStorage.getItem('zm-slow-count') || slowCount; } catch {}
+if (!['5', '10', '20', 'all'].includes(slowCount)) slowCount = '5';
 let weakRun = 0;
 // Which game the weak spots show: arithmetic, or the 80-in-8 test (its question kinds and accuracy).
 let weakGame = 'standard';
@@ -90,48 +98,89 @@ function factsHTML(qs) {
 }
 
 // "Last game" also lists that game's five slowest questions, exactly as they came up.
-// The last game's slowest questions, each with a × to leave it out: "what if" that question had
-// never come up. On a timed game its time goes to the rest of the game at your average pace there,
-// so the score that would have been = score − questions left out + their time ÷ that average. On
-// an endless run (no clock) it says how much shorter and quicker the run would have been.
-const whatIf = { ts: null, out: new Set(), qs: [], game: null };
-function slowestHTML(qs, game) {
-  const slow = qs.map((q, i) => ({ q, i })).sort((a, b) => b.q.t - a.q.t).slice(0, 5);
-  if (!slow.length) return '';
-  if (whatIf.ts !== game?.ts) whatIf.out = new Set();  // a new last game starts clear
-  Object.assign(whatIf, { ts: game?.ts, qs, game });
-  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq wi">${slow.map(({ q, i }, n) =>
-    `<li class="op-${esc(q.o)}${whatIf.out.has(i) ? ' out' : ''}" data-i="${i}"><span class="pos">${n + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
-    `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / slow[0].q.t).toFixed(3)})"></i></span>` +
-    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span>` +
-    `<button type="button" class="wi-x" aria-pressed="${whatIf.out.has(i)}" aria-label="Leave out ${esc(q.q)}" title="What if this question never came up?">×</button>` +
-    `</li>`).join('')}</ol><p class="wi-line" aria-live="polite">${whatIfLine()}</p>`;
+// The slowest questions of the last game, or of the games picked in Results, each with a × to leave
+// it out: "what if" that question had never come up. On a timed game its time goes to the rest of
+// that game at your average pace there, so the score that would have been = score − questions left
+// out + their time ÷ that pace; with several games, the line gives their average. On an endless run
+// (no clock) it says how much shorter the run would have been. × all leaves out every listed one.
+const whatIf = { id: null, out: new Set(), logs: [], games: [] };
+const wiKey = (gi, i) => `${gi}:${i}`;
+function slowestHTML(logs, games) {
+  const id = games.map(g => g.ts).join(',');
+  if (whatIf.id !== id) whatIf.out = new Set();  // other games start clear
+  Object.assign(whatIf, { id, logs, games });
+  const all = logs.flatMap((log, gi) => log.map((q, i) => ({ q, gi, i }))).sort((a, b) => b.q.t - a.q.t);
+  if (!all.length) return '';
+  const slow = slowCount === 'all' ? all : all.slice(0, Number(slowCount));
+  const many = games.length > 1, allOut = slow.every(x => whatIf.out.has(wiKey(x.gi, x.i)));
+  const when = g => `${dateLabel(parseDate(g.date))}${g.source === 'game' ? ` ${g.ts.slice(11, 16)}` : ''}`;
+  return `<div id="wi-box"><div class="facts-head"><h3>Slowest questions in ${many ? `these ${games.length} games` : 'this game'}</h3>` +
+    `<div class="facts-tools"><div class="seg" role="group" aria-label="Slowest questions to list">${['5', '10', '20', 'all'].map(c =>
+      `<button type="button" data-slow-count="${c}" aria-pressed="${slowCount === c}">${c === 'all' ? `All ${all.length}` : c}</button>`).join('')}</div>` +
+    `<div class="seg"><button type="button" class="wi-all" aria-pressed="${allOut}">${allOut ? 'Put all back' : '× all'}</button></div></div></div>` +
+    `<ol class="tower facts slowq wi">${slow.map(({ q, gi, i }, n) => { const out = whatIf.out.has(wiKey(gi, i));
+      return `<li class="op-${esc(q.o)}${out ? ' out' : ''}" data-k="${wiKey(gi, i)}"><span class="pos">${n + 1}</span><span class="stripe"></span>` +
+      `<span class="fact-name">${esc(q.q)} = ${esc(q.a)}${many ? `<small class="wi-when">${esc(when(games[gi]))}</small>` : ''}</span>` +
+      `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / all[0].q.t).toFixed(3)})"></i></span>` +
+      `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span>` +
+      `<button type="button" class="wi-x" aria-pressed="${out}" aria-label="Leave out ${esc(q.q)}" title="What if this question never came up?">×</button></li>`; }).join('')}</ol>` +
+    `<p class="wi-line" aria-live="polite">${whatIfLine()}</p></div>`;
 }
 function whatIfLine() {
-  const { out, qs, game } = whatIf;
-  if (!out.size) return game?.seconds > 0 ? 'Press × on a question to see what you’d have scored if it never came up.' : 'Press × on a question to see how much quicker your run would have been without it.';
-  const rest = qs.filter((_, i) => !out.has(i));
-  if (!rest.length) return 'Leave at least one question in to work out a pace.';
-  const pace = rest.reduce((t, q) => t + q.t, 0) / rest.length;
-  const freed = [...out].reduce((t, i) => t + qs[i].t, 0);
-  const all = qs.reduce((t, q) => t + q.t, 0) / qs.length;
-  if (!(game.seconds > 0)) {
-    return `Without ${out.size === 1 ? 'that question' : `these ${out.size} questions`}: your run would have been <b>${secs2(freed)} s</b> shorter` +
-      `<small>${secs2(pace)} s a question instead of ${secs2(all)}.</small>`;
+  const { out, logs, games } = whatIf;
+  const timed = games.some(g => g.seconds > 0);
+  if (!out.size) return timed ? 'Press × on a question to see what you’d have scored if it never came up.' : 'Press × on a question to see how much quicker your run would have been without it.';
+  const k = out.size, these = k === 1 ? 'that question' : `these ${k} questions`;
+  // each game on its own: its left-out time, at its own pace on what's left
+  let freedEndless = 0, emptied = false;
+  const per = games.map((g, gi) => {
+    const log = logs[gi], gone = log.map((q, i) => out.has(wiKey(gi, i)));
+    const n = gone.filter(Boolean).length, rest = log.filter((_, i) => !gone[i]);
+    const freed = log.reduce((t, q, i) => t + (gone[i] ? q.t : 0), 0);
+    if (n && !rest.length) emptied = true;
+    const pace = rest.length ? rest.reduce((t, q) => t + q.t, 0) / rest.length : 0;
+    if (!(g.seconds > 0)) { freedEndless += freed; return null; }
+    return { score: g.score, gain: n && pace ? freed / pace - n : 0, freed, pace, n };
+  });
+  if (emptied) return 'Leave at least one question of each game in to work out its pace.';
+  const timedGames = per.filter(Boolean);
+  const sign = x => `<span class="${x >= 0 ? 'up' : 'down'}">(${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(1)})</span>`;
+  const endlessNote = freedEndless ? `${timedGames.length ? 'Your endless runs' : `Without ${these}: your run${games.length > 1 ? 's' : ''}`} would have been <b>${secs2(freedEndless)} s</b> shorter.` : '';
+  if (!timedGames.some(x => x.n)) return endlessNote;
+  if (games.length === 1) {
+    const x = timedGames[0];
+    return `Without ${these}: about <b>${Math.round(x.score + x.gain)}</b> instead of ${x.score} ${sign(x.gain)}` +
+      `<small>Their ${secs2(x.freed)} s spent at your pace on the rest of this game, ${secs2(x.pace)} s a question.</small>`;
   }
-  const gain = freed / pace - out.size, would = game.score + gain;
-  return `Without ${out.size === 1 ? 'that question' : `these ${out.size} questions`}: about <b>${Math.round(would)}</b> instead of ${game.score} ` +
-    `<span class="${gain >= 0 ? 'up' : 'down'}">(${gain >= 0 ? '+' : '−'}${Math.abs(gain).toFixed(1)})</span>` +
-    `<small>Their ${secs2(freed)} s spent at your pace on the rest of this game, ${secs2(pace)} s a question.</small>`;
+  const before = timedGames.reduce((t, x) => t + x.score, 0) / timedGames.length;
+  const gain = timedGames.reduce((t, x) => t + x.gain, 0) / timedGames.length;
+  return `Without ${these}: an average of about <b>${(before + gain).toFixed(1)}</b> instead of ${before.toFixed(1)} across ${plural(timedGames.length, 'timed game')} ${sign(gain)}` +
+    `<small>Each game’s left-out time spent at your pace on the rest of that game.${endlessNote ? ` ${endlessNote.replace(/<\/?b>/g, '')}` : ''}</small>`;
 }
+const redrawSlowest = () => { const box = $('#wi-box'); if (box) box.outerHTML = slowestHTML(whatIf.logs, whatIf.games); };
 $('#weak').addEventListener('click', e => {
-  const x = e.target.closest('.wi-x');
-  if (!x) return;
-  const li = x.closest('li'), i = Number(li.dataset.i);
-  whatIf.out.has(i) ? whatIf.out.delete(i) : whatIf.out.add(i);
-  li.classList.toggle('out', whatIf.out.has(i));
-  x.setAttribute('aria-pressed', whatIf.out.has(i));
-  $('#weak .wi-line').innerHTML = whatIfLine();
+  const x = e.target.closest('.wi-x'), all = e.target.closest('.wi-all'), count = e.target.closest('[data-slow-count]');
+  if (x) {
+    const li = x.closest('li'), k = li.dataset.k;
+    whatIf.out.has(k) ? whatIf.out.delete(k) : whatIf.out.add(k);
+    li.classList.toggle('out', whatIf.out.has(k));
+    x.setAttribute('aria-pressed', whatIf.out.has(k));
+    const listed = [...document.querySelectorAll('#wi-box .slowq li')].map(r => r.dataset.k), allOut = listed.every(k2 => whatIf.out.has(k2));
+    const btn = $('#wi-box .wi-all');
+    btn.textContent = allOut ? 'Put all back' : '× all';
+    btn.setAttribute('aria-pressed', allOut);
+    $('#wi-box .wi-line').innerHTML = whatIfLine();
+  } else if (all) {
+    const listed = [...document.querySelectorAll('#wi-box .slowq li')].map(r => r.dataset.k);
+    const allOut = listed.every(k => whatIf.out.has(k));
+    for (const k of listed) allOut ? whatIf.out.delete(k) : whatIf.out.add(k);
+    redrawSlowest();
+    $('#wi-box .wi-all')?.focus();
+  } else if (count) {
+    slowCount = count.dataset.slowCount;
+    try { localStorage.setItem('zm-slow-count', slowCount); } catch {}
+    redrawSlowest();
+  }
 });
 
 async function renderWeak() {
@@ -148,11 +197,21 @@ async function renderWeak() {
   const emptyMsg = '<p class="empty-state">No question timings yet. Play a round on the <a href="play.html">Play</a> page and each operation will be ranked here by its time per question, slowest first.</p>';
   if (!timed.length) { el.innerHTML = emptyMsg; return; }
   // Last game is compared with the 10 games before it; last 10 with the 10 before those.
+  // Picked: the games ticked in Results (Pick), on their own.
+  const mine = timed.filter(g => picked.has(g.ts));
+  const pick = $('[data-window="picked"]');
+  pick.hidden = !picked.size;
+  pick.textContent = `Picked · ${mine.length}`;
+  if (weakWindow === 'picked' && !mine.length) {
+    el.innerHTML = `<p class="empty-state">No ${o80 ? '80-in-8 tests' : 'arithmetic games'} picked. In Results, press Pick and tick the games to look at together.</p>`;
+    return;
+  }
   const n = weakWindow === 'all' ? timed.length : Number(weakWindow);
-  const cur = timed.slice(0, n);
-  const prev = weakWindow === 'all' ? [] : timed.slice(n, n + 10);
-  const load = async list => (await getDetails(list.map(g => g.ts)).catch(() => [])).flat();
-  const [qs, prevQs] = await Promise.all([load(cur), load(prev)]);
+  const cur = weakWindow === 'picked' ? mine : timed.slice(0, n);
+  const prev = weakWindow === 'all' || weakWindow === 'picked' ? [] : timed.slice(n, n + 10);
+  const load = list => getDetails(list.map(g => g.ts)).catch(() => list.map(() => []));
+  const [logs, prevLogs] = await Promise.all([load(cur), load(prev)]);
+  const qs = logs.flat(), prevQs = prevLogs.flat();
   if (run !== weakRun) return;  // a newer render started while these loaded
   if (o80) return renderWeakO80(el, qs, prevQs, cur, prev);
 
@@ -163,7 +222,7 @@ async function renderWeak() {
   const sector = r => r.avg === fastest ? 's-purple' : before[r.op] ? (r.avg < before[r.op].avg ? 's-green' : 's-yellow') : '';
 
   // Remember where each row was so the new order can slide into place.
-  const was = new Map([...el.querySelectorAll('.tower li')].map(li => [li.dataset.op, { top: li.getBoundingClientRect().top, sector: li.dataset.sector }]));
+  const was = new Map([...el.querySelectorAll('.tower li[data-op]')].map(li => [li.dataset.op, { top: li.getBoundingClientRect().top, sector: li.dataset.sector }]));
   el.innerHTML =
     `<ol class="tower">${rows.map((r, i) => `<li class="op-${r.op} ${sector(r)}" data-op="${r.op}" data-sector="${sector(r)}">` +
       `<span class="pos">${i + 1}</span><span class="stripe"></span>` +
@@ -171,13 +230,13 @@ async function renderWeak() {
       `<span class="track" aria-hidden="true"><i style="transform:scaleX(${((r.avg / slowest * 100).toFixed(1)) / 100})"></i></span>` +
       `<span class="time">${secs2(r.avg)}<small>s</small></span>` +
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
-    `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
-    `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    DRILL + factsHTML(qs) + (weakWindow === '1' ? slowestHTML(qs, cur[0]) : '');
+    `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${weakWindow === 'picked' ? `${plural(cur.length, 'picked game')} · <button type="button" class="link-btn" data-clear-picks>Clear picks</button>` : plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
+    `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' && weakWindow !== 'picked' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
+    DRILL + factsHTML(qs) + (weakWindow === '1' || weakWindow === 'picked' ? slowestHTML(logs, cur) : '');
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;
-  for (const li of el.querySelectorAll('.tower li')) {
+  for (const li of el.querySelectorAll('.tower li[data-op]')) {  // (only the operation rows slide; the lists below have no op)
     const old = was.get(li.dataset.op);
     if (!old) continue;
     const dy = old.top - li.getBoundingClientRect().top;
@@ -241,8 +300,15 @@ $('#weak').addEventListener('click', e => {
   renderWeak();
 });
 
-document.querySelectorAll('[data-window]').forEach(b => b.addEventListener('click', () => {
-  weakWindow = b.dataset.window;
+document.querySelectorAll('[data-window]').forEach(b => b.addEventListener('click', () => setWeakWindow(b.dataset.window)));
+function setWeakWindow(w) {
+  weakWindow = w;
   try { localStorage.setItem('zm-weak', weakWindow); } catch {}
   renderWeak();
-}));
+}
+$('#weak').addEventListener('click', e => {
+  if (!e.target.closest('[data-clear-picks]')) return;
+  picked.clear(); savePicked();
+  renderRecent();
+  setWeakWindow('10');
+});
