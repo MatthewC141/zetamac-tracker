@@ -48,6 +48,8 @@ check('the daily card offers today’s set', /one try/.test(await b.text('#daily
 await b.click('#daily-go');
 await b.until('running');
 check('the daily is one try (no Try again)', await b.ev(`document.querySelector('#again').hidden`));
+await b.key('Escape'); await sleep(200);
+check('Esc doesn’t throw away the daily’s one try', await b.ev('running') && await b.shown('#game'));
 await answerMany(b, 5);
 await b.ev('finish()');
 await b.until(`/challenge saved/.test(document.querySelector('#saved').textContent)`);
@@ -73,6 +75,24 @@ for (let i = 0; i < 40; i++) { sq.push(Number((await b.text('#question')).replac
 await b.ev('finish()');
 check('squares never ask numbers ending in 0 or 5, or 1–20', sq.every(n => n % 5 !== 0 && n > 20), sq);
 
+// ---- Esc quits a timed game, saving nothing ----
+await b.go('play.html');
+const saved = () => b.ev(`fetch('api/scores').then(r => r.json()).then(l => l.length)`);
+const beforeEsc = await saved();
+await b.click('#start'); await b.until('running');
+await answerMany(b, 2);
+await b.key('Escape'); await sleep(400);
+check('Esc in a timed game goes back to the start screen', await b.shown('#settings') && !(await b.shown('#game')) && !(await b.ev('running')));
+check('…saving nothing', (await saved()) === beforeEsc);
+check('…with Start ready for the next go', await b.ev(`document.activeElement === document.querySelector('#start')`));
+await b.click('#start'); await b.until('running');
+check('a new game starts cleanly after it', (await b.text('#score')) === '0' && (await b.text('#secs')) !== '0');
+await answerMany(b, 2);
+await b.ev('finish()');
+await b.until(`/Saved|personal best/.test(document.querySelector('#saved').textContent)`);
+await b.key('Escape'); await sleep(200);
+check('Esc on the end screen goes back too', await b.shown('#settings') && (await saved()) === beforeEsc + 1);
+
 // ---- endless ----
 await b.go('play.html');
 await b.ev(`(s => { s.value = '0'; s.dispatchEvent(new Event('input')); s.dispatchEvent(new Event('change')); })(document.querySelector('#duration'))`);
@@ -81,6 +101,9 @@ await answerMany(b, 3);
 await b.key('Escape');
 await b.until(`/endless/i.test(document.querySelector('#saved').textContent)`);
 check('an endless run ends with Esc and saves', /endless run/i.test(await b.text('#saved')), await b.text('#saved'));
+await b.key('Escape'); await sleep(200);
+check('…and a second Esc goes back to the start screen', await b.shown('#settings') && !(await b.shown('#game')));
+
 
 // ---- a quant test ----
 await b.go('optiver.html');
@@ -98,6 +121,13 @@ await b.key('Tab');
 await b.ev('finish()');
 await b.until(`/Saved|first/.test(document.querySelector('#saved').textContent)`);
 check('a quant test marks right minus wrong', (await b.text('#final')) === '4' && /5 right · 1 wrong · 1 skipped/.test(await b.text('#split')), [await b.text('#final'), await b.text('#split')]);
+await b.key('Escape'); await sleep(200);
+check('Esc on a quant test’s end screen goes back', await b.shown('#settings') && !(await b.shown('#game')));
+const t0 = await b.ev(`fetch('api/scores').then(r => r.json()).then(l => l.length)`);
+await b.click('#start'); await b.until('running');
+await b.key('Escape'); await sleep(300);
+check('Esc mid-test quits back to the start screen, saving nothing', await b.shown('#settings') && !(await b.ev('running')) &&
+  (await b.ev(`fetch('api/scores').then(r => r.json()).then(l => l.length)`)) === t0);
 
 // ---- the dashboard ----
 await b.go('', 1500);
