@@ -1,4 +1,4 @@
-// The progress dashboard (index.html), part 1 of 9: the games loaded from the tracker, and what
+// The progress dashboard (index.html), part 1 of 8: the games loaded from the tracker, and what
 // the other parts share (names of the games, dates, the range picked, small helpers). The parts are
 // plain scripts loaded in order (index.html); dashboard.js, the last, wires up the page and loads it.
 const $ = s => document.querySelector(s);

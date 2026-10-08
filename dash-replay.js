@@ -1,4 +1,4 @@
-// The progress dashboard, part 7 of 9: replaying a saved game.
+// The progress dashboard, part 7 of 8: replaying a saved game.
 // ---------- replay: a saved game played back question by question ----------
 // Each question shows for as long as it took, and its answer appears as it was finished (the log
 // has each answer's time, not each keystroke). Long stalls are called out as they pass, and the

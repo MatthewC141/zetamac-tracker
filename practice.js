@@ -46,9 +46,8 @@ const GAME = {
 
 // ---- your weak spots ----
 // A drill built from your own games: the slowest kinds of arithmetic question in your last 10
-// timed games (like "× 7" or "– borrow", from the tracker's weak spots) and up to two kinds you often
-// correct, the 80-in-8 kinds you miss most, and a review of exact questions you were slow on (twice
-// your game's median), corrected or got wrong.
+// timed games (like "× 7" or "– borrow", from the tracker's weak spots), the 80-in-8 kinds you miss
+// most, and a review of exact questions you were slow on (twice your game's median) or got wrong.
 // A review question stays in until you've answered it quickly twice in drills (at or under your
 // usual time for that operation), so it keeps coming back until it's automatic.
 const weak = (() => {
@@ -58,8 +57,7 @@ const weak = (() => {
   const KIND_NAMES = { add: 'addition', sub: 'subtraction', mul: 'multiplication', div: 'division', dec: 'decimals', pct: 'percentages', mix: 'brackets' };
   // A logged question, checked before it's used (logs come back as the game sent them).
   const clean = q => q && typeof q.q === 'string' && q.q.length <= 40 && Number.isFinite(Number(q.t)) &&
-    { q: q.q, a: String(q.a ?? ''), o: /^[a-z]{1,8}$/.test(q.o) ? q.o : 'other', t: Number(q.t), r: ['y', 'n', 's'].includes(q.r) ? q.r : 'y',
-      c: Math.max(0, Math.floor(Number(q.c) || 0)) };
+    { q: q.q, a: String(q.a ?? ''), o: /^[a-z]{1,8}$/.test(q.o) ? q.o : 'other', t: Number(q.t), r: ['y', 'n', 's'].includes(q.r) ? q.r : 'y' };
   async function build() {
     const games = await (await fetch('api/scores')).json();
     if (!Array.isArray(games)) return;
@@ -83,18 +81,15 @@ const weak = (() => {
     }
     types = Object.entries(byFact).filter(([, ts]) => ts.length >= 3).map(([k, ts]) => [k, ts.reduce((a, b) => a + b, 0) / ts.length])
       .sort((a, b) => b[1] - a[1]).slice(0, TOP).map(([k]) => k);
-    // Kinds you correct in 15% or more of answers join them, up to two (P.correctedKinds).
-    const mistyped = P.correctedKinds(A.flatMap(g => g.qs)).filter(k => k.rate >= 0.15 && !types.includes(k.kind)).slice(0, 2).map(k => k.kind);
-    types = [...types, ...mistyped];
     for (const [o, ts] of Object.entries(byOp)) quick[o] = median(ts);
     // 80 in 8: the kinds answered wrong most often (under 90% right), at most two.
     const acc = {};
     for (const g of T) for (const q of g.qs) if (q.r !== 's') { const a = (acc[q.o] ||= { y: 0, n: 0, ts: [] }); q.r === 'n' ? a.n++ : (a.y++, a.ts.push(q.t)); }
     kinds = Object.entries(acc).filter(([o, a]) => KIND_NAMES[o] && a.y / (a.y + a.n) < 0.9).sort((a, b) => a[1].y / (a[1].y + a[1].n) - b[1].y / (b[1].y + b[1].n)).slice(0, 2).map(([o]) => o);
     for (const [o, a] of Object.entries(acc)) if (a.ts.length) quick[`o80:${o}`] = median(a.ts);
-    // Review: slow or corrected arithmetic answers and 80-in-8 misses, newest first, unless drilled away since.
+    // Review: slow arithmetic answers and 80-in-8 misses, newest first, unless drilled away since.
     const seen = new Map();
-    for (const g of A) { const m = median(g.qs.map(q => q.t)); for (const q of g.qs) if (((q.t >= 2 * m && q.t >= 1500) || q.c > 0) && !seen.has(q.q)) seen.set(q.q, { q: q.q, a: q.a, o: q.o, ts: g.ts, quickKey: q.o }); }
+    for (const g of A) { const m = median(g.qs.map(q => q.t)); for (const q of g.qs) if (q.t >= 2 * m && q.t >= 1500 && !seen.has(q.q)) seen.set(q.q, { q: q.q, a: q.a, o: q.o, ts: g.ts, quickKey: q.o }); }
     for (const g of T) for (const q of g.qs) if (q.r === 'n' && !seen.has(q.q)) seen.set(q.q, { q: q.q, a: q.a, o: q.o, ts: g.ts, quickKey: `o80:${q.o}` });
     const fastSince = (item) => D.filter(d => d.ts > item.ts).flatMap(d => d.qs).filter(q => q.q === item.q && q.t <= (quick[item.quickKey] ?? 3000)).length;
     review = [...seen.values()].filter(item => fastSince(item) < 2).slice(0, 24).map(item => ({ ...item, hits: 0 }));
