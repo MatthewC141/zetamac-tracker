@@ -154,6 +154,37 @@ await phone.shot('solo-what-if-390');
 phone.close();
 await b.ev(`document.querySelectorAll('#weak .slowq li .wi-x').forEach(x => x.getAttribute('aria-pressed') === 'true' && x.click())`);
 check('putting them back clears it', /^Press ×/.test(await b.text('#weak .wi-line')));
+// how many to list, and × all
+await b.click('#wi-box [data-slow-count="10"]');
+check('the list can show 10', await b.ev(`document.querySelectorAll('#wi-box .slowq li').length`) === 10);
+await b.click('#wi-box [data-slow-count="all"]');
+check('…or every question of the game', await b.ev(`document.querySelectorAll('#wi-box .slowq li').length`) === 30 && (await b.text('#wi-box [data-slow-count="all"]')) === 'All 30');
+await b.click('#wi-box [data-slow-count="5"]');
+await b.click('#wi-box .wi-all');
+check('× all leaves out every listed question at once', await b.ev(`document.querySelectorAll('#wi-box .slowq li.out').length`) === 5 &&
+  /^Without these 5 questions: about \d+ instead of 30/.test(await b.text('#wi-box .wi-line')) && (await b.text('#wi-box .wi-all')) === 'Put all back', await b.text('#wi-box .wi-line'));
+await b.click('#wi-box .wi-all');
+check('…and Put all back clears them', await b.ev(`document.querySelectorAll('#wi-box .slowq li.out').length`) === 0 && (await b.text('#wi-box .wi-all')) === '× all');
+
+// picking games from Results to look at together
+const games = await b.ev(`fetch('api/scores').then(r => r.json())`);
+const g30 = games.find(g => g.score === 30 && g.seconds === 120 && g.detail), g12 = games.find(g => g.score === 12 && g.seconds === 120 && g.detail);
+check('Pick is hidden until asked for', !(await b.shown('#recent .pick-game')));
+await b.click('#pick-toggle');
+check('Pick shows a tick box on games Weak spots can show', await b.shown('#recent .pick-game'));
+for (const g of [g30, g12]) await b.ev(`document.querySelector('#recent .pick-game[data-ts="${g.ts}"]').click()`);
+await b.until(`document.querySelector('[data-window="picked"]').getAttribute('aria-pressed') === 'true' && /these 2 games/.test(document.querySelector('#wi-box h3')?.textContent)`);
+check('ticking games switches Weak spots to them', (await b.text('[data-window="picked"]')) === 'Picked · 2' && /from 2 picked games/.test(await b.text('#weak .tower-note')));
+check('…each question labelled with its game', await b.ev(`document.querySelectorAll('#wi-box .slowq .wi-when').length`) === 5);
+await b.ev(`document.querySelector('#wi-box .slowq li .wi-x').click()`);
+check('leaving one out gives the average across the picked games: (30 + 12) / 2 = 21.0 → 22.2',
+  /^Without that question: an average of about 22\.2 instead of 21\.0 across 2 timed games \(\+1\.2\)/.test(await b.text('#wi-box .wi-line')), await b.text('#wi-box .wi-line'));
+await sleep(800); await b.ev(`document.querySelector('#wi-box').scrollIntoView({ block: 'center' })`); await b.shot('solo-picked');
+await b.go('', 1500);
+check('picks are remembered', (await b.text('[data-window="picked"]')) === 'Picked · 2');
+await b.ev(`document.querySelector('[data-clear-picks]').click()`);
+await b.until(`document.querySelector('[data-window="picked"]').hidden`);
+check('Clear picks empties them and goes back to the last 10 games', await b.ev(`document.querySelector('[data-window="10"]').getAttribute('aria-pressed')`) === 'true');
 await b.ev(`document.querySelector('[data-window="10"]').click()`);
 await b.shot('solo-dashboard', true);
 

@@ -23,11 +23,14 @@ function renderRecent() {
     const d = parseDate(g.date);
     const time = g.source === 'game' ? esc(g.ts.slice(11, 16)) : '<span class="src">logged</span>';
     const chev = '<span class="chev"></span>';
-    return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}><td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
+    // Pick (Weak spots shows these): arithmetic games and 80-in-8 tests with their question logs
+    const pickable = g.detail && ((g.mode || 'standard') === 'standard' || g.mode === 'o80');
+    const pick = `<td class="pickcol">${pickable ? `<input type="checkbox" class="pick-game" data-ts="${esc(g.ts)}"${picked.has(g.ts) ? ' checked' : ''} aria-label="Pick the game on ${esc(g.date)} for Weak spots">` : ''}</td>`;
+    return `<tr${g.detail ? ` class="has-detail" data-ts="${esc(g.ts)}" tabindex="0" aria-expanded="false"` : ''}>${pick}<td>${chev}${dateLabel(d)}</td><td>${time}</td>` +
       `<td class="num">${has(SQ_MODES, g.mode) ? `<span class="len sq">${SQ_MODES[g.mode]}</span>` : ''}${has(PRACTICE_MODES, g.mode) ? `<span class="len pr">${PRACTICE_TAGS[g.mode]}</span>` : ''}${g.mode === 'mixed' ? '<span class="len mx">Combined</span>' : ''}${isTest(g.mode) ? `<span class="len o8">${TESTS[g.mode][0]}</span>` : ''}${g.daily ? '<span class="len dy">Daily</span>' : ''}${g.seconds === 30 ? '<span class="len">30 s</span>' : ''}${g.seconds === 0 ? `<span class="len end">Endless ${clock(g.elapsed || 0)}</span>` : ''}<b>${g.score}</b>${pbs.has(g.i) ? '<span class="pb">PB</span>' : ''}</td>` +
       `<td class="num editcol"><button class="del" title="Delete this score" aria-label="Delete score ${g.score} on ${esc(g.date)}" data-i="${g.i}" data-ts="${esc(g.ts)}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8"/></svg></button></td></tr>`;
   });
-  $('#recent').innerHTML = rows.join('') || `<tr><td colspan="4" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
+  $('#recent').innerHTML = rows.join('') || `<tr><td colspan="5" class="src" style="padding:16px 6px">${allGames.length ? 'No games match these filters.' : 'No games yet.'}</td></tr>`;
   // Re-open whatever was expanded before a re-render.
   for (const ts of [...openGames]) {
     const tr = $(`#recent tr[data-ts="${CSS.escape(ts)}"]`);
@@ -140,7 +143,7 @@ async function expandGame(tr, sortSlow = false) {
   if (!row || !row.classList.contains('detail-row')) {
     row = document.createElement('tr');
     row.className = 'detail-row';
-    row.innerHTML = '<td colspan="4"><span class="src">Loading…</span></td>';
+    row.innerHTML = '<td colspan="5"><span class="src">Loading…</span></td>';
     tr.after(row);
   }
   tr.classList.add('open');
@@ -193,6 +196,7 @@ $('#recent').addEventListener('click', async e => {
   }
   const sort = e.target.closest('.bd-sort');
   if (sort) return expandGame(sort.closest('tr.detail-row').previousElementSibling, sort.dataset.slow !== '1');
+  if (e.target.closest('.pickcol')) return;  // ticking a game doesn't open it
   const game = e.target.closest('tr.has-detail');
   if (game && !e.target.closest('.del')) return toggleGame(game);
   const b = e.target.closest('.del');
@@ -206,6 +210,23 @@ $('#recent').addEventListener('click', async e => {
   }
 });
 
+// Pick: tick games for Weak spots, which then shows them together (its Picked view).
+$('#pick-toggle').addEventListener('click', e => {
+  const on = $('.recent-scroll').classList.toggle('picking');
+  e.target.setAttribute('aria-pressed', on);
+  e.target.textContent = on ? 'Done' : 'Pick';
+});
+$('#recent').addEventListener('change', e => {
+  const box = e.target.closest('.pick-game');
+  if (!box) return;
+  box.checked ? picked.add(box.dataset.ts) : picked.delete(box.dataset.ts);
+  savePicked();
+  // Weak spots follows: the picked games' kind (arithmetic or 80 in 8), on its Picked view
+  const g = allGames.find(x => x.ts === box.dataset.ts);
+  if (box.checked && g) weakGame = g.mode === 'o80' ? 'o80' : 'standard';
+  try { localStorage.setItem('zm-weak-game', weakGame); } catch {}
+  setWeakWindow(picked.size ? 'picked' : '10');
+});
 $('#edit-toggle').addEventListener('click', e => {
   const on = $('.recent-scroll').classList.toggle('editing');
   e.target.setAttribute('aria-pressed', on);
