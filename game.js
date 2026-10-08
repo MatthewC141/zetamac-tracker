@@ -6,7 +6,7 @@
 //   GAME.label(cfg)            the game's name on the saved line, or
 //   GAME.saved(cfg, result)    the whole saved line: { text | html, pb }
 //   GAME.begin(cfg), GAME.right(typed, answer), GAME.answered(question, ms),
-//   GAME.afterSave(cfg), GAME.finished(cfg, log), GAME.loaded()   optional hooks
+//   GAME.afterSave(cfg), GAME.loaded()   optional hooks
 const input = $('#answer');
 let log = [], current = null, prevLen = 0, startAt = 0, cfg, answer = '', score = 0, endAt = 0, timer = 0, running = false, history = [];
 
@@ -105,37 +105,23 @@ function finish() {
   $('#final').textContent = score;
   $('#end').style.display = 'block';
   zmSay(`${cfg.duration === 0 ? 'Done' : 'Time'}. You scored ${score}.`);
-  GAME.finished?.(cfg, log);
   save(score, elapsed);
   // Short pause so keys mashed at the buzzer don't trigger "Try again".
   setTimeout(() => $('#again').focus(), 700);
 }
 
-function showSettings() {
-  $('#game').style.display = 'none';
-  $('#settings').style.display = 'block';
-  $('#start').focus();
-}
-
-// Esc during a game: an endless run ends and saves (it has no clock to end it); a timed game is
-// thrown away, unsaved, and it's back to the settings. The daily challenge ignores it, since
-// starting it uses the day's one try.
-function quit() {
-  clearInterval(timer);
-  running = false;
-  input.disabled = true;
-  zmSay('Game stopped, not saved.');
-  showSettings();
-}
-
 $('#start').addEventListener('click', () => start());
 $('#stop').addEventListener('click', e => { e.preventDefault(); if (running) finish(); });
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || !running || cfg.daily) return;
-  if (cfg.duration === 0) finish(); else quit();
+  if (e.key === 'Escape' && running && cfg.duration === 0) finish();
 });
 $('#again').addEventListener('click', e => { e.preventDefault(); start(); });
-$('#change').addEventListener('click', e => { e.preventDefault(); showSettings(); });
+$('#change').addEventListener('click', e => {
+  e.preventDefault();
+  $('#game').style.display = 'none';
+  $('#settings').style.display = 'block';
+  $('#start').focus();
+});
 
 fetch('api/scores').then(r => r.json()).then(d => { if (Array.isArray(d)) history = d; }).catch(() => {}).then(() => GAME.loaded?.());
 updateNote();

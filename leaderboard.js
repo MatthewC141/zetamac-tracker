@@ -107,7 +107,7 @@
       const you = mine(r.username);
       const all = [...view.rows, ...view.around], ahead = you && all.filter(x => x.pos < r.pos && x.score > r.score).sort((x, y) => y.pos - x.pos)[0];
       return `<li class="${b.team}${you ? ' me' : ''}"><span class="pos">${r.place}</span><span class="stripe"></span>` +
-        `<span class="who">${nameLink(r.username)}${r.source === 'zetamac' ? '<span class="zm" title="Played on arithmetic.zetamac.com">on zetamac</span>' : ''}${you ? '<span class="you">You</span>' : ''}${ahead ? `<span class="to-pass">${ahead.score - r.score + 1} to pass ${esc(ahead.username)}</span>` : ''}</span>` +
+        `<span class="who">${nameLink(r.username)}${you ? '<span class="you">You</span>' : ''}${ahead ? `<span class="to-pass">${ahead.score - r.score + 1} to pass ${esc(ahead.username)}</span>` : ''}</span>` +
         `<span class="figure${r.place === 1 ? ' p1' : ''}">${figure(b, r)}</span><span class="gap">${r === top ? 'P1' : `−${top.score - r.score}`}</span><span class="date">${b.elo ? `${r.wins}–${r.losses}` : b.daily ? '' : dateText(r.date)}</span></li>`;
     };
     const skipped = view.around.length ? view.around[0].pos - view.rows.length - 1 : 0;

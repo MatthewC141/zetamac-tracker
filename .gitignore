@@ -1,23 +1,7 @@
-*.iml
-.gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-node_modules/
-dist/
-.env
-xcuserdata/
-DerivedData/
-__pycache__/
-.venv/
-
-# Zetamach
 zetamac
 scores.csv
 *.tmp
+.DS_Store
 details/
+node_modules/
 tests/shots/

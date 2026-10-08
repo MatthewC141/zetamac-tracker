@@ -1,4 +1,4 @@
-// The progress dashboard, part 3 of 9: weak spots, the timing tower of question kinds.
+// The progress dashboard, part 3 of 8: weak spots, the timing tower of question kinds.
 // ---------- first viewport: weak spots (the timing tower) ----------
 // Arithmetic operations ranked by seconds per question, slowest first. Sector colors follow live
 // timing: purple = fastest operation, green = faster than in the previous window, yellow = slower.
@@ -57,42 +57,13 @@ const factRow = (f, i, top) => {
   const ranked = f.n >= MIN_FACT;
   return `<li class="op-${f.op}${ranked ? '' : ' none'}"><span class="pos">${ranked ? i + 1 : ''}</span><span class="stripe"></span>` +
     `<span class="fact-name">${esc(f.k)}</span><span class="track" aria-hidden="true"><i style="transform:scaleX(${(ranked ? (f.avg / top * 100).toFixed(1) : 0) / 100})"></i></span>` +
-    `<span class="time">${f.n ? `${secs2(f.avg)}<small>s</small>` : '—'}</span>` +
-    // A type whose only answers were left out as outliers has come up; it just has no time to show.
-    `<span class="gap"${!f.n && f.out ? ` title="${plural(f.out, 'answer')} left out as unusually slow"` : ''}>${!f.n ? (f.out ? 'left out' : 'none yet') : ranked ? plural(f.n, 'q') : 'too few'}</span></li>`;
+    `<span class="time">${f.n ? `${secs2(f.avg)}<small>s</small>` : '—'}</span><span class="gap">${!f.n ? 'none yet' : ranked ? plural(f.n, 'q') : 'too few'}</span></li>`;
 };
-
-// The Guide tab that teaches a kind of question ("× 7", "– borrow") or an operation ("div").
-const GUIDE_TABS = { add: 'add', sub: 'sub', mul: 'mul', div: 'div', '+': 'add', '–': 'sub', '×': 'mul', '÷': 'div' };
-const guideTab = kindOrOp => GUIDE_TABS[kindOrOp] || GUIDE_TABS[kindOrOp.split(' ')[0]] || null;
-const trickLink = (kindOrOp, text) => {
-  const tab = guideTab(kindOrOp);
-  return tab ? `<a class="trick" href="guide.html#${tab}">${text}</a>` : '';
-};
-// Your two slowest operations, linked to their tricks, and remembered so the Guide can mark them.
-function trickLine(rows) {
-  const slowest = rows.slice(0, 2).map(r => r.op);
-  try { localStorage.setItem('zm-slow-ops', JSON.stringify(slowest)); } catch {}
-  return `<p class="trick-line">Learn the trick: ${slowest.map(op => trickLink(op, OP_NAMES[op])).join(' · ')}</p>`;
-}
-
-// The kinds of question you most often corrected: a fact you mistype is one you don't quite know,
-// even when its time looks fine.
-const CORRECTED_TOP = 5;
-function correctedHTML(qs) {
-  const kinds = window.ZM_PROBLEMS.correctedKinds(qs).slice(0, CORRECTED_TOP);
-  if (!kinds.length) return '';
-  return `<div class="facts-head"><h3>Most corrected</h3></div>` +
-    `<ol class="corrected">${kinds.map(k => `<li><span class="fact-name">${esc(k.kind)}</span>` +
-      `<span>corrected <b>${k.fixed}</b> of ${plural(k.n, 'answer')}</span><span class="rate">${Math.round(k.rate * 100)}%</span>` +
-      `${trickLink(k.kind, 'Trick')}</li>`).join('')}</ol>` +
-    `<p class="facts-note">Answers where you deleted a digit before getting it right · types with fewer than 3 answers aren’t listed</p>`;
-}
 
 function factsHTML(qs) {
   const used = factsTrim ? trimOutliers(qs) : qs;
   const dropped = qs.length - used.length;
-  const avg = avgBy(used, factOf), all = avgBy(qs, factOf);
+  const avg = avgBy(used, factOf);
   const head = `<div class="facts-head"><h3>Slowest question types</h3>` +
     `<div class="facts-tools"><div class="seg" role="group" aria-label="Question types to show">` +
       `<button type="button" data-facts="top" aria-pressed="${!factsAll}">Top 6</button><button type="button" data-facts="all" aria-pressed="${factsAll}" title="Carrying and borrowing for + and –, and every × and ÷ fact from 2 to 12">All facts</button></div>` +
@@ -106,7 +77,7 @@ function factsHTML(qs) {
   // Every type, one column per operation, slowest first; types not seen yet sit at the bottom.
   // Addition and subtraction split by carrying and borrowing; × and ÷ by the 2–12 fact.
   const col = (op, rows, title, cls = '') => {
-    const list = rows.map(([key, label]) => ({ op, n: 0, avg: 0, ...avg[key], k: label, out: (all[key]?.n || 0) - (avg[key]?.n || 0) }))
+    const list = rows.map(([key, label]) => ({ op, n: 0, avg: 0, ...avg[key], k: label }))
       .sort((a, b) => (b.n >= MIN_FACT) - (a.n >= MIN_FACT) || (b.n > 0) - (a.n > 0) || b.avg - a.avg);
     const top = Math.max(...list.filter(f => f.n >= MIN_FACT).map(f => f.avg), 1);
     return `<div class="facts-col ${cls}"><h4>${title}</h4><ol class="tower facts">${list.map((f, i) => factRow(f, i, top)).join('')}</ol></div>`;
@@ -118,35 +89,14 @@ function factsHTML(qs) {
     col('mul', table('×'), 'Multiplication') + col('div', table('÷'), 'Division') + `</div>` + note;
 }
 
-// What if: the score a timed game would likely have had without some of its questions. Their time
-// goes back on the clock and is spent at the game's own pace on the rest, so each crossed-out
-// question costs its answer and buys back (its time ÷ the average time of the others) answers.
-function whatIf(qs, leftOut) {
-  const kept = qs.filter((q, i) => !leftOut.has(i));
-  if (!kept.length || kept.length === qs.length) return null;
-  const freed = qs.reduce((t, q, i) => t + (leftOut.has(i) ? q.t : 0), 0);
-  const pace = kept.reduce((t, q) => t + q.t, 0) / kept.length;
-  return { score: qs.length, estimate: kept.length + freed / pace, freed, pace, count: qs.length - kept.length };
-}
-const whatIfLine = w => !w ? '' : `<b>Without ${w.count === 1 ? 'that question' : `these ${w.count}`}: about ${w.estimate.toFixed(1)}</b> instead of ${w.score} ` +
-  `(+${(w.estimate - w.score).toFixed(1)}). The ${secs2(w.freed)} s ${w.count === 1 ? 'it' : 'they'} took, at your ${secs2(w.pace)} s a question, buys about ` +
-  `${(w.freed / w.pace).toFixed(1)} more answers.`;
-
-// "Last game" also lists that game's five slowest questions, exactly as they came up. In a timed
-// game each can be crossed out to see the what-if score.
-let lastGameQs = [], leftOut = new Set();
-function slowestHTML(qs, timed) {
-  lastGameQs = qs;
-  leftOut = new Set();
-  const slow = qs.map((q, i) => ({ ...q, i })).sort((a, b) => b.t - a.t).slice(0, 5);
+// "Last game" also lists that game's five slowest questions, exactly as they came up.
+function slowestHTML(qs) {
+  const slow = [...qs].sort((a, b) => b.t - a.t).slice(0, 5);
   if (!slow.length) return '';
-  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq${timed ? ' whatif' : ''}">${slow.map((q, n) =>
-    `<li class="op-${esc(q.o)}" data-q="${q.i}"><span class="pos">${n + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
+  return `<div class="facts-head"><h3>Slowest questions in this game</h3></div><ol class="tower facts slowq">${slow.map((q, i) =>
+    `<li class="op-${esc(q.o)}"><span class="pos">${i + 1}</span><span class="stripe"></span><span class="fact-name">${esc(q.q)} = ${esc(q.a)}</span>` +
     `<span class="track" aria-hidden="true"><i style="transform:scaleX(${(q.t / slow[0].t).toFixed(3)})"></i></span>` +
-    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span>` +
-    (timed ? `<button type="button" class="leave-out" data-leave-out="${q.i}" aria-pressed="false" aria-label="Leave out ${esc(q.q)}" title="What if this question never came up?">✕</button>` : '') +
-    `</li>`).join('')}</ol>` +
-    (timed ? '<p class="whatif-line" id="whatif-line" aria-live="polite">Cross out a question with ✕ to see what you’d likely have scored without it.</p>' : '');
+    `<span class="time">${secs2(q.t)}<small>s</small></span><span class="gap">${q.c ? `${q.c} fix${q.c === 1 ? '' : 'es'}` : ''}</span></li>`).join('')}</ol>`;
 }
 
 async function renderWeak() {
@@ -166,11 +116,8 @@ async function renderWeak() {
   const n = weakWindow === 'all' ? timed.length : Number(weakWindow);
   const cur = timed.slice(0, n);
   const prev = weakWindow === 'all' ? [] : timed.slice(n, n + 10);
-  // Each game's log, fetched once: the questions for the tower, and the 2-minute games' for pacing.
-  const logsOf = list => getDetails(list.map(g => g.ts)).catch(() => []);
-  const [curLogs, prevLogs] = await Promise.all([logsOf(cur), logsOf(prev)]);
-  const qs = curLogs.flat(), prevQs = prevLogs.flat();
-  const paceLogs = curLogs.filter((log, i) => paced(cur[i]));
+  const load = async list => (await getDetails(list.map(g => g.ts)).catch(() => [])).flat();
+  const [qs, prevQs] = await Promise.all([load(cur), load(prev)]);
   if (run !== weakRun) return;  // a newer render started while these loaded
   if (o80) return renderWeakO80(el, qs, prevQs, cur, prev);
 
@@ -191,7 +138,7 @@ async function renderWeak() {
       `<span class="gap">${r.avg === fastest ? 'Fastest' : `+${secs2(r.avg - fastest)}`}</span></li>`).join('')}</ol>` +
     `<div class="tower-note"><span>Seconds per question · ${plural(qs.length, 'question')} from ${plural(cur.length, 'game')}${prev.length ? `, compared with the ${prev.length === 1 ? 'game' : plural(prev.length, 'game')} before` : ''}</span>` +
     `<span class="key"><span class="s-purple">Fastest</span>${prev.length ? '<span class="s-green">Faster</span><span class="s-yellow">Slower</span>' : weakWindow !== 'all' ? '<span>Faster / slower colors start after your next timed game</span>' : ''}</span></div>` +
-    trickLine(rows) + paceHTML(paceLogs) + DRILL + factsHTML(qs) + correctedHTML(qs) + (weakWindow === '1' ? slowestHTML(qs, cur[0]?.seconds > 0) : '');
+    DRILL + factsHTML(qs) + (weakWindow === '1' ? slowestHTML(qs) : '');
 
   renderHeatmap();  // the calendar beside the tower sizes itself to the tower's new height
   if (reduceMotion.matches) return;
@@ -205,17 +152,6 @@ async function renderWeak() {
       li.addEventListener('animationend', () => li.classList.remove('lit'), { once: true });
     }
   }
-}
-
-// Pacing over the same games' 2-minute rounds: right answers per 30-second quarter, averaged.
-function paceHTML(logs) {
-  const played = logs.filter(paceable);
-  if (!played.length) return '';
-  const counts = played.map(paceOf);
-  const avg = [0, 1, 2, 3].map(i => counts.reduce((t, c) => t + c[i], 0) / played.length);
-  const trend = paceTrend(avg);
-  return `<p class="pace-line">Answers per 30 s, ${played.length === 1 ? 'in this 2-minute game' : `averaged over ${plural(played.length, '2-minute game')}`}: ` +
-    `${paceFigures(avg, played.length === 1 ? 0 : 1)}${trend ? ` · ${trend}` : ''}</p>`;
 }
 
 // A practice run made of these: Practice's "Your weak spots" drill.
@@ -262,16 +198,6 @@ $('#weak-game').addEventListener('click', e => {
 });
 
 $('#weak').addEventListener('click', e => {
-  const cross = e.target.closest('[data-leave-out]');
-  if (cross) {
-    const i = Number(cross.dataset.leaveOut);
-    leftOut.has(i) ? leftOut.delete(i) : leftOut.add(i);
-    cross.setAttribute('aria-pressed', leftOut.has(i));
-    cross.closest('li').classList.toggle('left-out', leftOut.has(i));
-    const w = whatIf(lastGameQs, leftOut);
-    $('#whatif-line').innerHTML = w ? whatIfLine(w) : 'Cross out a question with ✕ to see what you’d likely have scored without it.';
-    return;
-  }
   const b = e.target.closest('[data-facts]');
   if (!b) return;
   if (b.dataset.facts === 'trim') factsTrim = !factsTrim;

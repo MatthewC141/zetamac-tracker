@@ -112,8 +112,8 @@
       const rows = await r.json();
       if (!cloud.user()) return expired();  // the sign-in ran out and couldn't be renewed
       if (!r.ok) throw new Error(rows.error);
-      const played = rows.filter(g => g.source !== 'manual').length;
-      $('#me-sub').textContent = `Signed in · ${plural(rows.length, 'game')} in your account${rows.length ? `, ${played} played here or on zetamac` : ''}.`;
+      const played = rows.filter(g => g.source === 'game').length;
+      $('#me-sub').textContent = `Signed in · ${plural(rows.length, 'game')} in your account${rows.length ? `, ${played} played on the site` : ''}.`;
     } catch (err) {
       $('#me-sub').textContent = err.message || 'Couldn’t load your games.';
     }

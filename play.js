@@ -22,8 +22,8 @@ function readSettings() {
 function updateNote() {
   const s = readSettings();
   $('#custom-note').textContent = s.error ? s.error
-    : s.tracked ? (s.duration === 30 ? 'Saved to the 30-second section of your tracker. Esc during a game quits without saving.'
-      : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : 'Esc during a game quits without saving.')
+    : s.tracked ? (s.duration === 30 ? 'Saved to the 30-second section of your tracker.'
+      : s.duration === 0 ? 'No timer. Press Esc or Stop when you’re done; your run counts toward your endless record.' : '')
     : 'Custom settings: this game won’t be saved to your tracker. (Tracked: default ranges at 120, 30 seconds or endless.)';
 }
 document.querySelectorAll('#settings input, #settings select').forEach(el => el.addEventListener('input', updateNote));
@@ -46,26 +46,8 @@ const GAME = {
     return { text: `Saved · ${label}personal best ${Math.max(prevBest, final)}${proj}` };
   },
   afterSave(cfg) { if (cfg.daily) daily.render(); },
-  finished(cfg, log) {
-    if (!cfg.tracked) { $('#summary').textContent = ''; return; }  // custom ranges don't compare with your usual
-    $('#summary').replaceChildren(...zmSummary.lines(log, recentLogs).map(line => Object.assign(document.createElement('p'), { textContent: line })));
-    recentLogs = [log.slice(), ...recentLogs].slice(0, RECENT);
-  },
-  loaded() { daily.render(); loadRecentLogs(); },
+  loaded() { daily.render(); },
 };
-
-// The question logs of your last few Arithmetic games (daily challenges included), newest first,
-// for the summary under the score. Fetched once when the page opens; each game played adds its own.
-const RECENT = 10;
-let recentLogs = [];
-async function loadRecentLogs() {
-  const recent = history.filter(g => (g.mode === 'standard' || g.mode === 'daily') && g.detail).slice(-RECENT);
-  if (!recent.length) return;
-  try {
-    const { details } = await (await fetch(`api/details?ts=${recent.map(g => encodeURIComponent(g.ts)).join(',')}`)).json();
-    recentLogs = recent.map(g => details?.[g.ts]).filter(Array.isArray).reverse();
-  } catch {}  // without them the summary names the slowest question instead
-}
 
 // ---- the daily challenge ----
 // Everyone gets the same 2 minutes of zetamac arithmetic each calendar day (problems.js builds it

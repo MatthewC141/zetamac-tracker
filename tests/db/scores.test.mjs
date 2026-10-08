@@ -53,7 +53,7 @@ check("a player can't delete someone else's scores", (await db.query('select cou
 // ---- the leaderboard view ----
 const lb = (await as(null, `select username, score from leaderboard where mode = 'standard' and seconds = 120`)).rows;
 check('the board holds each player’s best counted game', JSON.stringify(lb) === JSON.stringify([{ username: 'alex', score: 30 }]), lb);
-check('the board shows names, figures and where each game was played', Object.keys((await as(null, 'select * from leaderboard limit 1')).rows[0]).join() === 'username,mode,seconds,score,elapsed,date,wrongs,source');
+check('the board shows names and figures only', Object.keys((await as(null, 'select * from leaderboard limit 1')).rows[0]).join() === 'username,mode,seconds,score,elapsed,date,wrongs');
 check('drills stay off the board', (await as(null, `select count(*)::int n from leaderboard where mode = 'drill'`)).rows[0].n === 0);
 
 // ---- private accounts ----
