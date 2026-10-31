@@ -1,4 +1,4 @@
-# Zetamach
+# Zetamac-tracker
 
 A clone of [zetamac](https://arithmetic.zetamac.com) that saves every game, plus a dashboard to track progress over time. I made it to practice for trading interview mental math tests.
 
@@ -15,7 +15,7 @@ A clone of [zetamac](https://arithmetic.zetamac.com) that saves every game, plus
 - Per-question timing, so you can see which kinds of problems slow you down, and a replay of any saved game
 - Dashboard with score history, daily bests, a calendar heatmap, and slowest question types
 - A guide page with mental math shortcuts for each operation and the quant tests
-- Optional accounts, public profiles and a leaderboard (all time or this week) on Supabase
+- Optional accounts, public profiles, and a leaderboard (all time or this week) on Supabase
 - Installs on a phone and plays offline; games played offline while signed in go up when you're back online
 
 ## Running locally
